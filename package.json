@@ -17,7 +17,7 @@
     "lint:web": "npm run lint -w @brickshare/web",
     "test": "npm run test -w @brickshare/web",
     "test:watch": "npm run test:watch -w @brickshare/web",
-    "dump-schema": "supabase db dump --schema public --file docs/schema.sql || echo '⚠️  Error: Ejecuta primero: supabase login && supabase link --project-ref tevoogkifiszfontzkgd'"
+    "dump-schema": "bash scripts/update-schema-docs.sh"
   },
   "engines": {
     "node": ">=18"

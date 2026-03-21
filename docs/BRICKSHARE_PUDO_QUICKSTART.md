@@ -10,7 +10,7 @@ Sistema de códigos QR para validar entregas y devoluciones en puntos Brickshare
 
 ```bash
 # Aplicar migración de base de datos
-supabase db push
+supabase db reset
 ```
 
 ### 2. Desplegar Edge Functions

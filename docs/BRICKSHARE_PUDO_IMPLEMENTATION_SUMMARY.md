@@ -324,7 +324,7 @@ npm run test:brickshare-qr
 ### 1. Base de Datos
 ```bash
 # Aplicar migración
-supabase db push
+supabase db reset
 ```
 
 ### 2. Edge Functions

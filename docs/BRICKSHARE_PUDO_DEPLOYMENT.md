@@ -3,7 +3,7 @@
 ## ✅ Pre-Deployment Checklist
 
 ### 1. Database Setup
-- [ ] Aplicar migración: `supabase db push`
+- [ ] Aplicar migración: `supabase db reset`
 - [ ] Verificar que se crearon las tablas:
   - [ ] `brickshare_pudo_locations`
   - [ ] `qr_validation_logs`

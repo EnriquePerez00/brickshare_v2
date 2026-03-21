@@ -124,7 +124,7 @@
 supabase db reset
 
 # Against remote
-supabase db push
+supabase db reset
 
 # Generate TypeScript types after schema changes
 supabase gen types typescript --project-id <id> > src/integrations/supabase/types.ts
