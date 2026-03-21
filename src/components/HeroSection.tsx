@@ -71,26 +71,6 @@ const HeroSection = () => {
             </Button>
           </motion.div>
 
-          {/* Stats */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.4 }}
-            className="flex flex-wrap gap-8 mt-12 pt-8 border-t border-border"
-          >
-            <div>
-              <p className="text-3xl font-display font-bold text-foreground">500+</p>
-              <p className="text-sm text-muted-foreground">Sets disponibles</p>
-            </div>
-            <div>
-              <p className="text-3xl font-display font-bold text-foreground">2,000+</p>
-              <p className="text-sm text-muted-foreground">Familias felices</p>
-            </div>
-            <div>
-              <p className="text-3xl font-display font-bold text-foreground">15,000+</p>
-              <p className="text-sm text-muted-foreground">Horas de empleo generado</p>
-            </div>
-          </motion.div>
         </div>
       </div>
     </section>

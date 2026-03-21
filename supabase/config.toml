@@ -12,3 +12,8 @@ verify_jwt = true
 [functions.add-lego-set]
 verify_jwt = false
 
+[functions.correos-pudo]
+verify_jwt = false
+
+[functions.brickman-chat]
+verify_jwt = false

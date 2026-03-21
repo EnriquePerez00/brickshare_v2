@@ -29,8 +29,10 @@ export function useSavePudoPoint() {
             if (!user) throw new Error("User not authenticated");
             await saveUserPudoPoint(user.id, pudoData);
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["user-pudo-point", user?.id] });
+        onSuccess: async () => {
+            // Invalidate and refetch immediately to ensure UI updates
+            await queryClient.invalidateQueries({ queryKey: ["user-pudo-point", user?.id] });
+            await queryClient.refetchQueries({ queryKey: ["user-pudo-point", user?.id] });
         },
     });
 }

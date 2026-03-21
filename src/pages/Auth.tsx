@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
@@ -23,7 +24,7 @@ const Auth = () => {
 
   const onlySignup = searchParams.get("onlySignup") === "true";
 
-  const [mode, setMode] = useState<"login" | "signup" | "forgot-password" | "update-password">(
+  const [mode, setMode] = useState<"login" | "signup" | "update-password">(
     type === "recovery" ? "update-password" : (searchParams.get("mode") === "signup" || onlySignup ? "signup" : "login")
   );
 
@@ -34,6 +35,11 @@ const Auth = () => {
   }, [onlySignup]);
 
   const [email, setEmail] = useState("");
+  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
+  const [isForgotPasswordSubmitting, setIsForgotPasswordSubmitting] = useState(false);
+  const [isVerificationOpen, setIsVerificationOpen] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
@@ -73,16 +79,14 @@ const Auth = () => {
       }
     }
 
-    if (mode !== "forgot-password") {
-      const passwordResult = passwordSchema.safeParse(password);
-      if (!passwordResult.success) {
-        newErrors.password = passwordResult.error.errors[0].message;
-      }
+    const passwordResult = passwordSchema.safeParse(password);
+    if (!passwordResult.success) {
+      newErrors.password = passwordResult.error.errors[0].message;
+    }
 
-      if (mode === "update-password") {
-        if (password !== confirmPassword) {
-          newErrors.confirmPassword = "Las contraseñas no coinciden";
-        }
+    if (mode === "update-password") {
+      if (password !== confirmPassword) {
+        newErrors.confirmPassword = "Las contraseñas no coinciden";
       }
     }
 
@@ -130,27 +134,10 @@ const Auth = () => {
           variant: "destructive",
         });
       } else {
-        toast({
-          title: "¡Cuenta creada!",
-          description: "Revisa tu email para confirmar la cuenta",
-        });
-        setMode("login");
+        setRegisteredEmail(email);
+        setIsVerificationOpen(true);
       }
-    } else if (mode === "forgot-password") {
-      const { error } = await resetPassword(email);
-      if (error) {
-        toast({
-          title: "Error",
-          description: error.message,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Email enviado",
-          description: "Revisa tu bandeja de entrada para recuperar tu contraseña",
-        });
-        setMode("login");
-      }
+
     } else if (mode === "update-password") {
       const { error } = await updateUserPassword(password);
       if (error) {
@@ -162,13 +149,35 @@ const Auth = () => {
       } else {
         toast({
           title: "Contraseña actualizada",
-          description: "Tu contraseña ha sido cambiada correctamente",
+          description: "Tu contraseña ha sido cambiada correctamente. Por favor, inicia sesión.",
         });
-        redirectBasedOnRole();
+        setMode("login");
+        navigate("/auth"); // Reset query params to avoid staying in recovery mode
       }
     }
 
     setIsSubmitting(false);
+  };
+
+  const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const emailResult = emailSchema.safeParse(forgotPasswordEmail);
+    if (!emailResult.success) {
+      toast({ title: "Error", description: emailResult.error.errors[0].message, variant: "destructive" });
+      return;
+    }
+
+    setIsForgotPasswordSubmitting(true);
+    const { error } = await resetPassword(forgotPasswordEmail);
+    setIsForgotPasswordSubmitting(false);
+
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Email enviado", description: "Revisa tu bandeja de entrada para recuperar tu contraseña" });
+      setIsForgotPasswordOpen(false);
+      setForgotPasswordEmail("");
+    }
   };
 
   const handleGoogleSignIn = async () => {
@@ -307,7 +316,7 @@ const Auth = () => {
                           {mode === "login" && (
                             <button
                               type="button"
-                              onClick={() => setMode("forgot-password")}
+                              onClick={() => setIsForgotPasswordOpen(true)}
                               className="text-xs text-primary font-medium hover:text-primary/80 transition-colors"
                             >
                               ¿Olvidaste tu contraseña?
@@ -451,35 +460,17 @@ const Auth = () => {
               </div>
             </div>
           ) : (
-            /* Forgot Password or Update Password Views */
+            /* Update Password View */
             <div className="p-8">
               <h1 className="text-2xl font-display font-bold text-foreground text-center mb-2">
-                {mode === "forgot-password" ? "Recuperar contraseña" : "Nueva contraseña"}
+                Nueva contraseña
               </h1>
               <p className="text-muted-foreground text-center text-sm mb-8">
-                {mode === "forgot-password"
-                  ? "Te enviaremos un email para restablecer tu acceso"
-                  : "Introduce tu nueva contraseña segura"}
+                Introduce tu nueva contraseña segura
               </p>
 
               <form onSubmit={handleSubmit} className="space-y-4">
-                {mode === "forgot-password" ? (
-                  <div className="space-y-2">
-                    <Label htmlFor="email" className="text-sm font-medium">Email</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="tu@email.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="pl-10 h-11 bg-muted/30 border-border/50"
-                        required
-                      />
-                    </div>
-                  </div>
-                ) : (
+                <>
                   <>
                     <div className="space-y-2">
                       <Label htmlFor="password">Nueva contraseña</Label>
@@ -512,7 +503,7 @@ const Auth = () => {
                       </div>
                     </div>
                   </>
-                )}
+                </>
 
                 <Button
                   type="submit"
@@ -520,23 +511,74 @@ const Auth = () => {
                   className="w-full h-11 gradient-hero font-bold mt-4"
                 >
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {mode === "forgot-password" ? "Enviar instrucciones" : "Actualizar contraseña"}
+                  Actualizar contraseña
                 </Button>
-
-                {mode === "forgot-password" && (
-                  <button
-                    type="button"
-                    onClick={() => setMode("login")}
-                    className="w-full text-sm text-muted-foreground hover:text-primary transition-colors flex items-center justify-center gap-2 mt-4"
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                    Volver al inicio de sesión
-                  </button>
-                )}
               </form>
             </div>
           )}
         </div>
+
+        {/* Password Reset Dialog */}
+        <Dialog open={isForgotPasswordOpen} onOpenChange={setIsForgotPasswordOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Recuperar contraseña</DialogTitle>
+              <DialogDescription>
+                Introduce tu email y te enviaremos un enlace para restablecer tu contraseña.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleForgotPasswordSubmit} className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <Label htmlFor="forgot-email">Email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="forgot-email"
+                    type="email"
+                    placeholder="tu@email.com"
+                    value={forgotPasswordEmail}
+                    onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                    className="pl-10 h-11 bg-muted/30 border-border/50"
+                    required
+                  />
+                </div>
+              </div>
+              <Button type="submit" disabled={isForgotPasswordSubmitting} className="w-full gradient-hero font-bold">
+                {isForgotPasswordSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Enviar enlace
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Verification Dialog */}
+        <Dialog open={isVerificationOpen} onOpenChange={(open) => {
+          setIsVerificationOpen(open);
+          if (!open) setMode("login");
+        }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Verifica tu cuenta</DialogTitle>
+              <DialogDescription>
+                Hemos enviado un correo a <span className="font-semibold">{registeredEmail}</span> para confirmar tu registro.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col items-center justify-center py-6 space-y-4 text-center">
+              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <Mail className="h-6 w-6 text-primary" />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Por favor, revisa tu bandeja de entrada o la carpeta de spam y haz clic en el enlace para activar tu cuenta.
+              </p>
+              <Button type="button" onClick={() => {
+                setIsVerificationOpen(false);
+                setMode("login");
+              }} className="w-full font-bold mt-2">
+                Entendido
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Footer info */}
         <p className="mt-8 text-center text-xs text-muted-foreground/60">

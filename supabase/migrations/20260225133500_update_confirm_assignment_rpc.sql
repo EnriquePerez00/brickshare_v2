@@ -1,6 +1,9 @@
 -- Update confirm_assign_sets_to_users RPC to include PUDO and set details
 -- This allows the Edge Function to perform Correos pre-registration immediately after assignment
 
+-- Drop existing function first to allow changing the return type
+DROP FUNCTION IF EXISTS public.confirm_assign_sets_to_users(UUID[]);
+
 CREATE OR REPLACE FUNCTION public.confirm_assign_sets_to_users(p_user_ids UUID[])
 RETURNS TABLE (
     envio_id UUID, 

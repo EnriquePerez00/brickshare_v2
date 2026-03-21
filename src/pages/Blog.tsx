@@ -275,7 +275,7 @@ const Blog = () => {
                       <Badge variant="secondary" className="text-xs">
                         {post.category}
                       </Badge>
-                      <span className="text-xs text-muted-foreground">{post.readTime} lectura</span>
+                      <span className="text-xs text-muted-foreground">{post.readTime} de lectura</span>
                     </div>
                     <h3 className="text-xl font-semibold text-foreground mb-3 group-hover:text-primary transition-colors">
                       {post.title}

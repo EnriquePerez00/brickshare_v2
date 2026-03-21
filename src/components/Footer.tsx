@@ -95,17 +95,9 @@ const Footer = () => {
             <ul className="space-y-3">
               <li className="flex items-center gap-3 text-sm text-primary-foreground/70">
                 <Mail className="h-4 w-4" />
-                <Link to="/contacto" className="hover:text-primary-foreground transition-colors">
-                  hola@brickshare.es
-                </Link>
-              </li>
-              <li className="flex items-center gap-3 text-sm text-primary-foreground/70">
-                <Phone className="h-4 w-4" />
-                +34 900 123 456
-              </li>
-              <li className="flex items-start gap-3 text-sm text-primary-foreground/70">
-                <MapPin className="h-4 w-4 mt-0.5" />
-                <span>Calle de la Innovación, 42<br />28001 Madrid, España</span>
+                <a href="mailto:info@brickshare.eu" className="hover:text-primary-foreground transition-colors">
+                  info@brickshare.eu
+                </a>
               </li>
             </ul>
           </div>

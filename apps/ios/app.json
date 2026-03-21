@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "Brickshare",
+    "slug": "brickshare",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "es.brickshare.app"
+    },
+    "android": {
+      "package": "es.brickshare.app"
+    },
+    "scheme": "brickshare"
+  }
+}

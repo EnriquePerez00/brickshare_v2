@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion } from "framer-motion";
-import { Mail, Phone, MapPin, Send, Loader2 } from "lucide-react";
+import { Mail, Send, Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -60,7 +60,7 @@ const Contacto = () => {
         setIsSubmitting(true);
         try {
             await sendEmail({
-                to: "hola@brickshare.es",
+                to: "info@brickshare.eu",
                 subject: `Nuevo mensaje de contacto: ${values.subject}`,
                 html: `
           <h3>Nuevo mensaje de contacto</h3>
@@ -117,27 +117,9 @@ const Contacto = () => {
                                         </div>
                                         <div>
                                             <p className="font-semibold">Email</p>
-                                            <p className="text-muted-foreground">hola@brickshare.es</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-start gap-4">
-                                        <div className="p-3 rounded-xl bg-primary/10 text-primary">
-                                            <Phone className="h-6 w-6" />
-                                        </div>
-                                        <div>
-                                            <p className="font-semibold">Teléfono</p>
-                                            <p className="text-muted-foreground">+34 900 123 456</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-start gap-4">
-                                        <div className="p-3 rounded-xl bg-primary/10 text-primary">
-                                            <MapPin className="h-6 w-6" />
-                                        </div>
-                                        <div>
-                                            <p className="font-semibold">Ubicación</p>
-                                            <p className="text-muted-foreground">
-                                                Calle de la Innovación, 42<br />28001 Madrid, España
-                                            </p>
+                                            <a href="mailto:info@brickshare.eu" className="text-muted-foreground hover:text-primary transition-colors">
+                                                info@brickshare.eu
+                                            </a>
                                         </div>
                                     </div>
                                 </div>

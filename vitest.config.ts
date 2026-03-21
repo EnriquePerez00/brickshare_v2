@@ -1,16 +1,4 @@
-import { defineConfig } from "vitest/config";
-import react from "@vitejs/plugin-react-swc";
-import path from "path";
-
-export default defineConfig({
-  plugins: [react()],
-  test: {
-    environment: "jsdom",
-    globals: true,
-    setupFiles: ["./src/test/setup.ts"],
-    include: ["src/**/*.{test,spec}.{ts,tsx}"],
-  },
-  resolve: {
-    alias: { "@": path.resolve(__dirname, "./src") },
-  },
-});
+// Root vitest config — delegates to apps/web workspace.
+// Run tests with: npm run test -w @brickshare/web
+// See apps/web/vitest.config.ts for the actual configuration.
+export {};

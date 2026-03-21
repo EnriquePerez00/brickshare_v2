@@ -1,0 +1,524 @@
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Eye, CheckCircle, XCircle, Trash2, Package2, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+
+interface PreviewAssignment {
+    user_id: string;
+    user_name: string;
+    set_id: string;
+    set_name: string;
+    set_ref: string;
+    set_price: number;
+    current_stock: number;
+}
+
+interface ConfirmedEnvio {
+    envio_id: string;
+    user_id: string;
+    set_id: string;
+    user_name: string;
+    set_name: string;
+    set_ref: string;
+    set_price: number;
+    correos_shipment_id?: string;
+    label_url?: string;
+    created_at: string;
+}
+
+interface PaymentErrorInfo {
+    open: boolean;
+    userName: string;
+    userEmail: string;
+    errorMessage: string;
+    errorCode: string;
+}
+
+type ViewMode = "initial" | "preview" | "confirmed";
+
+const SetAssignment = () => {
+    const queryClient = useQueryClient();
+    const [viewMode, setViewMode] = useState<ViewMode>("initial");
+    const [previewAssignments, setPreviewAssignments] = useState<PreviewAssignment[]>([]);
+    const [confirmedEnvios, setConfirmedEnvios] = useState<ConfirmedEnvio[]>([]);
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+    const [envioToDelete, setEnvioToDelete] = useState<string | null>(null);
+    const [paymentErrorDialog, setPaymentErrorDialog] = useState<PaymentErrorInfo>({
+        open: false,
+        userName: "",
+        userEmail: "",
+        errorMessage: "",
+        errorCode: ""
+    });
+
+    // Preview mutation - shows proposal without making changes
+    const previewMutation = useMutation({
+        mutationFn: async () => {
+            const { data, error } = await supabase.rpc("preview_assign_sets_to_users");
+            if (error) throw error;
+            return data as PreviewAssignment[];
+        },
+        onSuccess: (data: PreviewAssignment[]) => {
+            if (data.length > 0) {
+                setPreviewAssignments(data);
+                setViewMode("preview");
+                toast.success(`Se encontraron ${data.length} asignaciones posibles`);
+            } else {
+                toast.info("No se encontraron asignaciones posibles (sin usuarios elegibles o sin stock)");
+            }
+        },
+        onError: (error: Error) => {
+            toast.error("Error al generar propuesta: " + error.message);
+        },
+    });
+
+    // Confirm mutation - executes payments FIRST, then assignments
+    const confirmMutation = useMutation({
+        mutationFn: async (assignments: PreviewAssignment[]) => {
+            const paymentResults = [];
+
+            // Phase 1: Process payments for each assignment
+            for (const assignment of assignments) {
+                const { data: paymentResponse, error: paymentError } = await supabase.functions.invoke(
+                    'process-assignment-payment',
+                    {
+                        body: {
+                            userId: assignment.user_id,
+                            setRef: assignment.set_ref,
+                            setPrice: assignment.set_price || 100.00
+                        }
+                    }
+                );
+
+                if (paymentError || !paymentResponse?.success) {
+                    // Note: The Edge Function automatically handles rollback internally
+                    // (cancels deposit if transport fails). Here we just log the successful
+                    // payment IDs in case manual cleanup is needed later.
+                    if (paymentResults.length > 0) {
+                        console.warn('Previous successful payments before error:', paymentResults.map(r => ({
+                            depositId: r.depositPaymentIntentId,
+                            transportId: r.transportPaymentIntentId
+                        })));
+                    }
+
+                    // Get user email for error dialog
+                    const { data: userData } = await supabase
+                        .from('users')
+                        .select('email')
+                        .eq('user_id', assignment.user_id)
+                        .single();
+
+                    throw {
+                        userName: assignment.user_name,
+                        userEmail: paymentResponse?.userEmail || userData?.email || 'Email no disponible',
+                        errorMessage: paymentResponse?.error || paymentError?.message || 'Error desconocido',
+                        errorCode: paymentResponse?.errorCode || 'unknown'
+                    };
+                }
+
+                paymentResults.push(paymentResponse);
+            }
+
+            // Phase 2: If all payments succeeded, confirm assignments in database
+            const userIds = assignments.map(a => a.user_id);
+            const { data, error } = await supabase.rpc("confirm_assign_sets_to_users", {
+                p_user_ids: userIds,
+            });
+
+            if (error) {
+                // Log payment IDs that may need manual cleanup in Stripe Dashboard
+                console.error('Database operation failed after payments. Manual cleanup may be needed:');
+                console.error('Payment IntentIDs:', paymentResults.map(r => ({
+                    depositId: r.depositPaymentIntentId,
+                    transportId: r.transportPaymentIntentId,
+                    note: 'Transport already captured - may need refund. Deposit can be cancelled.'
+                })));
+
+                throw new Error(`Error en base de datos: ${error.message}. Los pagos fueron procesados pero las asignaciones no se guardaron. Revisa Stripe Dashboard.`);
+            }
+
+            return data as ConfirmedEnvio[];
+        },
+        onSuccess: async (data: ConfirmedEnvio[]) => {
+            setConfirmedEnvios(data);
+            setViewMode("confirmed");
+            setPreviewAssignments([]);
+            toast.success(`¡Éxito! Se procesaron ${data.length} pagos y asignaciones`);
+
+            // Phase 3: Automatic Correos Preregistration
+            toast.info("Iniciando preregistros en Correos...");
+
+            for (const envio of data) {
+                try {
+                    const { data: preregResult, error: preregError } = await supabase.functions.invoke('correos-logistics', {
+                        body: { action: 'preregister', p_envios_id: envio.envio_id }
+                    });
+
+                    if (preregError) throw preregError;
+
+                    // Fetch label automatically
+                    await supabase.functions.invoke('correos-logistics', {
+                        body: { action: 'get_label', p_envios_id: envio.envio_id }
+                    });
+
+                    // Update local state with tracking info
+                    setConfirmedEnvios(current => current.map(e =>
+                        e.envio_id === envio.envio_id
+                            ? { ...e, correos_shipment_id: preregResult.correos_shipment_id }
+                            : e
+                    ));
+
+                    toast.success(`Preregistro completado para ${envio.user_name}`);
+                } catch (err) {
+                    console.error(`Error en preregistro para ${envio.user_name}:`, err);
+                    toast.error(`Error en preregistro de ${envio.user_name}`);
+                }
+            }
+
+            queryClient.invalidateQueries({ queryKey: ["admin-set-assignment-inventory"] });
+            queryClient.invalidateQueries({ queryKey: ["admin-shipments"] });
+        },
+        onError: (error: any) => {
+            // If error has payment info, show dialog
+            if (error.userName && error.errorMessage) {
+                setPaymentErrorDialog({
+                    open: true,
+                    userName: error.userName,
+                    userEmail: error.userEmail,
+                    errorMessage: error.errorMessage,
+                    errorCode: error.errorCode
+                });
+            } else {
+                toast.error("Error al confirmar asignaciones: " + (error.message || error));
+            }
+        },
+    });
+
+    // Delete mutation - removes confirmed assignment with rollback
+    const deleteMutation = useMutation({
+        mutationFn: async (envioId: string) => {
+            const { error } = await supabase.rpc("delete_assignment_and_rollback", {
+                p_envio_id: envioId,
+            });
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            toast.success("Asignación eliminada correctamente");
+            if (envioToDelete) {
+                setConfirmedEnvios((prev) => prev.filter((e) => e.envio_id !== envioToDelete));
+            }
+            queryClient.invalidateQueries({ queryKey: ["admin-set-assignment-inventory"] });
+            queryClient.invalidateQueries({ queryKey: ["admin-shipments"] });
+        },
+        onError: (error: Error) => {
+            toast.error("Error al eliminar asignación: " + error.message);
+        },
+    });
+
+    const handleGenerateProposal = () => {
+        setConfirmedEnvios([]);
+        previewMutation.mutate();
+    };
+
+    const handleConfirmAssignments = () => {
+        confirmMutation.mutate(previewAssignments);
+    };
+
+    const handleCancelPreview = () => {
+        setPreviewAssignments([]);
+        setViewMode("initial");
+        toast.info("Propuesta cancelada");
+    };
+
+    const handleDeleteClick = (envioId: string) => {
+        setEnvioToDelete(envioId);
+        setDeleteConfirmOpen(true);
+    };
+
+    const handleDeleteConfirm = () => {
+        if (envioToDelete) {
+            deleteMutation.mutate(envioToDelete);
+        }
+        setDeleteConfirmOpen(false);
+        setEnvioToDelete(null);
+    };
+
+    return (
+        <div className="space-y-6">
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                    <div>
+                        <CardTitle>Asignación Automática de Sets</CardTitle>
+                        <p className="text-sm text-muted-foreground mt-1">
+                            {viewMode === "initial" && "Genera una propuesta de asignaciones basada en wishlists y stock disponible"}
+                            {viewMode === "preview" && "Revisa la propuesta y confírmala o cancélala"}
+                            {viewMode === "confirmed" && "Asignaciones confirmadas - puedes eliminar aquí si es necesario"}
+                        </p>
+                    </div>
+                    <div className="flex gap-2">
+                        {viewMode === "initial" && (
+                            <Button
+                                onClick={handleGenerateProposal}
+                                disabled={previewMutation.isPending}
+                                className="bg-primary hover:bg-primary/90"
+                            >
+                                {previewMutation.isPending ? (
+                                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                                ) : (
+                                    <Eye className="h-4 w-4 mr-2" />
+                                )}
+                                Genera propuesta de asignación
+                            </Button>
+                        )}
+                        {viewMode === "preview" && (
+                            <>
+                                <Button
+                                    onClick={handleCancelPreview}
+                                    variant="outline"
+                                    disabled={confirmMutation.isPending}
+                                >
+                                    <XCircle className="h-4 w-4 mr-2" />
+                                    Cancelar
+                                </Button>
+                                <Button
+                                    onClick={handleConfirmAssignments}
+                                    disabled={confirmMutation.isPending}
+                                    className="bg-green-600 hover:bg-green-700"
+                                >
+                                    {confirmMutation.isPending ? (
+                                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                                    ) : (
+                                        <CheckCircle className="h-4 w-4 mr-2" />
+                                    )}
+                                    Confirmar asignaciones
+                                </Button>
+                            </>
+                        )}
+                        {viewMode === "confirmed" && (
+                            <Button
+                                onClick={() => setViewMode("initial")}
+                                variant="outline"
+                            >
+                                <RefreshCw className="h-4 w-4 mr-2" />
+                                Nueva propuesta
+                            </Button>
+                        )}
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    {viewMode === "initial" && (
+                        <div className="text-center py-12">
+                            <Package2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                            <p className="text-muted-foreground">
+                                Haz clic en "Genera propuesta de asignación" para ver qué sets se asignarían.
+                            </p>
+                        </div>
+                    )}
+
+                    {viewMode === "preview" && (
+                        <div>
+                            <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+                                <p className="text-sm text-blue-900 dark:text-blue-100">
+                                    <strong>Vista previa:</strong> Esta es una propuesta. No se han realizado cambios en la base de datos.
+                                    Revisa las asignaciones y confirma o cancela.
+                                </p>
+                            </div>
+                            <div className="rounded-md border">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Usuario</TableHead>
+                                            <TableHead>Set Propuesto (Ref)</TableHead>
+                                            <TableHead className="text-center">Stock Actual</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {previewAssignments.map((assignment) => (
+                                            <TableRow key={assignment.user_id}>
+                                                <TableCell className="font-medium">
+                                                    {assignment.user_name}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {assignment.set_name} ({assignment.set_ref})
+                                                </TableCell>
+                                                <TableCell className="text-center">
+                                                    <Badge variant="outline">{assignment.current_stock} disponible</Badge>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </div>
+                    )}
+
+                    {viewMode === "confirmed" && (
+                        <div>
+                            {confirmedEnvios.length === 0 ? (
+                                <div className="text-center py-12">
+                                    <Package2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                                    <p className="text-muted-foreground">
+                                        No hay asignaciones confirmadas.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="rounded-md border">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Usuario</TableHead>
+                                                <TableHead>Set (Ref)</TableHead>
+                                                <TableHead>Fecha</TableHead>
+                                                <TableHead className="text-center">Acciones</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {confirmedEnvios.map((envio) => (
+                                                <TableRow key={envio.envio_id}>
+                                                    <TableCell className="font-medium">
+                                                        {envio.user_name}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {envio.set_name} ({envio.set_ref})
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="flex flex-col gap-1">
+                                                            <span>{new Date(envio.created_at).toLocaleDateString()}</span>
+                                                            {envio.correos_shipment_id && (
+                                                                <Badge variant="outline" className="w-fit text-[10px] font-mono">
+                                                                    {envio.correos_shipment_id}
+                                                                </Badge>
+                                                            )}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell className="text-center">
+                                                        <div className="flex justify-center gap-1">
+                                                            {envio.correos_shipment_id ? (
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    onClick={() => {
+                                                                        supabase.functions.invoke('correos-logistics', {
+                                                                            body: { action: 'get_label', p_envios_id: envio.envio_id }
+                                                                        }).then(({ data }) => {
+                                                                            if (data?.label_url) window.open(data.label_url, '_blank');
+                                                                        });
+                                                                    }}
+                                                                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                                                >
+                                                                    <Package2 className="h-4 w-4 mr-1" />
+                                                                    Etiqueta
+                                                                </Button>
+                                                            ) : (
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    onClick={() => {
+                                                                        toast.info("Reintentando preregistro...");
+                                                                        supabase.functions.invoke('correos-logistics', {
+                                                                            body: { action: 'preregister', p_envios_id: envio.envio_id }
+                                                                        }).then(() => toast.success("Preregistro solicitado"));
+                                                                    }}
+                                                                >
+                                                                    <RefreshCw className="h-4 w-4" />
+                                                                </Button>
+                                                            )}
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => handleDeleteClick(envio.envio_id)}
+                                                                disabled={deleteMutation.isPending}
+                                                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>¿Eliminar asignación?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Esta acción eliminará el envío, el pedido asociado y devolverá el set al inventario.
+                            El estado del usuario se actualizará a "sin set".
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDeleteConfirm}
+                            className="bg-destructive hover:bg-destructive/90"
+                        >
+                            Eliminar
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog open={paymentErrorDialog.open} onOpenChange={(open) => setPaymentErrorDialog({ ...paymentErrorDialog, open })}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Error en el Procesamiento de Pago</AlertDialogTitle>
+                        <AlertDialogDescription className="space-y-2">
+                            <div>
+                                <strong>Usuario:</strong> {paymentErrorDialog.userName}
+                            </div>
+                            <div>
+                                <strong>Email:</strong> {paymentErrorDialog.userEmail}
+                            </div>
+                            <div className="mt-2 p-3 bg-red-50 dark:bg-red-950 rounded border border-red-200 dark:border-red-800">
+                                <strong>Error:</strong> {paymentErrorDialog.errorMessage}
+                            </div>
+                            {paymentErrorDialog.errorCode === "insufficient_funds" && (
+                                <div className="mt-2 text-sm text-muted-foreground">
+                                    El usuario no tiene fondos suficientes para completar la transacción.
+                                    La asignación no se ha realizado.
+                                </div>
+                            )}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogAction onClick={() => setPaymentErrorDialog({ open: false, userName: "", userEmail: "", errorMessage: "", errorCode: "" })}>
+                            Aceptar
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </div>
+    );
+};
+
+export default SetAssignment;

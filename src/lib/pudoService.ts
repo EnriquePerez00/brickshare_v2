@@ -4,7 +4,7 @@ export interface CorreosPudoPoint {
     user_id: string;
     correos_id_pudo: string;
     correos_nombre: string;
-    correos_tipo_punto: "Oficina" | "Citypaq" | "Locker";
+    correos_tipo_punto: "Oficina" | "Citypaq" | "Locker" | "Deposito";
     correos_direccion_calle: string;
     correos_direccion_numero?: string;
     correos_codigo_postal: string;

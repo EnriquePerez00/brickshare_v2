@@ -17,12 +17,33 @@ interface CorreosConfig {
 
 const OFFICE_ADDRESS = {
     nombre: "Brickshare Oficinas",
-    direccion: "Avinguda josep Tarradellas 97, 5",
+    direccion: "Avinguda josep Tarradellas 97",
     cp: "08029",
     poblacion: "Barcelona",
     provincia: "Barcelona",
     pais: "España"
 };
+
+function parseDimensions(dimStr: string | null) {
+    // Default dimensions if null or malformed
+    const defaults = { alto: 10, ancho: 20, largo: 30 };
+    if (!dimStr) return defaults;
+
+    try {
+        // Expected format: "48 x 37.8 x 7 cm"
+        const parts = dimStr.toLowerCase().replace('cm', '').split('x').map(p => parseFloat(p.trim()));
+        if (parts.length >= 3 && !parts.some(isNaN)) {
+            return {
+                alto: parts[0],
+                ancho: parts[1],
+                largo: parts[2]
+            };
+        }
+    } catch (e) {
+        console.warn("Failed to parse dimensions:", dimStr);
+    }
+    return defaults;
+}
 
 // Simple in-memory cache for the token
 let cachedToken: string | null = null;
@@ -185,7 +206,28 @@ serve(async (req) => {
             case 'preregister': {
                 const { data: envio, error: envioError } = await supabaseClient
                     .from('envios')
-                    .select('*, profiles(full_name, email, phone)')
+                    .select(`
+                        id, 
+                        direccion_envio, 
+                        ciudad_envio, 
+                        codigo_postal_envio, 
+                        user_id,
+                        order_id,
+                        orders (
+                            set_id,
+                            sets (
+                                set_name,
+                                set_ref,
+                                set_weight,
+                                set_dim
+                            )
+                        ),
+                        users:user_id (
+                            full_name,
+                            email,
+                            phone
+                        )
+                    `)
                     .eq('id', p_envios_id)
                     .single();
 
@@ -207,20 +249,23 @@ serve(async (req) => {
                             provincia: OFFICE_ADDRESS.provincia,
                         },
                         destinatario: {
-                            nombre: envio.profiles?.full_name || "Cliente Brickshare",
+                            nombre: envio.users?.full_name || "Cliente Brickshare",
                             direccion: envio.direccion_envio,
                             cp: envio.codigo_postal_envio,
                             poblacion: envio.ciudad_envio,
                             provincia: envio.ciudad_envio,
-                            email: envio.profiles?.email,
-                            telefono: envio.profiles?.phone,
+                            email: envio.users?.email,
+                            telefono: envio.users?.phone,
                         },
                         bultos: [{
-                            peso: 1,
-                            alto: 10,
-                            ancho: 20,
-                            largo: 30,
-                        }]
+                            peso: envio.orders?.sets?.set_weight || 1,
+                            ...parseDimensions(envio.orders?.sets?.set_dim)
+                        }],
+                        añadidos: [
+                            {
+                                tipAñadido: "E" // Entrega en Oficina/Citypaq
+                            }
+                        ]
                     }
                 };
 
@@ -254,10 +299,31 @@ serve(async (req) => {
             }
 
             case 'return_preregister': {
-                // 1. Fetch shipment and user data
+                // 1. Fetch shipment, user and set data
                 const { data: envio, error: envioError } = await supabaseClient
                     .from('envios')
-                    .select('*, profiles(full_name, email, phone)')
+                    .select(`
+                        id, 
+                        direccion_envio, 
+                        ciudad_envio, 
+                        codigo_postal_envio, 
+                        user_id,
+                        order_id,
+                        orders (
+                            set_id,
+                            sets (
+                                set_name,
+                                set_ref,
+                                set_weight,
+                                set_dim
+                            )
+                        ),
+                        users:user_id (
+                            full_name,
+                            email,
+                            phone
+                        )
+                    `)
                     .eq('id', p_envios_id)
                     .single();
 
@@ -284,13 +350,13 @@ serve(async (req) => {
                     envio: {
                         referencia: `RET-${envio.id.substring(0, 8)}`,
                         remitente: {
-                            nombre: envio.profiles?.full_name || "Cliente Brickshare",
+                            nombre: envio.users?.full_name || "Cliente Brickshare",
                             direccion: pudo?.correos_direccion_completa || envio.direccion_envio,
                             cp: pudo?.correos_codigo_postal || envio.codigo_postal_envio,
                             poblacion: pudo?.correos_ciudad || envio.ciudad_envio,
                             provincia: pudo?.correos_provincia || envio.ciudad_envio,
-                            email: envio.profiles?.email,
-                            telefono: envio.profiles?.phone,
+                            email: envio.users?.email,
+                            telefono: envio.users?.phone,
                         },
                         destinatario: {
                             nombre: OFFICE_ADDRESS.nombre,
@@ -300,10 +366,8 @@ serve(async (req) => {
                             provincia: OFFICE_ADDRESS.provincia,
                         },
                         bultos: [{
-                            peso: 1,
-                            alto: 10,
-                            ancho: 20,
-                            largo: 30,
+                            peso: envio.orders?.sets?.set_weight || 1,
+                            ...parseDimensions(envio.orders?.sets?.set_dim)
                         }],
                         caracteristicas: {
                             etiqueta_sin_etiqueta: "S"
@@ -323,7 +387,8 @@ serve(async (req) => {
                 }
 
                 const returnData = await returnResponse.json();
-                const returnCode = returnData.codEtiquetado;
+                const returnCode = returnData.codEtiquetado || (returnData.qrCode ? "QR_CODE_PENDING" : "UNKNOWN");
+                const qrCodeSvg = returnData.qrCode; // Base64 SVG from Correos
 
                 await supabaseClient
                     .from('envios')
@@ -337,23 +402,42 @@ serve(async (req) => {
                     .eq('id', p_envios_id);
 
                 await sendReturnEmail(supabaseUrl, supabaseKey, {
-                    to: envio.profiles?.email,
+                    to: envio.users?.email,
                     subject: "Tu código de devolución Brickshare",
                     html: `
-                        <div style="font-family: sans-serif; max-width: 600px; margin: auto;">
-                            <h2>¡Hola ${envio.profiles?.full_name}!</h2>
-                            <p>Has solicitado la devolución de tu set de LEGO. Hemos activado el servicio <strong>"Etiqueta sin Etiqueta"</strong> para tu comodidad.</p>
-                            <div style="background: #fdf6b2; padding: 20px; border-radius: 12px; border: 1px solid #facc15; text-align: center; margin: 20px 0;">
-                                <p style="margin: 0; font-size: 14px; color: #854d0e;">CÓDIGO DE DEVOLUCIÓN</p>
-                                <h1 style="margin: 10px 0; font-size: 32px; letter-spacing: 2px;">${returnCode}</h1>
+                        <div style="font-family: sans-serif; max-width: 600px; margin: auto; color: #333;">
+                            <h2 style="color: #1a1a1a;">¡Hola ${envio.users?.full_name}!</h2>
+                            <p>Has solicitado la devolución de tu set de LEGO <strong>${envio.orders?.sets?.set_name}</strong>. Hemos activado el servicio <strong>"Etiqueta sin Etiqueta"</strong> para tu comodidad.</p>
+                            
+                            <div style="background: #fdf6b2; padding: 30px; border-radius: 12px; border: 1px solid #facc15; text-align: center; margin: 24px 0;">
+                                <p style="margin: 0 0 10px 0; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #854d0e; font-weight: bold;">CÓDIGO DE DEVOLUCIÓN</p>
+                                <h1 style="margin: 0; font-size: 42px; letter-spacing: 4px; color: #000;">${returnCode !== "QR_CODE_PENDING" ? returnCode : "MOSTRAR QR"}</h1>
+                                
+                                ${qrCodeSvg ? `
+                                <div style="margin-top: 20px; background: white; padding: 15px; display: inline-block; border-radius: 8px;">
+                                    <img src="data:image/svg+xml;base64,${qrCodeSvg}" alt="Código QR de Correos" style="width: 200px; height: 200px;" />
+                                </div>
+                                ` : ''}
                             </div>
-                            <p><strong>Pasos a seguir:</strong></p>
-                            <ol>
-                                <li>Prepara el paquete de forma segura.</li>
-                                <li>Llévalo a tu oficina de Correos seleccionada: <strong>${pudo?.correos_nombre || 'Oficina de Correos'}</strong>.</li>
-                                <li>Muestra este código al personal de Correos. <strong>No necesitas imprimir nada.</strong></li>
+
+                            <div style="background: #f3f4f6; padding: 20px; border-radius: 12px; margin-bottom: 24px;">
+                                <p style="margin: 0 0 10px 0; font-weight: bold; color: #4b5563;">PUNTO DE ENTREGA SELECCIONADO:</p>
+                                <p style="margin: 0; font-size: 16px;">
+                                    <strong>${pudo?.correos_nombre || 'Oficina de Correos'}</strong><br/>
+                                    ${pudo?.correos_direccion_completa || envio.direccion_envio}
+                                </p>
+                            </div>
+
+                            <p style="font-weight: bold; font-size: 18px; margin-bottom: 15px;">Pasos a seguir:</p>
+                            <ol style="padding-left: 20px; line-height: 1.6;">
+                                <li style="margin-bottom: 10px;">Prepara el paquete de forma segura, preferiblemente en su embalaje original.</li>
+                                <li style="margin-bottom: 10px;">Llévalo al punto de Correos indicado arriba.</li>
+                                <li style="margin-bottom: 10px;">Muestra el <strong>código QR</strong> o el código alfanumérico al personal. <strong>No necesitas imprimir nada.</strong></li>
                             </ol>
-                            <p>Gracias por jugar con Brickshare.</p>
+                            
+                            <div style="margin-top: 40px; border-top: 1px solid #eee; padding-top: 20px; font-size: 14px; color: #666; text-align: center;">
+                                <p>Gracias por jugar con Brickshare. ¡Esperamos verte pronto!</p>
+                            </div>
                         </div>
                     `
                 });

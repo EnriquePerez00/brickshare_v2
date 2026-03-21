@@ -79,7 +79,7 @@ const commonFeatures = [
   { icon: Package, text: "Intercambios ilimitados" },
   { icon: Clock, text: "Tiempo de uso ilimitado" },
   { icon: ShieldCheck, text: "Seguro de piezas pequeñas incluido" },
-  { icon: Truck, text: "Envío urgente (10€/trayecto)" }
+  { icon: Truck, text: "Gestión de envíos ultra-rápida" }
 ];
 
 const steps = [
@@ -373,6 +373,7 @@ const ComoFunciona = () => {
                       <div className="mt-2">
                         <span className="text-4xl font-bold text-foreground">{plan.price}</span>
                         <span className="text-muted-foreground"> €/mes</span>
+                        <p className="text-xs text-muted-foreground mt-2 font-medium bg-muted/30 p-1.5 rounded-md">Suscripción base: {plan.price}€/mes + 10€ logística por cada intercambio de set</p>
                       </div>
                       <CardDescription className="mt-2">
                         {plan.description}

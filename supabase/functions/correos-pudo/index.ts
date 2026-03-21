@@ -10,88 +10,7 @@ interface CorreosConfig {
   clientId: string;
   clientSecret: string;
   baseUrl: string;
-  authUrl: string;
-  scope: string;
 }
-
-// Simple in-memory cache for the token (variables persist in hot instances of Edge Functions)
-let cachedToken: string | null = null;
-let tokenExpiration: number | null = null;
-
-const getCorreosToken = async (config: CorreosConfig): Promise<string> => {
-  // Return cached token if valid (providing a buffer, e.g., 60 seconds)
-  if (cachedToken && tokenExpiration && Date.now() < tokenExpiration - 60000) {
-    return cachedToken;
-  }
-
-  console.log("Acquiring new Correos token for PUDO...");
-
-  const params = new URLSearchParams();
-  params.append('grant_type', 'client_credentials');
-  params.append('client_id', config.clientId);
-  params.append('client_secret', config.clientSecret);
-  params.append('scope', config.scope);
-
-  const response = await fetch(config.authUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'Accept': 'application/json',
-    },
-    body: params,
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Failed to get OAuth token: ${response.status} ${response.statusText} - ${text}`);
-  }
-
-  const data = await response.json();
-
-  if (!data.access_token) {
-    throw new Error(`Token response missing access_token: ${JSON.stringify(data)}`);
-  }
-
-  cachedToken = data.access_token;
-  // expiresIn is in minutes ("30"), convert to ms
-  const expiresInMinutes = data.expiresIn ? parseInt(data.expiresIn) : 30;
-  tokenExpiration = Date.now() + (expiresInMinutes * 60 * 1000);
-
-  return data.access_token;
-};
-
-// Helper to handle 401 retries
-const fetchWithAuth = async (url: string, options: RequestInit, config: CorreosConfig): Promise<Response> => {
-  let token = await getCorreosToken(config);
-
-  // First attempt
-  let response = await fetch(url, {
-    ...options,
-    headers: {
-      ...options.headers,
-      'Authorization': `Bearer ${token}`
-    }
-  });
-
-  // Retry logic: if 401 or 403, invalidate token and retry once
-  if (response.status === 401 || response.status === 403) {
-    console.warn(`Received ${response.status}, refreshing token and retrying...`);
-    cachedToken = null; // Invalidate cache
-    tokenExpiration = null;
-
-    token = await getCorreosToken(config); // Fetch new token
-
-    response = await fetch(url, {
-      ...options,
-      headers: {
-        ...options.headers,
-        'Authorization': `Bearer ${token}`
-      }
-    });
-  }
-
-  return response;
-};
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -128,9 +47,7 @@ serve(async (req) => {
     const config: CorreosConfig = {
       clientId: Deno.env.get('CORREOS_CLIENT_ID') ?? '',
       clientSecret: Deno.env.get('CORREOS_CLIENT_SECRET') ?? '',
-      baseUrl: Deno.env.get('CORREOS_BASE_URL') ?? Deno.env.get('CORREOS_BASE_PRE_PROD_URL') ?? 'https://api-pre.correos.es',
-      authUrl: Deno.env.get('CORREOS_AUTH_URL') ?? 'https://apioauthcid.correos.es/Api/Authorize/Token',
-      scope: Deno.env.get('CORREOS_SCOPE') ?? 'Preregistro' // Assuming preregistro scope might work, or terminals if configured
+      baseUrl: Deno.env.get('CORREOS_BASE_URL') ?? 'https://api1.correos.es',
     }
 
     if (!config.clientId || !config.clientSecret) {
@@ -143,28 +60,47 @@ serve(async (req) => {
       url.searchParams.append('longitude', lng.toString())
       url.searchParams.append('distance', radius.toString())
 
-      // Some Correos APIs (like terminals) require headers directly
-      // regardless of OAuth token presence.
-      const response = await fetchWithAuth(url.toString(), {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'client_id': config.clientId,
-          'client_secret': config.clientSecret
-        }
-      }, config)
+      let response;
+      let retries = 1;
 
-      if (!response.ok) {
+      while (retries >= 0) {
+        response = await fetch(url.toString(), {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'client_id': config.clientId,
+            'client_secret': config.clientSecret
+          }
+        });
+
+        if (response.ok) break;
+
+        // If 5xx error, retry once
+        if (response.status >= 500 && retries > 0) {
+          console.log(`Correos API 5xx error (${response.status}), retrying...`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          retries--;
+          continue;
+        }
+
         const errText = await response.text();
-        throw new Error(`Correos API Error: ${response.status} ${response.statusText} - ${errText}`)
+        console.error(`Correos API Final Error: ${response.status}`, errText);
+        throw new Error(`Error de Correos (${response.status})`);
+      }
+
+      if (!response || !response.ok) {
+        throw new Error("No se pudo obtener respuesta de Correos");
       }
 
       const data = await response.json()
-      const content = data.content || data || []
+      // Ensure we have an array to map over
+      const content = Array.isArray(data) ? data : (data.content && Array.isArray(data.content) ? data.content : []);
 
-      // Map Correos TerminalInfoResponseDTO to our internal format
+      if (content.length === 0 && data.error) {
+        throw new Error(data.error);
+      }
+
       const results = content.map((term: any) => {
-        // Handle coordinates which often come with commas in Spanish API
         const parseCoord = (val: any) => {
           if (typeof val === 'number') return val;
           if (typeof val === 'string') return parseFloat(val.replace(',', '.'));
@@ -172,15 +108,27 @@ serve(async (req) => {
         };
 
         return {
-          id_correos_pudo: term.terminalId || term.codHomepaq || term.id,
-          nombre: term.alias || term.channelDescription || term.name || "Oficina de Correos",
-          direccion: term.address || term.direccion,
-          cp: term.postalCode || term.cp,
-          ciudad: term.municipality || term.poblacion || term.location,
+          id_correos_pudo: term.terminalId || term.codHomepaq || term.id || `unknown-${Math.random()}`,
+          nombre: term.alias || term.channelDescription || term.name || (term.terminalType === "P" || term.terminalType === "PUBLICO" ? "Citypaq" : "Oficina de Correos"),
+          direccion: term.address || term.direccion || "Dirección no disponible",
+          cp: term.postalCode || term.cp || "00000",
+          ciudad: term.municipality || term.poblacion || term.location || "Localidad no disponible",
           lat: parseCoord(term.latitudeWGS84 || term.latitudeETRS89 || term.latitude || term.lat),
           lng: parseCoord(term.longitudeWGS84 || term.longitudeETRS89 || term.longitude || term.lng),
-          horario: term.openingDescription || term.openingHours || term.fullSchedule || "Consultar en oficina",
-          tipo_punto: term.terminalType === "P" || term.terminalType === "PUBLICO" ? "Citypaq" : "Oficina"
+          horario: term.openingDescription || term.openingHours || term.fullSchedule || "Consultar en ubicación",
+          tipo_punto: (() => {
+            const name = (term.alias || term.channelDescription || term.name || "").toUpperCase();
+            const type = (term.terminalType || "").toUpperCase();
+
+            // Name overrides
+            if (name.includes("CITYPAQ")) return "Citypaq";
+            if (name.includes("SUC") || name.includes("OFICINA") || name.includes("DIRECCION")) return "Oficina";
+
+            // Type-based classification
+            if (type === "P" || type === "PUBLICO" || type === "D" || type === "DOMICILIARIO") return "Citypaq";
+
+            return "Oficina";
+          })()
         };
       })
 
@@ -188,12 +136,11 @@ serve(async (req) => {
         JSON.stringify(results),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
-    } catch (apiError) {
-      console.error('Correos API error:', apiError)
-      // Fallback or rethrow
+    } catch (apiError: any) {
+      console.error('PUDO Function error:', apiError)
       throw apiError
     }
-  } catch (error) {
+  } catch (error: any) {
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

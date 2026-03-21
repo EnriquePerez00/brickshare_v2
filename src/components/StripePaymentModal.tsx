@@ -171,8 +171,12 @@ const StripePaymentModal = ({
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>Finalizar Suscripción</DialogTitle>
-                    <DialogDescription>
-                        Estás contratando el plan <strong>{planName}</strong>. Introduce tus datos de pago de forma segura.
+                    <DialogDescription className="space-y-4">
+                        <p>Estás contratando el plan <strong>{planName}</strong>. Introduce tus datos de pago de forma segura.</p>
+                        <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-200 dark:border-blue-800 text-sm text-blue-800 dark:text-blue-300 flex items-start gap-2 text-left">
+                            <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
+                            <p><strong>Nota sobre tu seguridad:</strong> Retendremos temporalmente el valor del set en tu tarjeta como fianza (no se cobra). Se liberará al devolver el set.</p>
+                        </div>
                     </DialogDescription>
                 </DialogHeader>
                 {clientSecret && (

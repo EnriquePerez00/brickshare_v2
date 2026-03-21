@@ -61,6 +61,36 @@ export const useOrders = () => {
     });
 };
 
+export const useActiveOrders = () => {
+    const { user } = useAuth();
+
+    return useQuery({
+        queryKey: ["active-orders", user?.id],
+        queryFn: async () => {
+            if (!user) throw new Error("User not authenticated");
+
+            const { data, error } = await supabase
+                .from("envios")
+                .select(`
+                  id,
+                  user_id,
+                  set_ref,
+                  estado_envio,
+                  updated_at,
+                  sets:sets!left(set_name, set_image_url, set_theme, set_piece_count)
+                `)
+                .eq("user_id", user.id)
+                .in("estado_envio", ["preparacion", "ruta_envio", "entregado", "ruta_devolucion"])
+                .order("updated_at", { ascending: false });
+
+            if (error) throw error;
+            return data as unknown as OrderData[];
+        },
+        enabled: !!user,
+        staleTime: 1000 * 60 * 5, // 5 minutes cache
+    });
+};
+
 export const useReturnSet = () => {
     const queryClient = useQueryClient();
     const { toast } = useToast();
