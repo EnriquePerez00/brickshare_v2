@@ -43,7 +43,13 @@ VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...
 VITE_APP_URL=http://localhost:5173
 ```
 
-### 4. Iniciar dev server
+### 4. Configurar Supabase CLI
+
+Para trabajar con migraciones y funciones de Supabase, necesitas configurar el CLI. Sigue la guía completa en:
+
+**[📖 Guía de Configuración Supabase CLI](./SUPABASE_CLI_SETUP.md)**
+
+### 5. Iniciar dev server
 ```bash
 npm run dev
 ```
@@ -192,28 +198,32 @@ Se recomienda instalar la extensión ESLint en VS Code y activar "Format on Save
 
 ## Debugging
 
-### Supabase local
+### Edge Functions (Remoto)
 ```bash
-supabase start
-supabase status  # Ver URLs locales
-```
+# Ver logs en tiempo real
+supabase functions logs nombre-funcion --follow
 
-### Edge Functions local
-```bash
-supabase functions serve nombre-funcion --env-file .env.local
-```
-
-### Ver logs de Edge Functions
-```bash
+# Ver logs históricos
 supabase functions logs nombre-funcion
 ```
+
+### Base de Datos
+```bash
+# Ver estado del proyecto
+supabase status
+
+# Ejecutar queries
+supabase db query "SELECT * FROM table_name LIMIT 5"
+```
+
+**Nota**: Este proyecto trabaja solo con Supabase remoto, no usa Docker local. Ver [SUPABASE_CLI_SETUP.md](./SUPABASE_CLI_SETUP.md) para más detalles.
 
 ---
 
 ## FAQ para Desarrolladores
 
-**¿Cómo accedo al panel de Supabase en local?**
-Tras `supabase start`, el Studio estará en `http://localhost:54323`
+**¿Cómo accedo al panel de Supabase?**
+Dashboard remoto: https://supabase.com/dashboard/project/tevoogkifiszfontzkgd
 
 **¿Cómo probar webhooks de Stripe en local?**
 ```bash

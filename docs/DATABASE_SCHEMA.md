@@ -600,6 +600,11 @@ Output format is unaligned.
 
 ### envios
 
+- **on_envio_recibido_almacen**
+  - Evento: UPDATE
+  - Timing: BEFORE
+  - Función: `EXECUTE FUNCTION handle_envio_recibido_almacen()`
+
 - **update_envios_updated_at**
   - Evento: UPDATE
   - Timing: BEFORE
@@ -614,11 +619,6 @@ Output format is unaligned.
   - Evento: UPDATE
   - Timing: AFTER
   - Función: `EXECUTE FUNCTION handle_envio_entregado()`
-
-- **on_envio_recibido_almacen**
-  - Evento: UPDATE
-  - Timing: BEFORE
-  - Función: `EXECUTE FUNCTION handle_envio_recibido_almacen()`
 
 - **on_envio_ruta_devolucion_inv**
   - Evento: UPDATE
@@ -686,15 +686,15 @@ Output format is unaligned.
 
 ### sets
 
-- **update_sets_updated_at**
-  - Evento: UPDATE
-  - Timing: BEFORE
-  - Función: `EXECUTE FUNCTION update_updated_at_column()`
-
 - **on_set_created**
   - Evento: INSERT
   - Timing: AFTER
   - Función: `EXECUTE FUNCTION handle_new_set_inventory()`
+
+- **update_sets_updated_at**
+  - Evento: UPDATE
+  - Timing: BEFORE
+  - Función: `EXECUTE FUNCTION update_updated_at_column()`
 
 
 ### shipping_orders

@@ -31,6 +31,13 @@ CREATE INDEX IF NOT EXISTS chat_messages_created_idx      ON public.chat_message
 ALTER TABLE public.chat_conversations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chat_messages      ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "chat_conversations_insert" ON public.chat_conversations;
+DROP POLICY IF EXISTS "chat_conversations_select" ON public.chat_conversations;
+DROP POLICY IF EXISTS "chat_messages_insert" ON public.chat_messages;
+DROP POLICY IF EXISTS "chat_messages_select" ON public.chat_messages;
+DROP POLICY IF EXISTS "chat_messages_update_feedback" ON public.chat_messages;
+
 -- Anyone (anon or authenticated) can insert a conversation
 CREATE POLICY "chat_conversations_insert" ON public.chat_conversations
   FOR INSERT WITH CHECK (true);
@@ -62,6 +69,8 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+
+DROP TRIGGER IF EXISTS chat_messages_update_conversation_ts ON public.chat_messages;
 
 CREATE TRIGGER chat_messages_update_conversation_ts
   AFTER INSERT ON public.chat_messages

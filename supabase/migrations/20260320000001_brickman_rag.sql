@@ -13,11 +13,13 @@ create table if not exists public.brickman_knowledge (
 -- RLS: public read (Edge Function reads without auth), service_role can write
 alter table public.brickman_knowledge enable row level security;
 
+drop policy if exists "Public read access for brickman knowledge" on public.brickman_knowledge;
 create policy "Public read access for brickman knowledge"
   on public.brickman_knowledge
   for select
   using (true);
 
+drop policy if exists "Service role full access for brickman knowledge" on public.brickman_knowledge;
 create policy "Service role full access for brickman knowledge"
   on public.brickman_knowledge
   for all
@@ -34,6 +36,7 @@ begin
 end;
 $$;
 
+drop trigger if exists update_brickman_knowledge_updated_at on public.brickman_knowledge;
 create trigger update_brickman_knowledge_updated_at
   before update on public.brickman_knowledge
   for each row
