@@ -912,85 +912,85 @@ export type Database = {
       }
       users_correos_dropping: {
         Row: {
-          correos_accesibilidad: boolean | null
-          correos_capacidad_lockers: number | null
-          correos_ciudad: string
-          correos_codigo_interno: string | null
-          correos_codigo_postal: string
-          correos_direccion_calle: string
-          correos_direccion_completa: string
-          correos_direccion_numero: string | null
-          correos_disponible: boolean
+          correos_accessibility: boolean | null
+          correos_locker_capacity: number | null
+          correos_city: string
+          correos_internal_code: string | null
+          correos_zip_code: string
+          correos_street: string
+          correos_full_address: string
+          correos_street_number: string | null
+          correos_available: boolean
           correos_email: string | null
-          correos_fecha_seleccion: string
-          correos_horario_apertura: string | null
-          correos_horario_estructurado: Json | null
+          correos_selection_date: string
+          correos_opening_hours: string | null
+          correos_structured_hours: Json | null
           correos_id_pudo: string
-          correos_latitud: number
-          correos_longitud: number
-          correos_nombre: string
-          correos_pais: string
+          correos_latitude: number
+          correos_longitude: number
+          correos_name: string
+          correos_country: string
           correos_parking: boolean | null
-          correos_provincia: string
-          correos_servicios_adicionales: string[] | null
-          correos_telefono: string | null
-          correos_tipo_punto: string
+          correos_province: string
+          correos_additional_services: string[] | null
+          correos_phone: string | null
+          correos_point_type: string
           created_at: string
           updated_at: string
           user_id: string
         }
         Insert: {
-          correos_accesibilidad?: boolean | null
-          correos_capacidad_lockers?: number | null
-          correos_ciudad: string
-          correos_codigo_interno?: string | null
-          correos_codigo_postal: string
-          correos_direccion_calle: string
-          correos_direccion_completa: string
-          correos_direccion_numero?: string | null
-          correos_disponible?: boolean
+          correos_accessibility?: boolean | null
+          correos_locker_capacity?: number | null
+          correos_city: string
+          correos_internal_code?: string | null
+          correos_zip_code: string
+          correos_street: string
+          correos_full_address: string
+          correos_street_number?: string | null
+          correos_available?: boolean
           correos_email?: string | null
-          correos_fecha_seleccion?: string
-          correos_horario_apertura?: string | null
-          correos_horario_estructurado?: Json | null
+          correos_selection_date?: string
+          correos_opening_hours?: string | null
+          correos_structured_hours?: Json | null
           correos_id_pudo: string
-          correos_latitud: number
-          correos_longitud: number
-          correos_nombre: string
-          correos_pais?: string
+          correos_latitude: number
+          correos_longitude: number
+          correos_name: string
+          correos_country?: string
           correos_parking?: boolean | null
-          correos_provincia: string
-          correos_servicios_adicionales?: string[] | null
-          correos_telefono?: string | null
-          correos_tipo_punto: string
+          correos_province: string
+          correos_additional_services?: string[] | null
+          correos_phone?: string | null
+          correos_point_type: string
           created_at?: string
           updated_at?: string
           user_id: string
         }
         Update: {
-          correos_accesibilidad?: boolean | null
-          correos_capacidad_lockers?: number | null
-          correos_ciudad?: string
-          correos_codigo_interno?: string | null
-          correos_codigo_postal?: string
-          correos_direccion_calle?: string
-          correos_direccion_completa?: string
-          correos_direccion_numero?: string | null
-          correos_disponible?: boolean
+          correos_accessibility?: boolean | null
+          correos_locker_capacity?: number | null
+          correos_city?: string
+          correos_internal_code?: string | null
+          correos_zip_code?: string
+          correos_street?: string
+          correos_full_address?: string
+          correos_street_number?: string | null
+          correos_available?: boolean
           correos_email?: string | null
-          correos_fecha_seleccion?: string
-          correos_horario_apertura?: string | null
-          correos_horario_estructurado?: Json | null
+          correos_selection_date?: string
+          correos_opening_hours?: string | null
+          correos_structured_hours?: Json | null
           correos_id_pudo?: string
-          correos_latitud?: number
-          correos_longitud?: number
-          correos_nombre?: string
-          correos_pais?: string
+          correos_latitude?: number
+          correos_longitude?: number
+          correos_name?: string
+          correos_country?: string
           correos_parking?: boolean | null
-          correos_provincia?: string
-          correos_servicios_adicionales?: string[] | null
-          correos_telefono?: string | null
-          correos_tipo_punto?: string
+          correos_province?: string
+          correos_additional_services?: string[] | null
+          correos_phone?: string | null
+          correos_point_type?: string
           created_at?: string
           updated_at?: string
           user_id?: string

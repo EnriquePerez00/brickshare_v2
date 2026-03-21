@@ -43,18 +43,18 @@ const Dashboard = () => {
     try {
       await savePudoMutation.mutateAsync({
         correos_id_pudo: point.id_correos_pudo || `unknown-${Date.now()}`,
-        correos_nombre: point.nombre || "Oficina de Correos",
-        correos_tipo_punto: point.tipo_punto || "Oficina",
-        correos_direccion_calle: point.direccion || "Dirección no disponible",
-        correos_codigo_postal: point.cp || "00000",
-        correos_ciudad: point.ciudad || "Localidad no disponible",
-        correos_provincia: point.ciudad || "Provincia no disponible",
-        correos_pais: "España",
-        correos_direccion_completa: `${point.direccion || "Dirección no disponible"}, ${point.cp || "00000"} ${point.ciudad || "Localidad no disponible"}`,
-        correos_latitud: point.lat || 0,
-        correos_longitud: point.lng || 0,
-        correos_horario_apertura: point.horario || "Consultar en ubicación",
-        correos_disponible: true,
+        correos_name: point.nombre || "Oficina de Correos",
+        correos_point_type: point.tipo_punto || "Oficina",
+        correos_street: point.direccion || "Dirección no disponible",
+        correos_zip_code: point.cp || "00000",
+        correos_city: point.ciudad || "Localidad no disponible",
+        correos_province: point.ciudad || "Provincia no disponible",
+        correos_country: "España",
+        correos_full_address: `${point.direccion || "Dirección no disponible"}, ${point.cp || "00000"} ${point.ciudad || "Localidad no disponible"}`,
+        correos_latitude: point.lat || 0,
+        correos_longitude: point.lng || 0,
+        correos_opening_hours: point.horario || "Consultar en ubicación",
+        correos_available: true,
       });
 
       toast.success("Punto de entrega actualizado correctamente");
@@ -398,8 +398,8 @@ const Dashboard = () => {
               {pudoPoint?.correos_id_pudo ? (
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="flex items-start gap-4">
-                    <div className={`mt-1 p-2 rounded-full ${pudoPoint.correos_tipo_punto === 'Oficina' ? 'bg-blue-100' : 'bg-yellow-100'}`}>
-                      {pudoPoint.correos_tipo_punto === 'Oficina' ? (
+                    <div className={`mt-1 p-2 rounded-full ${pudoPoint.correos_point_type === 'Oficina' ? 'bg-blue-100' : 'bg-yellow-100'}`}>
+                      {pudoPoint.correos_point_type === 'Oficina' ? (
                         <Building2 className="h-6 w-6 text-blue-600" />
                       ) : (
                         <Package className="h-6 w-6 text-yellow-600" />
@@ -407,20 +407,20 @@ const Dashboard = () => {
                     </div>
                     <div>
                       <h3 className="font-bold text-foreground flex items-center gap-2">
-                        {pudoPoint.correos_nombre}
+                        {pudoPoint.correos_name}
                         <Badge
-                          className={`font-normal text-[0.65rem] uppercase py-0 px-1.5 h-4 ${pudoPoint.correos_tipo_punto === 'Oficina'
+                          className={`font-normal text-[0.65rem] uppercase py-0 px-1.5 h-4 ${pudoPoint.correos_point_type === 'Oficina'
                               ? 'bg-blue-100 text-blue-700 border-blue-200'
                               : 'bg-yellow-100 text-yellow-700 border-yellow-200'
                             }`}
                         >
-                          {pudoPoint.correos_tipo_punto === 'Oficina' ? 'Oficina Correos' : 'Punto Citypaq'}
+                          {pudoPoint.correos_point_type === 'Oficina' ? 'Oficina Correos' : 'Punto Citypaq'}
                         </Badge>
                       </h3>
-                      <p className="text-sm text-muted-foreground">{pudoPoint.correos_direccion_completa}</p>
-                      {pudoPoint.correos_fecha_seleccion && (
+                      <p className="text-sm text-muted-foreground">{pudoPoint.correos_full_address}</p>
+                      {pudoPoint.correos_selection_date && (
                         <p className="text-[10px] text-muted-foreground mt-2 uppercase tracking-tight">
-                          Seleccionado el {new Date(pudoPoint.correos_fecha_seleccion).toLocaleDateString()}
+                          Seleccionado el {new Date(pudoPoint.correos_selection_date).toLocaleDateString()}
                         </p>
                       )}
                     </div>

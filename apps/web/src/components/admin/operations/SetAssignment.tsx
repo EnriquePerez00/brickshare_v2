@@ -173,14 +173,14 @@ const SetAssignment = () => {
             for (const shipment of data) {
                 try {
                     const { data: preregResult, error: preregError } = await supabase.functions.invoke('correos-logistics', {
-                        body: { action: 'preregister', p_envios_id: shipment.shipment_id }
+                        body: { action: 'preregister', p_shipment_id: shipment.shipment_id }
                     });
 
                     if (preregError) throw preregError;
 
                     // Fetch label automatically
                     await supabase.functions.invoke('correos-logistics', {
-                        body: { action: 'get_label', p_envios_id: shipment.shipment_id }
+                        body: { action: 'get_label', p_shipment_id: shipment.shipment_id }
                     });
 
                     // Update local state with tracking info
@@ -421,7 +421,7 @@ const SetAssignment = () => {
                                                                     size="sm"
                                                                     onClick={() => {
                                                                         supabase.functions.invoke('correos-logistics', {
-                                                                            body: { action: 'get_label', p_envios_id: shipment.shipment_id }
+                                                                            body: { action: 'get_label', p_shipment_id: shipment.shipment_id }
                                                                         }).then(({ data }) => {
                                                                             if (data?.label_url) window.open(data.label_url, '_blank');
                                                                         });
@@ -438,7 +438,7 @@ const SetAssignment = () => {
                                                                     onClick={() => {
                                                                         toast.info("Reintentando preregistro...");
                                                                         supabase.functions.invoke('correos-logistics', {
-                                                                            body: { action: 'preregister', p_envios_id: shipment.shipment_id }
+                                                                            body: { action: 'preregister', p_shipment_id: shipment.shipment_id }
                                                                         }).then(() => toast.success("Preregistro solicitado"));
                                                                     }}
                                                                 >

@@ -62,7 +62,7 @@ export const useReturnSet = () => {
             const { data, error: functionError } = await supabase.functions.invoke('correos-logistics', {
                 body: {
                     action: 'return_preregister',
-                    p_envios_id: envioId
+                    p_shipment_id: envioId
                 }
             });
 

@@ -30,7 +30,7 @@ const ShipmentsList = () => {
         setProcessing(`${shipmentId}-${action}`);
         try {
             const { data, error } = await supabase.functions.invoke('correos-logistics', {
-                body: { action, p_envios_id: shipmentId }
+                body: { action, p_shipment_id: shipmentId }
             });
 
             if (error) throw error;

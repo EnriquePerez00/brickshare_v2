@@ -161,7 +161,7 @@ serve(async (req) => {
           const { data: authUser } = await supabase.auth.admin.getUserById(userId);
           const { data: profile } = await supabase
             .from("profiles")
-            .select("full_name, correos_nombre")
+            .select("full_name, correos_name")
             .eq("id", userId)
             .maybeSingle();
 
@@ -169,7 +169,7 @@ serve(async (req) => {
             await sendEmail("subscription_activated", authUser.user.email, {
               name: profile?.full_name ?? "",
               plan: plan ?? "Estándar",
-              pudo_name: profile?.correos_nombre ?? undefined,
+              pudo_name: profile?.correos_name ?? undefined,
             });
           }
         }

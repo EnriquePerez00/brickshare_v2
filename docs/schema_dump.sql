@@ -1231,31 +1231,31 @@ COMMENT ON COLUMN "public"."users"."referral_credits" IS 'Accumulated credits fr
 CREATE TABLE IF NOT EXISTS "public"."users_correos_dropping" (
     "user_id" "uuid" NOT NULL,
     "correos_id_pudo" "text" NOT NULL,
-    "correos_nombre" "text" NOT NULL,
-    "correos_tipo_punto" "text" NOT NULL,
-    "correos_direccion_calle" "text" NOT NULL,
-    "correos_direccion_numero" "text",
-    "correos_codigo_postal" "text" NOT NULL,
-    "correos_ciudad" "text" NOT NULL,
-    "correos_provincia" "text" NOT NULL,
-    "correos_pais" "text" DEFAULT 'España'::"text" NOT NULL,
-    "correos_direccion_completa" "text" NOT NULL,
-    "correos_latitud" numeric(10,8) NOT NULL,
-    "correos_longitud" numeric(11,8) NOT NULL,
-    "correos_horario_apertura" "text",
-    "correos_horario_estructurado" "jsonb",
-    "correos_disponible" boolean DEFAULT true NOT NULL,
-    "correos_telefono" "text",
+    "correos_name" "text" NOT NULL,
+    "correos_point_type" "text" NOT NULL,
+    "correos_street" "text" NOT NULL,
+    "correos_street_number" "text",
+    "correos_zip_code" "text" NOT NULL,
+    "correos_city" "text" NOT NULL,
+    "correos_province" "text" NOT NULL,
+    "correos_country" "text" DEFAULT 'España'::"text" NOT NULL,
+    "correos_full_address" "text" NOT NULL,
+    "correos_latitude" numeric(10,8) NOT NULL,
+    "correos_longitude" numeric(11,8) NOT NULL,
+    "correos_opening_hours" "text",
+    "correos_structured_hours" "jsonb",
+    "correos_available" boolean DEFAULT true NOT NULL,
+    "correos_phone" "text",
     "correos_email" "text",
-    "correos_codigo_interno" "text",
-    "correos_capacidad_lockers" integer,
-    "correos_servicios_adicionales" "text"[],
-    "correos_accesibilidad" boolean DEFAULT false,
+    "correos_internal_code" "text",
+    "correos_locker_capacity" integer,
+    "correos_additional_services" "text"[],
+    "correos_accessibility" boolean DEFAULT false,
     "correos_parking" boolean DEFAULT false,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "correos_fecha_seleccion" timestamp with time zone DEFAULT "now"() NOT NULL,
-    CONSTRAINT "users_correos_dropping_correos_tipo_punto_check" CHECK (("correos_tipo_punto" = ANY (ARRAY['Oficina'::"text", 'Citypaq'::"text", 'Locker'::"text"])))
+    "correos_selection_date" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "users_correos_dropping_correos_tipo_punto_check" CHECK (("correos_point_type" = ANY (ARRAY['Oficina'::"text", 'Citypaq'::"text", 'Locker'::"text"])))
 );
 
 
@@ -1512,11 +1512,11 @@ CREATE INDEX "idx_set_piece_list_set_id" ON "public"."set_piece_list" USING "btr
 
 
 
-CREATE INDEX "idx_users_correos_dropping_cp" ON "public"."users_correos_dropping" USING "btree" ("correos_codigo_postal");
+CREATE INDEX "idx_users_correos_dropping_cp" ON "public"."users_correos_dropping" USING "btree" ("correos_zip_code");
 
 
 
-CREATE INDEX "idx_users_correos_dropping_tipo" ON "public"."users_correos_dropping" USING "btree" ("correos_tipo_punto");
+CREATE INDEX "idx_users_correos_dropping_tipo" ON "public"."users_correos_dropping" USING "btree" ("correos_point_type");
 
 
 
@@ -1662,7 +1662,7 @@ ALTER TABLE ONLY "public"."shipments"
 
 
 ALTER TABLE ONLY "public"."inventory_sets"
-    ADD CONSTRAINT "inventario_sets_set_id_fkey" FOREIGN KEY ("set_id") REFERENCES "public"."sets"("id") ON DELETE CASCADE;
+    ADD CONSTRAINT "inventory_sets_set_id_fkey" FOREIGN KEY ("set_id") REFERENCES "public"."sets"("id") ON DELETE CASCADE;
 
 
 

@@ -154,7 +154,10 @@ serve(async (req) => {
             scope: Deno.env.get('CORREOS_SCOPE') ?? 'oauthtest'
         }
 
-        const { action, p_envios_id } = await req.json()
+        const { action, p_envios_id, p_shipment_id } = await req.json()
+
+        // Support both old and new parameter names during transition
+        const shipmentId = p_shipment_id || p_envios_id;
 
         // 1. JWT Verification and Authorization
         const authHeader = req.headers.get('Authorization')
@@ -195,9 +198,9 @@ serve(async (req) => {
             )
         }
 
-        if (!action || !p_envios_id) {
+        if (!action || !shipmentId) {
             return new Response(
-                JSON.stringify({ error: 'Missing action or p_envios_id' }),
+                JSON.stringify({ error: 'Missing action or p_shipment_id' }),
                 { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             )
         }
@@ -228,7 +231,7 @@ serve(async (req) => {
                             phone
                         )
                     `)
-                    .eq('id', p_envios_id)
+                    .eq('id', shipmentId)
                     .single();
 
                 if (shipmentError || !shipment) {
@@ -290,7 +293,7 @@ serve(async (req) => {
                         shipment_status: 'prepared',
                         updated_at: new Date().toISOString()
                     })
-                    .eq('id', p_envios_id);
+                    .eq('id', shipmentId);
 
                 return new Response(
                     JSON.stringify({ message: 'Preregistration successful', correos_shipment_id: correosShipmentId }),
@@ -324,7 +327,7 @@ serve(async (req) => {
                             phone
                         )
                     `)
-                    .eq('id', p_envios_id)
+                    .eq('id', shipmentId)
                     .single();
 
                 if (shipmentError || !shipment) {
@@ -351,10 +354,10 @@ serve(async (req) => {
                         referencia: `RET-${shipment.id.substring(0, 8)}`,
                         remitente: {
                             nombre: shipment.users?.full_name || "Cliente Brickshare",
-                            direccion: pudo?.correos_direccion_completa || shipment.shipping_address,
-                            cp: pudo?.correos_codigo_postal || shipment.shipping_postal_code,
-                            poblacion: pudo?.correos_ciudad || shipment.shipping_city,
-                            provincia: pudo?.correos_provincia || shipment.shipping_city,
+                            direccion: pudo?.correos_full_address || shipment.shipping_address,
+                            cp: pudo?.correos_zip_code || shipment.shipping_postal_code,
+                            poblacion: pudo?.correos_city || shipment.shipping_city,
+                            provincia: pudo?.correos_province || shipment.shipping_city,
                             email: shipment.users?.email,
                             telefono: shipment.users?.phone,
                         },
@@ -399,7 +402,7 @@ serve(async (req) => {
                         pickup_provider: 'Correos (Sin Etiqueta)',
                         updated_at: new Date().toISOString()
                     })
-                    .eq('id', p_envios_id);
+                    .eq('id', shipmentId);
 
                 await sendReturnEmail(supabaseUrl, supabaseKey, {
                     to: shipment.users?.email,
@@ -423,8 +426,8 @@ serve(async (req) => {
                             <div style="background: #f3f4f6; padding: 20px; border-radius: 12px; margin-bottom: 24px;">
                                 <p style="margin: 0 0 10px 0; font-weight: bold; color: #4b5563;">PUNTO DE ENTREGA SELECCIONADO:</p>
                                 <p style="margin: 0; font-size: 16px;">
-                                    <strong>${pudo?.correos_nombre || 'Oficina de Correos'}</strong><br/>
-                                    ${pudo?.correos_direccion_completa || shipment.shipping_address}
+                                    <strong>${pudo?.correos_name || 'Oficina de Correos'}</strong><br/>
+                                    ${pudo?.correos_full_address || shipment.shipping_address}
                                 </p>
                             </div>
 
@@ -452,7 +455,7 @@ serve(async (req) => {
                 const { data: shipment, error: shipmentError } = await supabaseClient
                     .from('shipments')
                     .select('correos_shipment_id')
-                    .eq('id', p_envios_id)
+                    .eq('id', shipmentId)
                     .single();
 
                 if (shipmentError || !shipment?.correos_shipment_id) {
@@ -472,7 +475,7 @@ serve(async (req) => {
 
                 const labelBlob = await labelResponse.blob();
                 const fileName = `label_${shipment.correos_shipment_id}.pdf`;
-                const filePath = `${p_envios_id}/${fileName}`;
+                const filePath = `${shipmentId}/${fileName}`;
 
                 await supabaseClient.storage.from('shipping-labels').upload(filePath, labelBlob, {
                     contentType: 'application/pdf',
@@ -484,7 +487,7 @@ serve(async (req) => {
                 await supabaseClient.from('shipments').update({
                     label_url: publicUrl,
                     updated_at: new Date().toISOString()
-                }).eq('id', p_envios_id);
+                }).eq('id', shipmentId);
 
                 return new Response(
                     JSON.stringify({ message: 'Label generated successfully', label_url: publicUrl }),
@@ -496,7 +499,7 @@ serve(async (req) => {
                 const { data: shipment, error: shipmentError } = await supabaseClient
                     .from('shipments')
                     .select('*, users:user_id(full_name, email, phone)')
-                    .eq('id', p_envios_id)
+                    .eq('id', shipmentId)
                     .single();
 
                 if (shipmentError || !shipment) throw new Error(`Shipment not found: ${shipmentError?.message}`);
@@ -536,7 +539,7 @@ serve(async (req) => {
                 await supabaseClient.from('shipments').update({
                     pickup_id: pickupId,
                     updated_at: new Date().toISOString()
-                }).eq('id', p_envios_id);
+                }).eq('id', shipmentId);
 
                 return new Response(
                     JSON.stringify({ message: 'Pickup requested successfully', pickup_id: pickupId }),
@@ -548,7 +551,7 @@ serve(async (req) => {
                 const { data: shipment, error: shipmentError } = await supabaseClient
                     .from('shipments')
                     .select('correos_shipment_id')
-                    .eq('id', p_envios_id)
+                    .eq('id', shipmentId)
                     .single();
 
                 if (shipmentError || !shipment?.correos_shipment_id) {
@@ -570,7 +573,7 @@ serve(async (req) => {
                 await supabaseClient.from('shipments').update({
                     last_tracking_update: new Date().toISOString(),
                     updated_at: new Date().toISOString()
-                }).eq('id', p_envios_id);
+                }).eq('id', shipmentId);
 
                 return new Response(
                     JSON.stringify({ message: 'Tracking info retrieved', data: trackData }),
