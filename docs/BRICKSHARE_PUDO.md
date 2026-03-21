@@ -40,7 +40,7 @@ npm install
 ### 2. Aplicar Migración de Base de Datos
 
 ```bash
-supabase db push
+supabase db reset
 ```
 
 ### 3. Desplegar Edge Functions

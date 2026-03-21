@@ -161,7 +161,7 @@ supabase migration new nombre_de_la_migracion
 # El archivo se crea en supabase/migrations/
 # Editar el archivo .sql con los cambios
 # Aplicar en local
-supabase db push
+supabase db reset
 
 # Para producción, el deploy aplica las migraciones automáticamente
 ```

@@ -156,18 +156,17 @@ STRIPE_SECRET_KEY=sk_test_...
 
 ## 🚢 Deployment
 
-El proyecto usa Docker para desarrollo local. Para producción:
+El proyecto usa Docker y Supabase local para desarrollo. Para producción:
 
-1. **Base de datos**: Proyecto Supabase en la nube
-2. **Frontend**: Vercel o similar
-3. **Edge Functions**: Desplegadas automáticamente con Supabase CLI
+1. **Frontend**: Vercel o similar
+2. **Base de datos**: Supabase local (Docker)
 
 ```bash
-# Push de migraciones a producción
-supabase db push --linked
+# Aplicar migraciones localmente
+supabase db reset
 
-# Deploy de Edge Functions
-supabase functions deploy
+# Actualizar documentación del esquema
+npm run dump-schema
 ```
 
 ## 🧪 Testing

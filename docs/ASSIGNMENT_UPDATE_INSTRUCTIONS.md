@@ -39,14 +39,13 @@ psql "postgresql://postgres:[TU_PASSWORD]@[TU_HOST]:5432/postgres"
 
 ### Opción 3: Configurar Supabase CLI correctamente
 
-Si quieres usar `npx supabase db push`, necesitas configurar las credenciales:
+Si quieres usar `npx supabase db reset`, necesitas configurar las credenciales:
 
 ```bash
 # Vincula tu proyecto
-npx supabase link --project-ref tevoogkifiszfontzkgd
 
 # Aplica las migraciones
-npx supabase db push
+npx supabase db reset
 ```
 
 ## 📝 Contenido de la Migración

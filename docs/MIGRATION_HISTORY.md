@@ -81,7 +81,6 @@ supabase db dump --data-only -f backups/local_data_$(date +%Y%m%d).sql
 
 ### Exportar Datos del Remoto
 ```bash
-supabase db dump --db-url "postgresql://postgres:[PASSWORD]@[HOST]:5432/postgres" --data-only -f backups/remote_data.sql
 ```
 
 ### Limpiar Dump para Importación Local
@@ -96,7 +95,7 @@ psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -f backups/remote_d
 
 ### Push de Migraciones al Remoto
 ```bash
-supabase db push
+supabase db reset
 ```
 
 ## Notas Importantes

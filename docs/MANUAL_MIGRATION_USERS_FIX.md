@@ -67,10 +67,9 @@ Si tienes las credenciales configuradas:
 npx supabase login
 
 # Enlaza el proyecto
-npx supabase link --project-ref tevoogkifiszfontzkgd
 
 # Aplica las migraciones pendientes
-npx supabase db push
+npx supabase db reset
 ```
 
 ## Verificación

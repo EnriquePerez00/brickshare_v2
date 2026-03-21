@@ -1,169 +1,135 @@
-# Sistema de Actualización Automática del Esquema de Base de Datos
+# Schema Auto-Update System
 
-## 📋 Descripción
+## 📋 Description
 
-Este sistema mantiene automáticamente actualizado el archivo `docs/schema.sql` con el esquema completo de la base de datos de Supabase (`public` schema) cada vez que se realiza un commit.
+This system automatically keeps the database schema documentation up-to-date whenever migrations are committed. It uses a Git pre-commit hook that detects changes in `supabase/migrations/` and regenerates the schema docs.
 
-## 🎯 Componentes
+## 🎯 Components
 
 ### 1. Git Hook Pre-commit
-**Ubicación**: `.git/hooks/pre-commit`
+**Location**: `.git/hooks/pre-commit`
 
-Se ejecuta automáticamente antes de cada commit y:
-- Verifica que Supabase CLI esté instalado
-- Genera un dump del esquema `public`
-- Guarda el resultado en `docs/schema.sql`
-- Añade el archivo al commit si hubo cambios
+Runs automatically before each commit and:
+- Checks if migration files are staged
+- Runs `scripts/update-schema-docs.sh` to regenerate documentation
+- Saves the result to `docs/DATABASE_SCHEMA.md` and `docs/schema_dump.sql`
+- Adds the updated files to the commit
 
-### 2. Script NPM Manual
-**Comando**: `npm run dump-schema`
+### 2. NPM Script
+**Command**: `npm run dump-schema`
 
-Para regenerar el esquema manualmente cuando sea necesario.
+To manually regenerate the schema documentation when needed.
 
-### 3. Script de Instalación
-**Ubicación**: `scripts/install-hooks.sh`
+### 3. Installation Script
+**Location**: `scripts/install-hooks.sh`
 
-Script para instalar el git hook en máquinas de otros desarrolladores.
+Script to install the git hook on developer machines.
 
-## 🚀 Configuración Inicial
+## 🚀 Setup
 
-### Para el primer uso:
+### First-time setup:
 
-**Sigue la guía completa de configuración en [SUPABASE_CLI_SETUP.md](./SUPABASE_CLI_SETUP.md)**
-
-Resumen de pasos:
 ```bash
-# 1. Genera access token desde dashboard de Supabase
-# https://supabase.com/dashboard/account/tokens
+# 1. Make sure Supabase local is running
+supabase start
 
-# 2. Guarda el token localmente
-mkdir -p ~/.supabase
-echo "TU_TOKEN_AQUI" > ~/.supabase/access-token
+# 2. Install git hooks
+bash scripts/install-hooks.sh
 
-# 3. Vincula el proyecto
-supabase link --project-ref tevoogkifiszfontzkgd --password "Urgell175177"
-
-# 4. Verifica que funciona
+# 3. Verify it works
 npm run dump-schema
 ```
 
-### Para otros desarrolladores:
+### For other developers:
 
 ```bash
-# Ejecuta el script de instalación
-./scripts/install-hooks.sh
-
-# Sigue las instrucciones de configuración que aparecen
+# Run the installation script
+bash scripts/install-hooks.sh
 ```
 
-## 📝 Uso
+## 📝 Usage
 
-### Automático
-El hook se ejecutará automáticamente en cada commit. Verás un mensaje como:
+### Automatic
+The hook runs automatically on every commit. You'll see a message like:
 
 ```
-🔄 Actualizando esquema de base de datos...
-✅ Esquema actualizado en docs/schema.sql
-   Agregando docs/schema.sql al commit...
+🔍 Migration detected, updating schema documentation...
+✅ Schema documentation updated and added to commit
 ```
 
 ### Manual
-Si necesitas regenerar el esquema sin hacer commit:
+If you need to regenerate the schema without committing:
 
 ```bash
 npm run dump-schema
 ```
 
-## ⚠️ Solución de Problemas
+## ⚠️ Troubleshooting
 
-### Error: "Supabase CLI no autenticado"
-
-```bash
-supabase login
-supabase link --project-ref tevoogkifiszfontzkgd
-```
-
-### Error: "password authentication failed"
-
-**Causa**: Contraseña de base de datos incorrecta.
-
-**Solución**: Verificar que usas la contraseña correcta: `Urgell175177`
+### Error: "Supabase is not running"
 
 ```bash
-supabase link --project-ref tevoogkifiszfontzkgd --password "Urgell175177"
+supabase start
 ```
 
-### Error: "Unauthorized"
+### The hook doesn't run
 
-**Causa**: Access token inválido o expirado.
-
-**Solución**: Genera un nuevo token desde el dashboard y guárdalo:
-```bash
-# 1. Ve a https://supabase.com/dashboard/account/tokens
-# 2. Genera nuevo token
-# 3. Guárdalo localmente
-echo "NUEVO_TOKEN" > ~/.supabase/access-token
-```
-
-Ver guía completa en [SUPABASE_CLI_SETUP.md](./SUPABASE_CLI_SETUP.md)
-
-### El hook no se ejecuta
-
-Verifica que sea ejecutable:
+Verify it's executable:
 ```bash
 chmod +x .git/hooks/pre-commit
 ```
 
-### Quiero deshabilitar temporalmente el hook
+### Temporarily disable the hook
 
-Renombra el archivo:
+Rename the file:
 ```bash
 mv .git/hooks/pre-commit .git/hooks/pre-commit.disabled
 ```
 
-Para reactivarlo:
+To re-enable:
 ```bash
 mv .git/hooks/pre-commit.disabled .git/hooks/pre-commit
 ```
 
-## 📂 Archivos del Sistema
+## 📂 System Files
 
 ```
-.git/hooks/pre-commit           # Hook que se ejecuta en cada commit
-docs/schema.sql                  # Esquema generado automáticamente
-scripts/install-hooks.sh         # Instalador para otros devs
-package.json                     # Contiene script "dump-schema"
+.git/hooks/pre-commit           # Hook that runs on each commit
+docs/DATABASE_SCHEMA.md          # Auto-generated schema documentation
+docs/schema_dump.sql             # Auto-generated SQL dump
+scripts/update-schema-docs.sh    # Schema documentation generator
+scripts/install-hooks.sh         # Hook installer for devs
+package.json                     # Contains "dump-schema" script
 ```
 
-## 🔄 Flujo de Trabajo
+## 🔄 Workflow
 
 ```
-1. Desarrollador hace cambios en migraciones SQL
+1. Developer makes changes to SQL migrations
    ↓
-2. Ejecuta: git add . && git commit -m "..."
+2. Runs: git add . && git commit -m "..."
    ↓
-3. El pre-commit hook se activa automáticamente
+3. Pre-commit hook activates automatically
    ↓
-4. Se genera docs/schema.sql con el esquema actual
+4. docs/DATABASE_SCHEMA.md and docs/schema_dump.sql are regenerated
    ↓
-5. Si hay cambios, se añade al commit automáticamente
+5. If there are changes, they are added to the commit
    ↓
-6. El commit se completa con código + esquema actualizado
+6. Commit completes with code + updated schema documentation
 ```
 
-## 💡 Beneficios
+## 💡 Benefits
 
-✅ **Documentación siempre actualizada**: El esquema en docs/ refleja el estado real de la BD
-✅ **Revisión de cambios**: En pull requests se pueden ver los cambios de esquema
-✅ **Historial completo**: Git mantiene historial de evolución del esquema
-✅ **Automatización**: Cero esfuerzo manual para mantener sincronizado
+✅ **Always up-to-date documentation**: Schema docs reflect the actual DB state
+✅ **Change review**: Schema changes are visible in pull requests
+✅ **Full history**: Git maintains the complete schema evolution history
+✅ **Automation**: Zero manual effort to keep documentation in sync
 
-## 📚 Referencias
+## ℹ️ Note
+
+This project uses **local Supabase only** (via Docker). There is no remote Supabase database. All migrations are applied locally via `supabase db reset`.
+
+## 📚 References
 
 - [Supabase CLI Documentation](https://supabase.com/docs/guides/cli)
 - [Git Hooks Documentation](https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks)
-
----
-
-**Última actualización**: 21/03/2026  
-**Mantenedor**: Equipo Brickshare

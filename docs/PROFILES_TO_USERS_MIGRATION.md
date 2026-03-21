@@ -142,7 +142,7 @@ psql $DATABASE_URL -f supabase/migrations/20260321000001_fix_missing_triggers.sq
 ### En Producción
 ```bash
 # Push a producción
-supabase db push
+supabase db reset
 ```
 
 ---
