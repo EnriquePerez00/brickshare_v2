@@ -7,25 +7,24 @@ export interface ShipmentData {
     user_id: string;
     set_id: string | null;
     set_ref: string | null;
-    fecha_asignada: string | null;
-    fecha_entrega: string | null;
-    fecha_entrega_real: string | null;
-    fecha_entrega_usuario: string | null;
-    fecha_recepcion_almacen: string | null;
-    fecha_recogida_almacen: string | null;
-    fecha_solicitud_devolucion: string | null;
-    fecha_devolucion_estimada: string | null;
-    estado_envio: string;
-    direccion_envio: string;
-    ciudad_envio: string;
-    codigo_postal_envio: string;
-    pais_envio: string;
-    proveedor_envio: string | null;
-    proveedor_recogida: string | null;
-    numero_seguimiento: string | null;
-    costo_envio: number | null;
-    transportista: string | null;
-    notas_adicionales: string | null;
+    assigned_date: string | null;
+    estimated_delivery_date: string | null;
+    actual_delivery_date: string | null;
+    user_delivery_date: string | null;
+    warehouse_reception_date: string | null;
+    warehouse_pickup_date: string | null;
+    return_request_date: string | null;
+    estimated_return_date: string | null;
+    shipment_status: string;
+    shipping_address: string;
+    shipping_city: string;
+    shipping_zip_code: string;
+    shipping_country: string;
+    shipping_provider: string | null;
+    pickup_provider: string | null;
+    tracking_number: string | null;
+    carrier: string | null;
+    additional_notes: string | null;
     correos_shipment_id: string | null;
     label_url: string | null;
     pickup_id: string | null;
@@ -50,7 +49,7 @@ export const useShipments = () => {
             }
 
             const { data, error } = await supabase
-                .from("envios" as any)
+                .from("shipments" as any)
                 .select(`
                     *,
                     users:user_id (

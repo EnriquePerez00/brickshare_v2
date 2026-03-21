@@ -22,21 +22,21 @@ const ShipmentsList = () => {
     // Filter active shipments and sort by updated_at DESC (most recent first)
     const activeShipments = shipments
         ?.filter(s =>
-            ['preparacion', 'ruta_envio', 'devuelto', 'ruta_devolucion', 'pendiente', 'asignado'].includes(s.estado_envio)
+            ['preparation', 'in_transit', 'returned', 'return_in_transit', 'pending', 'assigned'].includes(s.shipment_status)
         )
         .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
 
-    const handleLogisticsAction = async (envioId: string, action: 'preregister' | 'get_label') => {
-        setProcessing(`${envioId}-${action}`);
+    const handleLogisticsAction = async (shipmentId: string, action: 'preregister' | 'get_label') => {
+        setProcessing(`${shipmentId}-${action}`);
         try {
             const { data, error } = await supabase.functions.invoke('correos-logistics', {
-                body: { action, p_envios_id: envioId }
+                body: { action, p_envios_id: shipmentId }
             });
 
             if (error) throw error;
 
             toast({
-                title: action === 'preregister' ? "Envío Registrado" : "Etiqueta Generada",
+                title: action === 'preregister' ? "Shipment Registered" : "Label Generated",
                 description: data.message,
                 className: "bg-green-100 border-green-200 dark:bg-green-900/30 dark:border-green-800",
             });
@@ -45,7 +45,7 @@ const ShipmentsList = () => {
             console.error(`Error in ${action}:`, error);
             toast({
                 title: "Error",
-                description: error.message || "No se pudo completar la acción.",
+                description: error.message || "Could not complete the action.",
                 variant: "destructive",
             });
         } finally {
@@ -53,22 +53,22 @@ const ShipmentsList = () => {
         }
     };
 
-    const getStatusBadge = (estado: string) => {
-        switch (estado) {
-            case 'pendiente':
-                return <Badge variant="outline" className="bg-gray-100 text-gray-800 border-gray-300">Pendiente</Badge>;
-            case 'asignado':
-                return <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-300">Asignado</Badge>;
-            case 'preparacion':
-                return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300">En Preparación</Badge>;
-            case 'ruta_envio':
-                return <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">En Camino</Badge>;
-            case 'devuelto':
-                return <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-300">Devolución Solicitada</Badge>;
-            case 'ruta_devolucion':
-                return <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">En Devolución</Badge>;
+    const getStatusBadge = (status: string) => {
+        switch (status) {
+            case 'pending':
+                return <Badge variant="outline" className="bg-gray-100 text-gray-800 border-gray-300">Pending</Badge>;
+            case 'assigned':
+                return <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-300">Assigned</Badge>;
+            case 'preparation':
+                return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300">In Preparation</Badge>;
+            case 'in_transit':
+                return <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">In Transit</Badge>;
+            case 'returned':
+                return <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-300">Return Requested</Badge>;
+            case 'return_in_transit':
+                return <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">Return In Transit</Badge>;
             default:
-                return <Badge variant="outline">{estado}</Badge>;
+                return <Badge variant="outline">{status}</Badge>;
         }
     };
 
@@ -82,7 +82,7 @@ const ShipmentsList = () => {
         return (
             <div className="text-center py-12 bg-card rounded-xl border border-dashed border-border">
                 <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground text-lg">No hay envíos activos registrados.</p>
+                <p className="text-muted-foreground text-lg">No active shipments registered.</p>
             </div>
         );
     }
@@ -95,9 +95,9 @@ const ShipmentsList = () => {
                         <TableRow>
                             <TableHead>Email</TableHead>
                             <TableHead>Set Ref</TableHead>
-                            <TableHead>Estado Envío</TableHead>
-                            <TableHead>Dirección Envío</TableHead>
-                            <TableHead className="text-right">Acciones Correos</TableHead>
+                            <TableHead>Shipment Status</TableHead>
+                            <TableHead>Shipping Address</TableHead>
+                            <TableHead className="text-right">Correos Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -110,13 +110,13 @@ const ShipmentsList = () => {
                                     {shipment.set_ref || "-"}
                                 </TableCell>
                                 <TableCell>
-                                    {getStatusBadge(shipment.estado_envio)}
+                                    {getStatusBadge(shipment.shipment_status)}
                                 </TableCell>
                                 <TableCell>
                                     <div className="text-sm">
-                                        {shipment.direccion_envio}
+                                        {shipment.shipping_address}
                                         <div className="text-xs text-muted-foreground">
-                                            {shipment.codigo_postal_envio} {shipment.ciudad_envio}
+                                            {shipment.shipping_zip_code} {shipment.shipping_city}
                                         </div>
                                     </div>
                                 </TableCell>
@@ -133,7 +133,7 @@ const ShipmentsList = () => {
                                                 {processing === `${shipment.id}-preregister` ? (
                                                     <Loader2 className="h-3 w-3 animate-spin" />
                                                 ) : <ClipboardCheck className="h-3 w-3" />}
-                                                Prerregistro
+                                                Preregister
                                             </Button>
                                         ) : (
                                             <>
@@ -153,7 +153,7 @@ const ShipmentsList = () => {
                                                     {processing === `${shipment.id}-get_label` ? (
                                                         <Loader2 className="h-3 w-3 animate-spin" />
                                                     ) : <FileText className="h-3 w-3" />}
-                                                    {shipment.label_url ? 'Ver Etiqueta' : 'Generar Etiqueta'}
+                                                    {shipment.label_url ? 'View Label' : 'Generate Label'}
                                                 </Button>
                                                 {shipment.correos_shipment_id && (
                                                     <div className="text-[10px] text-muted-foreground mt-1">

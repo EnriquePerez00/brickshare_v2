@@ -14,7 +14,7 @@ import { Loader2, AlertCircle } from "lucide-react";
 
 /**
  * Component to manage and view missing LEGO parts reported during set reception.
- * Fetches data from 'operaciones_recepcion' where 'missing_parts' is not null.
+ * Fetches data from 'reception_operations' where 'missing_parts' is not null.
  */
 const PiecePurchaseManager = () => {
     const { data: missingPartsRequests, isLoading } = useQuery({
@@ -22,7 +22,7 @@ const PiecePurchaseManager = () => {
         queryFn: async () => {
             // Fetch records where missing_parts is not null or empty string
             const { data, error } = await supabase
-                .from("operaciones_recepcion")
+                .from("reception_operations")
                 .select(`
           id,
           missing_parts,

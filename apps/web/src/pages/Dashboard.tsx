@@ -290,11 +290,14 @@ const Dashboard = () => {
                       {orders.map((order, index) => {
                         const getStatusBadge = (status: string) => {
                           const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-                            preparacion: { label: "En Preparación", variant: "outline" },
-                            ruta_envio: { label: "En Ruta (Envío)", variant: "default" },
-                            entregado: { label: "Entregado", variant: "default" },
-                            devuelto: { label: "Devuelto", variant: "secondary" },
-                            ruta_devolucion: { label: "En Ruta (Devolución)", variant: "secondary" },
+                            pending: { label: "Pendiente", variant: "outline" },
+                            preparation: { label: "En Preparación", variant: "outline" },
+                            assigned: { label: "Asignado", variant: "outline" },
+                            in_transit: { label: "En Ruta (Envío)", variant: "default" },
+                            delivered: { label: "Entregado", variant: "default" },
+                            returned: { label: "Devuelto", variant: "secondary" },
+                            return_in_transit: { label: "En Ruta (Devolución)", variant: "secondary" },
+                            cancelled: { label: "Cancelado", variant: "destructive" },
                           };
                           const config = statusConfig[status] || { label: status, variant: "outline" };
                           return <Badge variant={config.variant}>{config.label}</Badge>;
@@ -311,7 +314,7 @@ const Dashboard = () => {
                         };
 
                         // Only the most recent order (index 0) can be returned, and only if it's delivered
-                        const canReturn = index === 0 && order.estado_envio === 'entregado';
+                        const canReturn = index === 0 && order.shipment_status === 'delivered';
 
                         return (
                           <tr key={order.id} className="hover:bg-muted/50 transition-colors">
@@ -328,7 +331,7 @@ const Dashboard = () => {
                                 <span>{order.sets?.set_name || "Set Desconocido"}</span>
                               </div>
                             </td>
-                            <td className="p-4">{getStatusBadge(order.estado_envio)}</td>
+                            <td className="p-4">{getStatusBadge(order.shipment_status)}</td>
                             <td className="p-4 text-muted-foreground">{formatDate(order.updated_at)}</td>
                             <td className="p-4 text-right">
                               {canReturn && (

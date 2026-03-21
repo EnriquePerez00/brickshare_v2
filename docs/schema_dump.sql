@@ -45,123 +45,18 @@ CREATE TYPE "public"."operation_type" AS ENUM (
 ALTER TYPE "public"."operation_type" OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."assign_sets_to_users"() RETURNS TABLE("envio_id" "uuid", "user_id" "uuid", "set_id" "uuid", "order_id" "uuid", "user_name" "text", "set_name" "text", "set_ref" "text", "created_at" timestamp with time zone)
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public'
-    AS $$
-DECLARE
-    r RECORD;
-    target_set_id UUID;
-    new_order_id UUID;
-    new_envio_id UUID;
-    v_set_name TEXT;
-    v_set_ref TEXT;
-    v_created_at TIMESTAMPTZ;
-BEGIN
-    -- Loop through eligible users
-    FOR r IN (
-        SELECT u.user_id, u.full_name
-        FROM public.users u
-        WHERE u.user_status IN ('sin set', 'set en devolucion')
-          AND EXISTS (SELECT 1 FROM public.wishlist w WHERE w.user_id = u.user_id)
-    ) LOOP
-        -- Find the first available set from user's wishlist (by creation order)
-        SELECT w.set_id, s.set_name, s.set_ref 
-        INTO target_set_id, v_set_name, v_set_ref
-        FROM public.wishlist w
-        JOIN public.inventory_sets i ON w.set_id = i.set_id
-        JOIN public.sets s ON w.set_id = s.id
-        WHERE w.user_id = r.user_id
-          AND i.inventory_set_total_qty > 0
-        ORDER BY w.created_at ASC
-        LIMIT 1;
-
-        -- If a set is found, perform assignment
-        IF target_set_id IS NOT NULL THEN
-            -- 1. Update Inventory: decrement total stock and increment en_envio
-            UPDATE public.inventory_sets
-            SET inventory_set_total_qty = inventory_set_total_qty - 1,
-                en_envio = en_envio + 1
-            WHERE inventory_sets.set_id = target_set_id;
-
-            -- 2. Create Order
-            INSERT INTO public.orders (user_id, set_id, status)
-            VALUES (r.user_id, target_set_id, 'pending')
-            RETURNING id INTO new_order_id;
-
-            -- 3. Create Envio record
-            INSERT INTO public.envios (
-                order_id, 
-                user_id, 
-                estado_envio,
-                direccion_envio,
-                ciudad_envio,
-                codigo_postal_envio
-            )
-            VALUES (
-                new_order_id,
-                r.user_id,
-                'pendiente',
-                'Pendiente de asignación',
-                'Pendiente',
-                '00000'
-            )
-            -- FIX: Explicitly specify table name to avoid ambiguity
-            RETURNING envios.id, envios.created_at INTO new_envio_id, v_created_at;
-
-            -- 4. Update User Status
-            UPDATE public.users
-            SET user_status = 'set en envio'
-            WHERE users.user_id = r.user_id;
-
-            -- Return the result with full details
-            envio_id := new_envio_id;
-            user_id := r.user_id;
-            set_id := target_set_id;
-            order_id := new_order_id;
-            user_name := r.full_name;
-            set_name := v_set_name;
-            set_ref := v_set_ref;
-            created_at := v_created_at;
-            
-            RETURN NEXT;
-        END IF;
-    END LOOP;
-END;
-$$;
-
-
-ALTER FUNCTION "public"."assign_sets_to_users"() OWNER TO "postgres";
-
-
-COMMENT ON FUNCTION "public"."assign_sets_to_users"() IS 'Assigns available sets to users based on wishlist and returns full envio details for immediate display';
-
-
-
 CREATE OR REPLACE FUNCTION "public"."confirm_assign_sets_to_users"("p_user_ids" "uuid"[]) RETURNS TABLE("envio_id" "uuid", "user_id" "uuid", "set_id" "uuid", "order_id" "uuid", "user_name" "text", "user_email" "text", "user_phone" "text", "set_name" "text", "set_ref" "text", "set_weight" numeric, "set_dim" "text", "pudo_id" "text", "pudo_name" "text", "pudo_address" "text", "pudo_cp" "text", "pudo_city" "text", "pudo_province" "text", "created_at" timestamp with time zone)
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
     AS $$
 DECLARE
     r RECORD;
-    target_set_id UUID;
-    new_order_id UUID;
-    new_envio_id UUID;
-    v_set_name TEXT;
-    v_set_ref TEXT;
-    v_set_weight NUMERIC;
-    v_set_dim TEXT;
-    v_user_email TEXT;
-    v_user_phone TEXT;
-    v_pudo_id TEXT;
-    v_pudo_name TEXT;
-    v_pudo_address TEXT;
-    v_pudo_cp TEXT;
-    v_pudo_city TEXT;
-    v_pudo_province TEXT;
+    target_set_id UUID; new_order_id UUID; new_envio_id UUID;
+    v_set_name TEXT; v_set_ref TEXT; v_set_weight NUMERIC; v_set_dim TEXT;
+    v_user_email TEXT; v_user_phone TEXT;
+    v_pudo_id TEXT; v_pudo_name TEXT; v_pudo_address TEXT; v_pudo_cp TEXT; v_pudo_city TEXT; v_pudo_province TEXT;
     v_created_at TIMESTAMPTZ;
 BEGIN
-    -- Loop through specified users only
     FOR r IN (
         SELECT u.user_id, u.full_name, u.email, u.phone,
                p.correos_id_pudo, p.correos_nombre, p.correos_direccion_completa,
@@ -169,68 +64,35 @@ BEGIN
         FROM public.users u
         LEFT JOIN public.users_correos_dropping p ON u.user_id = p.user_id
         WHERE u.user_id = ANY(p_user_ids)
-          AND u.user_status IN ('sin set', 'set en devolucion')
+          AND u.user_status IN ('no_set', 'set_returning')
           AND EXISTS (SELECT 1 FROM public.wishlist w WHERE w.user_id = u.user_id AND w.status = true)
     ) LOOP
-        -- Find the first available set from user's wishlist (by creation order)
         SELECT w.set_id, s.set_name, s.set_ref, s.set_weight, s.set_dim
         INTO target_set_id, v_set_name, v_set_ref, v_set_weight, v_set_dim
         FROM public.wishlist w
         JOIN public.inventory_sets i ON w.set_id = i.set_id
         JOIN public.sets s ON w.set_id = s.id
-        WHERE w.user_id = r.user_id
-          AND w.status = true
-          AND i.inventory_set_total_qty > 0
-        ORDER BY w.created_at ASC
-        LIMIT 1;
+        WHERE w.user_id = r.user_id AND w.status = true AND i.inventory_set_total_qty > 0
+        ORDER BY w.created_at ASC LIMIT 1;
 
-        -- If a set is found, perform assignment
         IF target_set_id IS NOT NULL THEN
-            -- 1. Update Inventory: decrement total stock and increment en_envio
-            UPDATE public.inventory_sets
-            SET inventory_set_total_qty = inventory_set_total_qty - 1,
-                en_envio = en_envio + 1
+            UPDATE public.inventory_sets SET inventory_set_total_qty = inventory_set_total_qty - 1, in_shipping = in_shipping + 1
             WHERE inventory_sets.set_id = target_set_id;
 
-            -- 2. Create Order
-            INSERT INTO public.orders (user_id, set_id, status)
-            VALUES (r.user_id, target_set_id, 'pending')
-            RETURNING id INTO new_order_id;
+            INSERT INTO public.orders (user_id, set_id, status) VALUES (r.user_id, target_set_id, 'pending') RETURNING id INTO new_order_id;
 
-            -- 3. Create Envio record with PUDO data
-            INSERT INTO public.envios (
-                order_id, 
-                user_id, 
-                estado_envio,
-                direccion_envio,
-                ciudad_envio,
-                codigo_postal_envio,
-                pais_envio
-            )
-            VALUES (
-                new_order_id,
-                r.user_id,
-                'pendiente',
-                COALESCE(r.correos_direccion_completa, 'Pendiente de asignación'),
-                COALESCE(r.correos_ciudad, 'Pendiente'),
-                COALESCE(r.correos_codigo_postal, '00000'),
-                'España'
-            )
-            RETURNING envios.id, envios.created_at INTO new_envio_id, v_created_at;
+            INSERT INTO public.shipments (order_id, user_id, shipment_status, shipping_address, shipping_city, shipping_zip_code, shipping_country)
+            VALUES (new_order_id, r.user_id, 'pending',
+                    COALESCE(r.correos_direccion_completa, 'Pending assignment'),
+                    COALESCE(r.correos_ciudad, 'Pending'),
+                    COALESCE(r.correos_codigo_postal, '00000'), 'España')
+            RETURNING shipments.id, shipments.created_at INTO new_envio_id, v_created_at;
 
-            -- 4. Update User Status
-            UPDATE public.users
-            SET user_status = 'set en envio'
-            WHERE users.user_id = r.user_id;
+            UPDATE public.users SET user_status = 'set_shipping' WHERE users.user_id = r.user_id;
 
-            -- 5. Update Wishlist Status
-            UPDATE public.wishlist
-            SET status = false,
-                status_changed_at = now()
-            WHERE wishlist.user_id = r.user_id 
-              AND wishlist.set_id = target_set_id;
+            UPDATE public.wishlist SET status = false, status_changed_at = now()
+            WHERE wishlist.user_id = r.user_id AND wishlist.set_id = target_set_id;
 
-            -- Populate return variables
             confirm_assign_sets_to_users.envio_id := new_envio_id;
             confirm_assign_sets_to_users.user_id := r.user_id;
             confirm_assign_sets_to_users.set_id := target_set_id;
@@ -249,7 +111,6 @@ BEGIN
             confirm_assign_sets_to_users.pudo_city := r.correos_ciudad;
             confirm_assign_sets_to_users.pudo_province := r.correos_provincia;
             confirm_assign_sets_to_users.created_at := v_created_at;
-            
             RETURN NEXT;
         END IF;
     END LOOP;
@@ -267,75 +128,28 @@ DECLARE
     v_validation RECORD;
     v_new_status TEXT;
 BEGIN
-    -- Validate QR code first
-    SELECT * INTO v_validation
-    FROM validate_qr_code(p_qr_code);
-    
+    SELECT * INTO v_validation FROM validate_qr_code(p_qr_code);
     IF NOT v_validation.is_valid THEN
-        RETURN QUERY SELECT 
-            false,
-            v_validation.error_message,
-            v_validation.shipment_id;
-        RETURN;
+        RETURN QUERY SELECT false, v_validation.error_message, v_validation.shipment_id; RETURN;
     END IF;
-    
-    -- Update shipment based on validation type
+
     IF v_validation.validation_type = 'delivery' THEN
         v_new_status := 'delivered';
-        
-        UPDATE envios
-        SET 
-            delivery_validated_at = now(),
-            estado_envio = v_new_status,
-            updated_at = now()
-        WHERE id = v_validation.shipment_id;
-        
+        UPDATE shipments SET delivery_validated_at = now(), shipment_status = v_new_status, updated_at = now() WHERE id = v_validation.shipment_id;
     ELSIF v_validation.validation_type = 'return' THEN
         v_new_status := 'returned';
-        
-        UPDATE envios
-        SET 
-            return_validated_at = now(),
-            estado_envio = v_new_status,
-            updated_at = now()
-        WHERE id = v_validation.shipment_id;
+        UPDATE shipments SET return_validated_at = now(), shipment_status = v_new_status, updated_at = now() WHERE id = v_validation.shipment_id;
     END IF;
-    
-    -- Log validation
-    INSERT INTO qr_validation_logs (
-        shipment_id,
-        qr_code,
-        validation_type,
-        validated_by,
-        validation_status,
-        metadata
-    ) VALUES (
-        v_validation.shipment_id,
-        p_qr_code,
-        v_validation.validation_type,
-        p_validated_by,
-        'success',
-        jsonb_build_object('validated_at', now())
-    );
-    
-    RETURN QUERY SELECT 
-        true,
-        format('Shipment successfully %s', 
-            CASE 
-                WHEN v_validation.validation_type = 'delivery' THEN 'delivered'
-                ELSE 'returned'
-            END
-        ),
-        v_validation.shipment_id;
+
+    INSERT INTO qr_validation_logs (shipment_id, qr_code, validation_type, validated_by, validation_status, metadata)
+    VALUES (v_validation.shipment_id, p_qr_code, v_validation.validation_type, p_validated_by, 'success', jsonb_build_object('validated_at', now()));
+
+    RETURN QUERY SELECT true, format('Shipment successfully %s', CASE WHEN v_validation.validation_type = 'delivery' THEN 'delivered' ELSE 'returned' END), v_validation.shipment_id;
 END;
 $$;
 
 
 ALTER FUNCTION "public"."confirm_qr_validation"("p_qr_code" "text", "p_validated_by" "text") OWNER TO "postgres";
-
-
-COMMENT ON FUNCTION "public"."confirm_qr_validation"("p_qr_code" "text", "p_validated_by" "text") IS 'Confirms a QR validation and updates shipment status';
-
 
 
 CREATE OR REPLACE FUNCTION "public"."delete_assignment_and_rollback"("p_envio_id" "uuid") RETURNS "void"
@@ -346,44 +160,22 @@ DECLARE
     v_user_id UUID;
     v_set_id UUID;
 BEGIN
-    -- Get user_id and set_id directly from envios
-    SELECT user_id, set_id INTO v_user_id, v_set_id
-    FROM public.envios
-    WHERE id = p_envio_id;
+    SELECT user_id, set_id INTO v_user_id, v_set_id FROM public.shipments WHERE id = p_envio_id;
+    IF v_user_id IS NULL THEN RAISE EXCEPTION 'Shipment with ID % not found', p_envio_id; END IF;
 
-    -- If envio doesn't exist, raise exception
-    IF v_user_id IS NULL THEN
-        RAISE EXCEPTION 'Envio with ID % not found', p_envio_id;
-    END IF;
+    DELETE FROM public.shipments WHERE id = p_envio_id;
 
-    -- 1. Delete the envio record (this will also delete related operaciones_recepcion if any due to CASCADE)
-    DELETE FROM public.envios WHERE id = p_envio_id;
-
-    -- 2. Rollback inventory: increment total qty, decrement en_envio
     UPDATE public.inventory_sets
-    SET inventory_set_total_qty = inventory_set_total_qty + 1,
-        en_envio = GREATEST(en_envio - 1, 0)
+    SET inventory_set_total_qty = inventory_set_total_qty + 1, in_shipping = GREATEST(in_shipping - 1, 0)
     WHERE set_id = v_set_id;
 
-    -- 3. Re-add to wishlist (if not already there)
-    INSERT INTO public.wishlist (user_id, set_id)
-    VALUES (v_user_id, v_set_id)
-    ON CONFLICT (user_id, set_id) DO NOTHING;
+    INSERT INTO public.wishlist (user_id, set_id) VALUES (v_user_id, v_set_id) ON CONFLICT (user_id, set_id) DO NOTHING;
 
-    -- 4. Update user status back to appropriate state
-    -- If user has other active envios, keep current status
-    -- Otherwise, set to 'sin set'
     UPDATE public.users
     SET user_status = CASE 
-        WHEN EXISTS (
-            SELECT 1 FROM public.envios 
-            WHERE user_id = v_user_id 
-            AND estado_envio IN ('preparacion', 'ruta_envio')
-        ) THEN user_status
-        ELSE 'sin set'
-    END
+        WHEN EXISTS (SELECT 1 FROM public.shipments WHERE user_id = v_user_id AND shipment_status IN ('preparation', 'in_transit'))
+        THEN user_status ELSE 'no_set' END
     WHERE user_id = v_user_id;
-
 END;
 $$;
 
@@ -391,45 +183,19 @@ $$;
 ALTER FUNCTION "public"."delete_assignment_and_rollback"("p_envio_id" "uuid") OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."delete_assignment_and_rollback"("p_envio_id" "uuid") IS 'Deletes an assignment (envio) and rolls back all changes including inventory and wishlist restoration';
-
-
-
 CREATE OR REPLACE FUNCTION "public"."generate_delivery_qr"("p_shipment_id" "uuid") RETURNS TABLE("qr_code" "text", "expires_at" timestamp with time zone)
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 DECLARE
-    v_qr_code TEXT;
-    v_expires_at TIMESTAMPTZ;
-    v_max_attempts INTEGER := 10;
-    v_attempt INTEGER := 0;
+    v_qr_code TEXT; v_expires_at TIMESTAMPTZ; v_max_attempts INTEGER := 10; v_attempt INTEGER := 0;
 BEGIN
     v_expires_at := now() + interval '30 days';
-    
     LOOP
-        v_qr_code := generate_qr_code();
-        v_attempt := v_attempt + 1;
-        
-        -- Check if QR code is unique
-        IF NOT EXISTS (
-            SELECT 1 FROM envios 
-            WHERE delivery_qr_code = v_qr_code OR return_qr_code = v_qr_code
-        ) THEN
-            EXIT;
-        END IF;
-        
-        IF v_attempt >= v_max_attempts THEN
-            RAISE EXCEPTION 'Unable to generate unique QR code after % attempts', v_max_attempts;
-        END IF;
+        v_qr_code := generate_qr_code(); v_attempt := v_attempt + 1;
+        IF NOT EXISTS (SELECT 1 FROM shipments WHERE delivery_qr_code = v_qr_code OR return_qr_code = v_qr_code) THEN EXIT; END IF;
+        IF v_attempt >= v_max_attempts THEN RAISE EXCEPTION 'Unable to generate unique QR code after % attempts', v_max_attempts; END IF;
     END LOOP;
-    
-    UPDATE envios
-    SET 
-        delivery_qr_code = v_qr_code,
-        delivery_qr_expires_at = v_expires_at,
-        updated_at = now()
-    WHERE id = p_shipment_id;
-    
+    UPDATE shipments SET delivery_qr_code = v_qr_code, delivery_qr_expires_at = v_expires_at, updated_at = now() WHERE id = p_shipment_id;
     RETURN QUERY SELECT v_qr_code, v_expires_at;
 END;
 $$;
@@ -457,7 +223,7 @@ $$;
 ALTER FUNCTION "public"."generate_qr_code"() OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."generate_referral_code"() RETURNS "trigger"
+CREATE OR REPLACE FUNCTION "public"."generate_referral_code_users"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     AS $$
 DECLARE
@@ -468,11 +234,12 @@ BEGIN
     IF NEW.referral_code IS NULL THEN
         LOOP
             -- 6-char uppercase alphanumeric code
-            new_code := UPPER(SUBSTRING(MD5(RANDOM()::TEXT || NEW.id::TEXT) FROM 1 FOR 6));
+            new_code := UPPER(SUBSTRING(MD5(RANDOM()::TEXT || NEW.user_id::TEXT) FROM 1 FOR 6));
 
             -- Check uniqueness
             IF NOT EXISTS (
-                SELECT 1 FROM public.profiles WHERE LOWER(referral_code) = LOWER(new_code)
+                SELECT 1 FROM public.users 
+                WHERE LOWER(referral_code) = LOWER(new_code)
             ) THEN
                 NEW.referral_code := new_code;
                 EXIT;
@@ -481,7 +248,7 @@ BEGIN
             attempts := attempts + 1;
             IF attempts > 10 THEN
                 -- Fallback: use longer hash
-                NEW.referral_code := UPPER(SUBSTRING(MD5(NEW.id::TEXT) FROM 1 FOR 8));
+                NEW.referral_code := UPPER(SUBSTRING(MD5(NEW.user_id::TEXT) FROM 1 FOR 8));
                 EXIT;
             END IF;
         END LOOP;
@@ -491,160 +258,28 @@ END;
 $$;
 
 
-ALTER FUNCTION "public"."generate_referral_code"() OWNER TO "postgres";
+ALTER FUNCTION "public"."generate_referral_code_users"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."generate_return_qr"("p_shipment_id" "uuid") RETURNS TABLE("qr_code" "text", "expires_at" timestamp with time zone)
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 DECLARE
-    v_qr_code TEXT;
-    v_expires_at TIMESTAMPTZ;
-    v_max_attempts INTEGER := 10;
-    v_attempt INTEGER := 0;
+    v_qr_code TEXT; v_expires_at TIMESTAMPTZ; v_max_attempts INTEGER := 10; v_attempt INTEGER := 0;
 BEGIN
     v_expires_at := now() + interval '30 days';
-    
     LOOP
-        v_qr_code := generate_qr_code();
-        v_attempt := v_attempt + 1;
-        
-        -- Check if QR code is unique
-        IF NOT EXISTS (
-            SELECT 1 FROM envios 
-            WHERE delivery_qr_code = v_qr_code OR return_qr_code = v_qr_code
-        ) THEN
-            EXIT;
-        END IF;
-        
-        IF v_attempt >= v_max_attempts THEN
-            RAISE EXCEPTION 'Unable to generate unique QR code after % attempts', v_max_attempts;
-        END IF;
+        v_qr_code := generate_qr_code(); v_attempt := v_attempt + 1;
+        IF NOT EXISTS (SELECT 1 FROM shipments WHERE delivery_qr_code = v_qr_code OR return_qr_code = v_qr_code) THEN EXIT; END IF;
+        IF v_attempt >= v_max_attempts THEN RAISE EXCEPTION 'Unable to generate unique QR code after % attempts', v_max_attempts; END IF;
     END LOOP;
-    
-    UPDATE envios
-    SET 
-        return_qr_code = v_qr_code,
-        return_qr_expires_at = v_expires_at,
-        updated_at = now()
-    WHERE id = p_shipment_id;
-    
+    UPDATE shipments SET return_qr_code = v_qr_code, return_qr_expires_at = v_expires_at, updated_at = now() WHERE id = p_shipment_id;
     RETURN QUERY SELECT v_qr_code, v_expires_at;
 END;
 $$;
 
 
 ALTER FUNCTION "public"."generate_return_qr"("p_shipment_id" "uuid") OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."handle_cierre_recepcion"() RETURNS "trigger"
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-BEGIN
-    -- Check if the reception operation was just marked as completed
-    IF NEW.status_recepcion = TRUE AND OLD.status_recepcion = FALSE THEN
-        
-        -- 1. Inventory Logic: Decrement 'en_devolucion' as it has been processed
-        UPDATE public.inventory_sets
-        SET en_devolucion = GREATEST(0, COALESCE(en_devolucion, 0) - 1),
-            updated_at = now()
-        WHERE set_id = NEW.set_id;
-
-        -- 2. State Logic: Determine if it goes back to active pool or needs repair
-        IF NEW.missing_parts IS NOT NULL AND TRIM(NEW.missing_parts) != '' THEN
-            -- There are missing parts. Increment 'en_reparacion' and set parent status
-            UPDATE public.inventory_sets
-            SET en_reparacion = COALESCE(en_reparacion, 0) + 1
-            WHERE set_id = NEW.set_id;
-
-            UPDATE public.sets
-            SET set_status = 'en reparacion',
-                updated_at = now()
-            WHERE id = NEW.set_id;
-        ELSE
-            -- Everything is fine. It returns to the available pool implicitly 
-            -- (by no longer being in 'en_devolucion').
-            UPDATE public.sets
-            SET set_status = 'activo',
-                updated_at = now()
-            WHERE id = NEW.set_id;
-        END IF;
-
-        -- 3. Update the original Envio record to mark manipulation as done
-        UPDATE public.envios
-        SET estado_manipulacion = TRUE,
-            updated_at = now()
-        WHERE id = NEW.event_id;
-
-    END IF;
-    RETURN NEW;
-END;
-$$;
-
-
-ALTER FUNCTION "public"."handle_cierre_recepcion"() OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."handle_envio_entregado"() RETURNS "trigger"
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-BEGIN
-    -- Check if the status changed to 'entregado'
-    IF NEW.estado_envio = 'entregado' AND OLD.estado_envio != 'entregado' THEN
-        -- Update the user's status to 'con set'
-        UPDATE public.users
-        SET user_status = 'con set'
-        WHERE user_id = NEW.user_id;
-    END IF;
-    RETURN NEW;
-END;
-$$;
-
-
-ALTER FUNCTION "public"."handle_envio_entregado"() OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."handle_envio_recibido_almacen"() RETURNS "trigger"
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-BEGIN
-    -- Check if the status changed to 'recibido_almacen' (or 'devuelto', using 'devuelto' to match schema docs if standard)
-    -- Typically Correos might mark it as delivered to the return address.
-    -- Let's use 'devuelto' as it's the standard final state for returns in the schema definition.
-    IF NEW.estado_envio = 'devuelto' AND OLD.estado_envio != 'devuelto' THEN
-        -- Insert a new operation record for the warehouse staff to process
-        INSERT INTO public.operaciones_recepcion (event_id, user_id, set_id)
-        VALUES (NEW.id, NEW.user_id, NEW.set_id);
-        
-        -- Also update the reception date on the envio
-        NEW.fecha_recepcion_almacen = now();
-    END IF;
-    RETURN NEW;
-END;
-$$;
-
-
-ALTER FUNCTION "public"."handle_envio_recibido_almacen"() OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."handle_envio_ruta_devolucion_inventory"() RETURNS "trigger"
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-BEGIN
-    -- Check if the status changed to 'ruta_devolucion'
-    IF NEW.estado_envio = 'ruta_devolucion' AND OLD.estado_envio != 'ruta_devolucion' THEN
-        -- Increase the 'en_devolucion' count for the associated set
-        UPDATE public.inventory_sets
-        SET en_devolucion = COALESCE(en_devolucion, 0) + 1,
-            updated_at = now()
-        WHERE set_id = NEW.set_id;
-    END IF;
-    RETURN NEW;
-END;
-$$;
-
-
-ALTER FUNCTION "public"."handle_envio_ruta_devolucion_inventory"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."handle_new_set_inventory"() RETURNS "trigger"
@@ -675,13 +310,19 @@ CREATE OR REPLACE FUNCTION "public"."handle_new_user"() RETURNS "trigger"
     SET "search_path" TO 'public'
     AS $$
 BEGIN
-    INSERT INTO public.profiles (id, full_name, avatar_url)
+    INSERT INTO public.users (
+        user_id,
+        full_name,
+        avatar_url,
+        email
+    )
     VALUES (
         NEW.id,
         NEW.raw_user_meta_data ->> 'full_name',
-        NEW.raw_user_meta_data ->> 'avatar_url'
+        NEW.raw_user_meta_data ->> 'avatar_url',
+        NEW.email
     )
-    ON CONFLICT (id) DO NOTHING;
+    ON CONFLICT (user_id) DO NOTHING;
     RETURN NEW;
 END;
 $$;
@@ -690,24 +331,94 @@ $$;
 ALTER FUNCTION "public"."handle_new_user"() OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."handle_return_status_update"() RETURNS "trigger"
+CREATE OR REPLACE FUNCTION "public"."handle_reception_close"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 BEGIN
-    -- Check if the status changed to 'ruta_devolucion'
-    IF NEW.estado_envio = 'ruta_devolucion' AND OLD.estado_envio != 'ruta_devolucion' THEN
-        -- Update the user's status to 'sin set' as requested
-        -- This allows them to be eligible for a new assignment immediately (Exchange flow)
-        UPDATE public.users
-        SET user_status = 'sin set'
-        WHERE user_id = NEW.user_id;
+    IF NEW.reception_completed = TRUE AND OLD.reception_completed = FALSE THEN
+        UPDATE public.inventory_sets
+        SET in_return = GREATEST(0, COALESCE(in_return, 0) - 1), updated_at = now()
+        WHERE set_id = NEW.set_id;
+
+        IF NEW.missing_parts IS NOT NULL AND TRIM(NEW.missing_parts) != '' THEN
+            UPDATE public.inventory_sets SET in_repair = COALESCE(in_repair, 0) + 1 WHERE set_id = NEW.set_id;
+            UPDATE public.sets SET set_status = 'in_repair', updated_at = now() WHERE id = NEW.set_id;
+        ELSE
+            UPDATE public.sets SET set_status = 'active', updated_at = now() WHERE id = NEW.set_id;
+        END IF;
+
+        UPDATE public.shipments SET handling_processed = TRUE, updated_at = now() WHERE id = NEW.event_id;
     END IF;
     RETURN NEW;
 END;
 $$;
 
 
-ALTER FUNCTION "public"."handle_return_status_update"() OWNER TO "postgres";
+ALTER FUNCTION "public"."handle_reception_close"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."handle_return_user_status"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+BEGIN
+    IF NEW.shipment_status = 'return_in_transit' AND OLD.shipment_status != 'return_in_transit' THEN
+        UPDATE public.users SET user_status = 'no_set' WHERE user_id = NEW.user_id;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."handle_return_user_status"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."handle_shipment_delivered"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+BEGIN
+    IF NEW.shipment_status = 'delivered' AND OLD.shipment_status != 'delivered' THEN
+        UPDATE public.users SET user_status = 'has_set' WHERE user_id = NEW.user_id;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."handle_shipment_delivered"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."handle_shipment_return_transit_inventory"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+BEGIN
+    IF NEW.shipment_status = 'return_in_transit' AND OLD.shipment_status != 'return_in_transit' THEN
+        UPDATE public.inventory_sets
+        SET in_return = COALESCE(in_return, 0) + 1, updated_at = now()
+        WHERE set_id = NEW.set_id;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."handle_shipment_return_transit_inventory"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."handle_shipment_warehouse_received"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+BEGIN
+    IF NEW.shipment_status = 'returned' AND OLD.shipment_status != 'returned' THEN
+        INSERT INTO public.reception_operations (event_id, user_id, set_id)
+        VALUES (NEW.id, NEW.user_id, NEW.set_id);
+        NEW.warehouse_reception_date = now();
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."handle_shipment_warehouse_received"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."handle_updated_at"() RETURNS "trigger"
@@ -741,13 +452,12 @@ ALTER FUNCTION "public"."has_role"("_user_id" "uuid", "_role" "public"."app_role
 
 CREATE OR REPLACE FUNCTION "public"."increment_referral_credits"("p_user_id" "uuid", "p_amount" integer DEFAULT 1) RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public'
     AS $$
-begin
-  update public.profiles
-  set    referral_credits = coalesce(referral_credits, 0) + p_amount
-  where  id = p_user_id;
-end;
+BEGIN
+    UPDATE public.users
+    SET referral_credits = referral_credits + p_amount
+    WHERE user_id = p_user_id;
+END;
 $$;
 
 
@@ -856,10 +566,10 @@ BEGIN
 
     v_referrer_id := v_referral.referrer_id;
 
-    -- Award credits to referrer
-    UPDATE public.profiles
+    -- Award credits to referrer in USERS table
+    UPDATE public.users
     SET referral_credits = referral_credits + v_referral.reward_credits
-    WHERE id = v_referrer_id;
+    WHERE user_id = v_referrer_id;
 
     -- Mark referral as credited
     UPDATE public.referrals
@@ -889,50 +599,24 @@ ALTER FUNCTION "public"."set_updated_at"() OWNER TO "postgres";
 CREATE OR REPLACE FUNCTION "public"."update_set_status_from_return"("p_set_id" "uuid", "p_new_status" "text", "p_envio_id" "uuid" DEFAULT NULL::"uuid") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
-DECLARE
 BEGIN
-    -- Validate input status
-    IF p_new_status NOT IN ('activo', 'inactivo', 'en reparacion') THEN
+    IF p_new_status NOT IN ('active', 'inactive', 'in_repair') THEN
         RAISE EXCEPTION 'Invalid status: %', p_new_status;
     END IF;
 
-    -- Update set status
-    UPDATE public.sets 
-    SET set_status = p_new_status,
-        updated_at = now()
-    WHERE id = p_set_id;
+    UPDATE public.sets SET set_status = p_new_status, updated_at = now() WHERE id = p_set_id;
 
-    -- Inventory Logic:
-    -- 1. ALWAYS decrement 'en_devolucion' as the item has arrived.
-    UPDATE public.inventory_sets
-    SET en_devolucion = en_devolucion - 1,
-        updated_at = now()
-    WHERE set_id = p_set_id;
+    UPDATE public.inventory_sets SET in_return = in_return - 1, updated_at = now() WHERE set_id = p_set_id;
 
-    -- 2. Conditional increments
-    IF p_new_status = 'en reparacion' THEN
-        -- Increment 'en_reparacion'
-        UPDATE public.inventory_sets
-        SET en_reparacion = en_reparacion + 1
-        WHERE set_id = p_set_id;
+    IF p_new_status = 'in_repair' THEN
+        UPDATE public.inventory_sets SET in_repair = in_repair + 1 WHERE set_id = p_set_id;
     END IF;
 
-    IF p_new_status = 'activo' THEN
-         -- Stock logic temporarily disabled due to missing 'stock_central' column in global refactor
-         -- TODO: Restore this once column name is verified (e.g. inventory_set_total_qty vs calculated)
-         -- UPDATE public.inventory_sets SET stock_central = stock_central + 1 WHERE set_id = p_set_id;
-         NULL; 
-    END IF;
-    
-    -- Update Envio if ID provided
+    IF p_new_status = 'active' THEN NULL; END IF;
+
     IF p_envio_id IS NOT NULL THEN
-        UPDATE public.envios
-        SET fecha_recepcion_almacen = now(),
-            estado_manipulacion = TRUE, -- Mark as processed
-            updated_at = now()
-        WHERE id = p_envio_id;
+        UPDATE public.shipments SET warehouse_reception_date = now(), handling_processed = TRUE, updated_at = now() WHERE id = p_envio_id;
     END IF;
-
 END;
 $$;
 
@@ -970,17 +654,11 @@ ALTER FUNCTION "public"."update_users_correos_dropping_updated_at"() OWNER TO "p
 CREATE OR REPLACE FUNCTION "public"."uses_brickshare_pudo"("shipment_id" "uuid") RETURNS boolean
     LANGUAGE "sql" STABLE
     AS $$
-  SELECT pickup_type = 'brickshare' AND brickshare_pudo_id IS NOT NULL
-  FROM envios
-  WHERE id = shipment_id;
+    SELECT pickup_type = 'brickshare' AND brickshare_pudo_id IS NOT NULL FROM shipments WHERE id = shipment_id;
 $$;
 
 
 ALTER FUNCTION "public"."uses_brickshare_pudo"("shipment_id" "uuid") OWNER TO "postgres";
-
-
-COMMENT ON FUNCTION "public"."uses_brickshare_pudo"("shipment_id" "uuid") IS 'Retorna true si el shipment usa el sistema de PUDO de Brickshare_logistics';
-
 
 
 CREATE OR REPLACE FUNCTION "public"."validate_qr_code"("p_qr_code" "text") RETURNS TABLE("shipment_id" "uuid", "validation_type" "text", "is_valid" boolean, "error_message" "text", "shipment_info" "jsonb")
@@ -988,108 +666,47 @@ CREATE OR REPLACE FUNCTION "public"."validate_qr_code"("p_qr_code" "text") RETUR
     AS $$
 DECLARE
     v_shipment RECORD;
-    v_is_valid BOOLEAN := false;
-    v_error_message TEXT := NULL;
-    v_validation_type TEXT := NULL;
-    v_shipment_info JSONB;
+    v_is_valid BOOLEAN := false; v_error_message TEXT := NULL; v_validation_type TEXT := NULL; v_shipment_info JSONB;
 BEGIN
-    -- Find shipment by QR code
-    SELECT 
-        s.id,
-        s.order_id,
-        s.estado_envio as status,
-        s.pickup_type,
-        s.delivery_qr_code,
-        s.delivery_qr_expires_at,
-        s.delivery_validated_at,
-        s.return_qr_code,
-        s.return_qr_expires_at,
-        s.return_validated_at,
-        s.brickshare_pudo_id,
-        o.set_id,
-        st.set_name,
-        st.set_ref as set_number,
-        st.theme
+    SELECT s.id, s.order_id, s.shipment_status as status, s.pickup_type,
+        s.delivery_qr_code, s.delivery_qr_expires_at, s.delivery_validated_at,
+        s.return_qr_code, s.return_qr_expires_at, s.return_validated_at,
+        s.brickshare_pudo_id, o.set_id, st.set_name, st.set_ref as set_number, st.set_theme as theme
     INTO v_shipment
-    FROM envios s
-    JOIN orders o ON s.order_id = o.id
-    LEFT JOIN sets st ON o.set_id = st.id
+    FROM shipments s JOIN orders o ON s.order_id = o.id LEFT JOIN sets st ON o.set_id = st.id
     WHERE s.delivery_qr_code = p_qr_code OR s.return_qr_code = p_qr_code;
-    
+
     IF NOT FOUND THEN
-        RETURN QUERY SELECT 
-            NULL::UUID,
-            NULL::TEXT,
-            false,
-            'QR code not found'::TEXT,
-            NULL::JSONB;
-        RETURN;
+        RETURN QUERY SELECT NULL::UUID, NULL::TEXT, false, 'QR code not found'::TEXT, NULL::JSONB; RETURN;
     END IF;
-    
-    -- Check if it's a Brickshare PUDO shipment
+
     IF v_shipment.pickup_type != 'brickshare' THEN
-        RETURN QUERY SELECT 
-            v_shipment.id,
-            NULL::TEXT,
-            false,
-            'This shipment is not for Brickshare pickup point'::TEXT,
-            NULL::JSONB;
-        RETURN;
+        RETURN QUERY SELECT v_shipment.id, NULL::TEXT, false, 'This shipment is not for Brickshare pickup point'::TEXT, NULL::JSONB; RETURN;
     END IF;
-    
-    -- Determine validation type and check validity
+
     IF v_shipment.delivery_qr_code = p_qr_code THEN
         v_validation_type := 'delivery';
-        
-        IF v_shipment.delivery_validated_at IS NOT NULL THEN
-            v_error_message := 'QR code already used';
-        ELSIF v_shipment.delivery_qr_expires_at < now() THEN
-            v_error_message := 'QR code has expired';
-        ELSE
-            v_is_valid := true;
-        END IF;
-        
+        IF v_shipment.delivery_validated_at IS NOT NULL THEN v_error_message := 'QR code already used';
+        ELSIF v_shipment.delivery_qr_expires_at < now() THEN v_error_message := 'QR code has expired';
+        ELSE v_is_valid := true; END IF;
     ELSIF v_shipment.return_qr_code = p_qr_code THEN
         v_validation_type := 'return';
-        
-        IF v_shipment.return_validated_at IS NOT NULL THEN
-            v_error_message := 'QR code already used';
-        ELSIF v_shipment.return_qr_expires_at < now() THEN
-            v_error_message := 'QR code has expired';
-        ELSIF v_shipment.delivery_validated_at IS NULL THEN
-            v_error_message := 'Cannot return a set that has not been delivered yet';
-        ELSE
-            v_is_valid := true;
-        END IF;
+        IF v_shipment.return_validated_at IS NOT NULL THEN v_error_message := 'QR code already used';
+        ELSIF v_shipment.return_qr_expires_at < now() THEN v_error_message := 'QR code has expired';
+        ELSIF v_shipment.delivery_validated_at IS NULL THEN v_error_message := 'Cannot return a set that has not been delivered yet';
+        ELSE v_is_valid := true; END IF;
     END IF;
-    
-    -- Build shipment info (excluding personal data)
-    v_shipment_info := jsonb_build_object(
-        'order_id', v_shipment.order_id,
-        'set_id', v_shipment.set_id,
-        'set_name', v_shipment.set_name,
-        'set_number', v_shipment.set_number,
-        'theme', v_shipment.theme,
-        'status', v_shipment.status,
-        'brickshare_pudo_id', v_shipment.brickshare_pudo_id,
-        'validation_type', v_validation_type
-    );
-    
-    RETURN QUERY SELECT 
-        v_shipment.id,
-        v_validation_type,
-        v_is_valid,
-        v_error_message,
-        v_shipment_info;
+
+    v_shipment_info := jsonb_build_object('order_id', v_shipment.order_id, 'set_id', v_shipment.set_id, 'set_name', v_shipment.set_name,
+        'set_number', v_shipment.set_number, 'theme', v_shipment.theme, 'status', v_shipment.status,
+        'brickshare_pudo_id', v_shipment.brickshare_pudo_id, 'validation_type', v_validation_type);
+
+    RETURN QUERY SELECT v_shipment.id, v_validation_type, v_is_valid, v_error_message, v_shipment_info;
 END;
 $$;
 
 
 ALTER FUNCTION "public"."validate_qr_code"("p_qr_code" "text") OWNER TO "postgres";
-
-
-COMMENT ON FUNCTION "public"."validate_qr_code"("p_qr_code" "text") IS 'Validates a QR code and returns shipment info without personal data';
-
 
 SET default_tablespace = '';
 
@@ -1134,33 +751,33 @@ COMMENT ON TABLE "public"."brickshare_pudo_locations" IS 'Brickshare pickup and 
 
 
 
-CREATE TABLE IF NOT EXISTS "public"."envios" (
+CREATE TABLE IF NOT EXISTS "public"."shipments" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "user_id" "uuid" NOT NULL,
-    "fecha_asignada" timestamp with time zone,
-    "fecha_entrega" timestamp with time zone,
-    "fecha_entrega_real" timestamp with time zone,
-    "fecha_entrega_usuario" timestamp with time zone,
-    "fecha_recepcion_almacen" timestamp with time zone,
-    "fecha_devolucion_estimada" "date",
-    "estado_envio" "text" DEFAULT 'pendiente'::"text" NOT NULL,
-    "direccion_envio" "text" NOT NULL,
-    "ciudad_envio" "text" NOT NULL,
-    "codigo_postal_envio" "text" NOT NULL,
-    "pais_envio" "text" DEFAULT 'España'::"text" NOT NULL,
-    "proveedor_envio" "text",
-    "direccion_proveedor_recogida" "text",
-    "numero_seguimiento" "text",
-    "transportista" "text",
-    "notas_adicionales" "text",
+    "assigned_date" timestamp with time zone,
+    "estimated_delivery_date" timestamp with time zone,
+    "actual_delivery_date" timestamp with time zone,
+    "user_delivery_date" timestamp with time zone,
+    "warehouse_reception_date" timestamp with time zone,
+    "estimated_return_date" "date",
+    "shipment_status" "text" DEFAULT 'pendiente'::"text" NOT NULL,
+    "shipping_address" "text" NOT NULL,
+    "shipping_city" "text" NOT NULL,
+    "shipping_zip_code" "text" NOT NULL,
+    "shipping_country" "text" DEFAULT 'España'::"text" NOT NULL,
+    "shipping_provider" "text",
+    "pickup_provider_address" "text",
+    "tracking_number" "text",
+    "carrier" "text",
+    "additional_notes" "text",
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "fecha_recogida_almacen" timestamp with time zone,
-    "fecha_solicitud_devolucion" timestamp with time zone,
-    "proveedor_recogida" "text",
+    "warehouse_pickup_date" timestamp with time zone,
+    "return_request_date" timestamp with time zone,
+    "pickup_provider" "text",
     "set_ref" "text",
     "set_id" "uuid",
-    "estado_manipulacion" boolean DEFAULT false,
+    "handling_processed" boolean DEFAULT false,
     "correos_shipment_id" "text",
     "label_url" "text",
     "pickup_id" "text",
@@ -1179,63 +796,63 @@ CREATE TABLE IF NOT EXISTS "public"."envios" (
     "return_validated_at" timestamp with time zone,
     "brickshare_metadata" "jsonb" DEFAULT '{}'::"jsonb",
     "brickshare_package_id" "text",
-    CONSTRAINT "check_estado_envio" CHECK (("estado_envio" = ANY (ARRAY['preparacion'::"text", 'ruta_envio'::"text", 'entregado'::"text", 'devuelto'::"text", 'ruta_devolucion'::"text", 'cancelado'::"text"]))),
+    CONSTRAINT "check_shipment_status" CHECK (("shipment_status" = ANY (ARRAY['pending'::"text", 'preparation'::"text", 'assigned'::"text", 'in_transit'::"text", 'delivered'::"text", 'returned'::"text", 'return_in_transit'::"text", 'cancelled'::"text"]))),
     CONSTRAINT "envios_pickup_type_check" CHECK (("pickup_type" = ANY (ARRAY['correos'::"text", 'brickshare'::"text"]))),
     CONSTRAINT "envios_swikly_status_check" CHECK (("swikly_status" = ANY (ARRAY['pending'::"text", 'wish_created'::"text", 'accepted'::"text", 'released'::"text", 'captured'::"text", 'expired'::"text", 'cancelled'::"text"])))
 );
 
 
-ALTER TABLE "public"."envios" OWNER TO "postgres";
+ALTER TABLE "public"."shipments" OWNER TO "postgres";
 
 
-COMMENT ON COLUMN "public"."envios"."estado_envio" IS 'Allowed values: preparacion, ruta_envio, entregado, devuelto, ruta_devolucion, cancelado';
-
-
-
-COMMENT ON COLUMN "public"."envios"."fecha_recogida_almacen" IS 'Date when the shipment was picked up from the warehouse';
+COMMENT ON COLUMN "public"."shipments"."shipment_status" IS 'Allowed values: preparacion, ruta_envio, entregado, devuelto, ruta_devolucion, cancelado';
 
 
 
-COMMENT ON COLUMN "public"."envios"."fecha_solicitud_devolucion" IS 'Date when the user requested a return';
+COMMENT ON COLUMN "public"."shipments"."warehouse_pickup_date" IS 'Date when the shipment was picked up from the warehouse';
 
 
 
-COMMENT ON COLUMN "public"."envios"."proveedor_recogida" IS 'Carrier or entity in charge of the return pickup';
+COMMENT ON COLUMN "public"."shipments"."return_request_date" IS 'Date when the user requested a return';
 
 
 
-COMMENT ON COLUMN "public"."envios"."set_ref" IS 'LEGO set reference (e.g., 75192) for quick reference';
+COMMENT ON COLUMN "public"."shipments"."pickup_provider" IS 'Carrier or entity in charge of the return pickup';
 
 
 
-COMMENT ON COLUMN "public"."envios"."set_id" IS 'Direct reference to the set being shipped, eliminates need for orders table';
+COMMENT ON COLUMN "public"."shipments"."set_ref" IS 'LEGO set reference (e.g., 75192) for quick reference';
 
 
 
-COMMENT ON COLUMN "public"."envios"."correos_shipment_id" IS 'External shipment identifier returned by Correos Preregister API';
+COMMENT ON COLUMN "public"."shipments"."set_id" IS 'Direct reference to the set being shipped, eliminates need for orders table';
 
 
 
-COMMENT ON COLUMN "public"."envios"."label_url" IS 'Path to the generated shipping label in storage';
+COMMENT ON COLUMN "public"."shipments"."correos_shipment_id" IS 'External shipment identifier returned by Correos Preregister API';
 
 
 
-COMMENT ON COLUMN "public"."envios"."pickup_id" IS 'External identifier for the scheduled pickup';
+COMMENT ON COLUMN "public"."shipments"."label_url" IS 'Path to the generated shipping label in storage';
 
 
 
-COMMENT ON COLUMN "public"."envios"."last_tracking_update" IS 'Timestamp of the last synchronization with Correos Tracking API';
+COMMENT ON COLUMN "public"."shipments"."pickup_id" IS 'External identifier for the scheduled pickup';
 
 
 
-COMMENT ON COLUMN "public"."envios"."brickshare_package_id" IS 'ID del package en Brickshare_logistics. Usado cuando pickup_type="brickshare" para sincronización con el sistema de PUDO.';
+COMMENT ON COLUMN "public"."shipments"."last_tracking_update" IS 'Timestamp of the last synchronization with Correos Tracking API';
+
+
+
+COMMENT ON COLUMN "public"."shipments"."brickshare_package_id" IS 'ID del package en Brickshare_logistics. Usado cuando pickup_type="brickshare" para sincronización con el sistema de PUDO.';
 
 
 
 CREATE OR REPLACE VIEW "public"."brickshare_pudo_shipments" AS
  SELECT "id",
     "user_id",
-    "estado_envio" AS "status",
+    "shipment_status" AS "status",
     "pickup_type",
     "brickshare_pudo_id",
     "brickshare_package_id",
@@ -1243,38 +860,34 @@ CREATE OR REPLACE VIEW "public"."brickshare_pudo_shipments" AS
     "delivery_validated_at" AS "delivery_qr_validated_at",
     "return_qr_code",
     "return_validated_at" AS "return_qr_validated_at",
-    "numero_seguimiento" AS "tracking_number",
+    "tracking_number",
     "created_at",
     "updated_at"
-   FROM "public"."envios" "s"
+   FROM "public"."shipments" "s"
   WHERE (("pickup_type" = 'brickshare'::"text") AND ("brickshare_pudo_id" IS NOT NULL));
 
 
 ALTER VIEW "public"."brickshare_pudo_shipments" OWNER TO "postgres";
 
 
-COMMENT ON VIEW "public"."brickshare_pudo_shipments" IS 'Vista de shipments que utilizan puntos PUDO de Brickshare_logistics';
-
-
-
 CREATE TABLE IF NOT EXISTS "public"."donations" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "user_id" "uuid",
-    "nombre" "text" NOT NULL,
+    "name" "text" NOT NULL,
     "email" "text" NOT NULL,
-    "telefono" "text",
-    "direccion" "text",
-    "peso_estimado" numeric NOT NULL,
-    "metodo_entrega" "text" NOT NULL,
-    "recompensa" "text" NOT NULL,
-    "ninos_beneficiados" integer NOT NULL,
-    "co2_evitado" numeric NOT NULL,
+    "phone" "text",
+    "address" "text",
+    "estimated_weight" numeric NOT NULL,
+    "delivery_method" "text" NOT NULL,
+    "reward" "text" NOT NULL,
+    "children_benefited" integer NOT NULL,
+    "co2_avoided" numeric NOT NULL,
     "status" "text" DEFAULT 'pending'::"text" NOT NULL,
     "tracking_code" "text",
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    CONSTRAINT "donations_metodo_entrega_check" CHECK (("metodo_entrega" = ANY (ARRAY['punto-recogida'::"text", 'recogida-domicilio'::"text"]))),
-    CONSTRAINT "donations_recompensa_check" CHECK (("recompensa" = ANY (ARRAY['economica'::"text", 'social'::"text"]))),
+    CONSTRAINT "donations_delivery_method_check" CHECK (("delivery_method" = ANY (ARRAY['pickup-point'::"text", 'home-pickup'::"text"]))),
+    CONSTRAINT "donations_reward_check" CHECK (("reward" = ANY (ARRAY['economic'::"text", 'social'::"text"]))),
     CONSTRAINT "donations_status_check" CHECK (("status" = ANY (ARRAY['pending'::"text", 'confirmed'::"text", 'shipped'::"text", 'received'::"text", 'processed'::"text", 'completed'::"text"])))
 );
 
@@ -1287,10 +900,10 @@ CREATE TABLE IF NOT EXISTS "public"."inventory_sets" (
     "set_id" "uuid" NOT NULL,
     "set_ref" "text",
     "inventory_set_total_qty" integer DEFAULT 0 NOT NULL,
-    "en_envio" integer DEFAULT 0 NOT NULL,
-    "en_uso" integer DEFAULT 0 NOT NULL,
-    "en_devolucion" integer DEFAULT 0 NOT NULL,
-    "en_reparacion" integer DEFAULT 0 NOT NULL,
+    "in_shipping" integer DEFAULT 0 NOT NULL,
+    "in_use" integer DEFAULT 0 NOT NULL,
+    "in_return" integer DEFAULT 0 NOT NULL,
+    "in_repair" integer DEFAULT 0 NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "spare_parts_order" "text"
@@ -1305,67 +918,6 @@ COMMENT ON TABLE "public"."inventory_sets" IS 'Detailed tracking of set units ac
 
 
 COMMENT ON COLUMN "public"."inventory_sets"."set_ref" IS 'Official LEGO reference number (sets.lego_ref)';
-
-
-
-CREATE TABLE IF NOT EXISTS "public"."operaciones_recepcion" (
-    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "event_id" "uuid",
-    "user_id" "uuid" NOT NULL,
-    "set_id" "uuid" NOT NULL,
-    "weight_measured" numeric(10,2),
-    "status_recepcion" boolean DEFAULT false NOT NULL,
-    "missing_parts" "text",
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL
-);
-
-
-ALTER TABLE "public"."operaciones_recepcion" OWNER TO "postgres";
-
-
-COMMENT ON TABLE "public"."operaciones_recepcion" IS 'Table to record the reception and maintenance check of sets returned by users.';
-
-
-
-COMMENT ON COLUMN "public"."operaciones_recepcion"."weight_measured" IS 'Actual weight of the set upon reception (in grams).';
-
-
-
-COMMENT ON COLUMN "public"."operaciones_recepcion"."status_recepcion" IS 'True if the reception process is completed.';
-
-
-
-COMMENT ON COLUMN "public"."operaciones_recepcion"."missing_parts" IS 'Details or notes about missing pieces found during reception.';
-
-
-
-CREATE TABLE IF NOT EXISTS "public"."profiles" (
-    "id" "uuid" NOT NULL,
-    "full_name" "text",
-    "avatar_url" "text",
-    "sub_status" "text" DEFAULT 'free'::"text",
-    "impact_points" integer DEFAULT 0,
-    "referral_code" "text",
-    "referred_by" "uuid",
-    "referral_credits" integer DEFAULT 0 NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL
-);
-
-
-ALTER TABLE "public"."profiles" OWNER TO "postgres";
-
-
-COMMENT ON COLUMN "public"."profiles"."referral_code" IS 'Unique shareable code (6 chars, auto-generated)';
-
-
-
-COMMENT ON COLUMN "public"."profiles"."referred_by" IS 'auth.users.id of the user who referred this one';
-
-
-
-COMMENT ON COLUMN "public"."profiles"."referral_credits" IS 'Accumulated credits from successful referrals';
 
 
 
@@ -1388,6 +940,38 @@ ALTER TABLE "public"."qr_validation_logs" OWNER TO "postgres";
 
 
 COMMENT ON TABLE "public"."qr_validation_logs" IS 'Logs of QR code validations for deliveries and returns';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."reception_operations" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "event_id" "uuid",
+    "user_id" "uuid" NOT NULL,
+    "set_id" "uuid" NOT NULL,
+    "weight_measured" numeric(10,2),
+    "reception_completed" boolean DEFAULT false NOT NULL,
+    "missing_parts" "text",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."reception_operations" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."reception_operations" IS 'Table to record the reception and maintenance check of sets returned by users.';
+
+
+
+COMMENT ON COLUMN "public"."reception_operations"."weight_measured" IS 'Actual weight of the set upon reception (in grams).';
+
+
+
+COMMENT ON COLUMN "public"."reception_operations"."reception_completed" IS 'True if the reception process is completed.';
+
+
+
+COMMENT ON COLUMN "public"."reception_operations"."missing_parts" IS 'Details or notes about missing pieces found during reception.';
 
 
 
@@ -1539,7 +1123,7 @@ CREATE TABLE IF NOT EXISTS "public"."sets" (
     "set_ref" "text",
     "set_weight" numeric,
     "set_minifigs" numeric,
-    "set_status" "text" DEFAULT 'inactivo'::"text",
+    "set_status" "text" DEFAULT 'inactive'::"text",
     "set_price" numeric DEFAULT 100.00,
     "current_value_new" numeric,
     "current_value_used" numeric,
@@ -1547,7 +1131,7 @@ CREATE TABLE IF NOT EXISTS "public"."sets" (
     "set_subtheme" "text",
     "barcode_upc" "text",
     "barcode_ean" "text",
-    CONSTRAINT "check_set_status_spanish" CHECK (("set_status" = ANY (ARRAY['activo'::"text", 'inactivo'::"text", 'en reparacion'::"text"])))
+    CONSTRAINT "check_set_status" CHECK (("set_status" = ANY (ARRAY['active'::"text", 'inactive'::"text", 'in_repair'::"text"])))
 );
 
 
@@ -1595,23 +1179,16 @@ CREATE TABLE IF NOT EXISTS "public"."users" (
     "impact_points" integer DEFAULT 0,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "address" "text",
-    "address_extra" "text",
-    "zip_code" "text",
-    "city" "text",
-    "province" "text",
-    "phone" "text",
     "email" "text",
     "subscription_type" "text",
     "subscription_status" "text" DEFAULT 'active'::"text",
-    "direccion" "text",
-    "codigo_postal" "text",
-    "ciudad" "text",
-    "telefono" "text",
     "profile_completed" boolean DEFAULT false,
-    "user_status" "text" DEFAULT 'sin set'::"text",
+    "user_status" "text" DEFAULT 'no_set'::"text",
     "stripe_customer_id" "text",
-    CONSTRAINT "check_user_status" CHECK (("user_status" = ANY (ARRAY['set en envio'::"text", 'sin set'::"text", 'recibido'::"text", 'set en devolucion'::"text", 'suspendido'::"text", 'cancelado'::"text"]))),
+    "referral_code" "text",
+    "referred_by" "uuid",
+    "referral_credits" integer DEFAULT 0 NOT NULL,
+    CONSTRAINT "check_user_status" CHECK (("user_status" = ANY (ARRAY['no_set'::"text", 'set_shipping'::"text", 'received'::"text", 'has_set'::"text", 'set_returning'::"text", 'suspended'::"text", 'cancelled'::"text"]))),
     CONSTRAINT "users_subscription_status_check" CHECK (("subscription_status" = ANY (ARRAY['active'::"text", 'inactive'::"text"])))
 );
 
@@ -1627,11 +1204,27 @@ COMMENT ON COLUMN "public"."users"."subscription_status" IS 'Status of the subsc
 
 
 
-COMMENT ON COLUMN "public"."users"."user_status" IS 'Allowed values: set en envio, sin set, recibido, set en devolucion, suspendido, cancelado';
+COMMENT ON COLUMN "public"."users"."profile_completed" IS 'Whether the user has completed their profile information';
+
+
+
+COMMENT ON COLUMN "public"."users"."user_status" IS 'Allowed values: set en envio, sin set, recibido, con set, set en devolucion, suspendido, cancelado';
 
 
 
 COMMENT ON COLUMN "public"."users"."stripe_customer_id" IS 'Stripe Customer ID associated with the user';
+
+
+
+COMMENT ON COLUMN "public"."users"."referral_code" IS 'Unique shareable code (6 chars, auto-generated)';
+
+
+
+COMMENT ON COLUMN "public"."users"."referred_by" IS 'auth.users.id of the user who referred this one';
+
+
+
+COMMENT ON COLUMN "public"."users"."referral_credits" IS 'Accumulated credits from successful referrals';
 
 
 
@@ -1701,22 +1294,22 @@ ALTER TABLE ONLY "public"."donations"
 
 
 
-ALTER TABLE ONLY "public"."envios"
+ALTER TABLE ONLY "public"."shipments"
     ADD CONSTRAINT "envios_delivery_qr_code_key" UNIQUE ("delivery_qr_code");
 
 
 
-ALTER TABLE ONLY "public"."envios"
-    ADD CONSTRAINT "envios_numero_seguimiento_key" UNIQUE ("numero_seguimiento");
+ALTER TABLE ONLY "public"."shipments"
+    ADD CONSTRAINT "envios_numero_seguimiento_key" UNIQUE ("tracking_number");
 
 
 
-ALTER TABLE ONLY "public"."envios"
+ALTER TABLE ONLY "public"."shipments"
     ADD CONSTRAINT "envios_pkey" PRIMARY KEY ("id");
 
 
 
-ALTER TABLE ONLY "public"."envios"
+ALTER TABLE ONLY "public"."shipments"
     ADD CONSTRAINT "envios_return_qr_code_key" UNIQUE ("return_qr_code");
 
 
@@ -1731,7 +1324,7 @@ ALTER TABLE ONLY "public"."inventory_sets"
 
 
 
-ALTER TABLE ONLY "public"."operaciones_recepcion"
+ALTER TABLE ONLY "public"."reception_operations"
     ADD CONSTRAINT "operaciones_recepcion_pkey" PRIMARY KEY ("id");
 
 
@@ -1743,16 +1336,6 @@ ALTER TABLE ONLY "public"."sets"
 
 ALTER TABLE ONLY "public"."users"
     ADD CONSTRAINT "profiles_pkey" PRIMARY KEY ("id");
-
-
-
-ALTER TABLE ONLY "public"."profiles"
-    ADD CONSTRAINT "profiles_pkey1" PRIMARY KEY ("id");
-
-
-
-ALTER TABLE ONLY "public"."profiles"
-    ADD CONSTRAINT "profiles_referral_code_key" UNIQUE ("referral_code");
 
 
 
@@ -1821,7 +1404,7 @@ ALTER TABLE ONLY "public"."wishlist"
 
 
 
-CREATE INDEX "envios_swikly_wish_id_idx" ON "public"."envios" USING "btree" ("swikly_wish_id");
+CREATE INDEX "envios_swikly_wish_id_idx" ON "public"."shipments" USING "btree" ("swikly_wish_id");
 
 
 
@@ -1853,43 +1436,43 @@ CREATE INDEX "idx_donations_status" ON "public"."donations" USING "btree" ("stat
 
 
 
-CREATE INDEX "idx_envios_brickshare_package_id" ON "public"."envios" USING "btree" ("brickshare_package_id") WHERE ("brickshare_package_id" IS NOT NULL);
+CREATE INDEX "idx_envios_brickshare_package_id" ON "public"."shipments" USING "btree" ("brickshare_package_id") WHERE ("brickshare_package_id" IS NOT NULL);
 
 
 
-CREATE INDEX "idx_envios_correos_shipment_id" ON "public"."envios" USING "btree" ("correos_shipment_id");
+CREATE INDEX "idx_envios_correos_shipment_id" ON "public"."shipments" USING "btree" ("correos_shipment_id");
 
 
 
-CREATE INDEX "idx_envios_delivery_qr" ON "public"."envios" USING "btree" ("delivery_qr_code") WHERE ("delivery_qr_code" IS NOT NULL);
+CREATE INDEX "idx_envios_delivery_qr" ON "public"."shipments" USING "btree" ("delivery_qr_code") WHERE ("delivery_qr_code" IS NOT NULL);
 
 
 
-CREATE INDEX "idx_envios_estado" ON "public"."envios" USING "btree" ("estado_envio");
+CREATE INDEX "idx_envios_estado" ON "public"."shipments" USING "btree" ("shipment_status");
 
 
 
-CREATE INDEX "idx_envios_fecha_entrega" ON "public"."envios" USING "btree" ("fecha_entrega" DESC);
+CREATE INDEX "idx_envios_fecha_entrega" ON "public"."shipments" USING "btree" ("estimated_delivery_date" DESC);
 
 
 
-CREATE INDEX "idx_envios_numero_seguimiento" ON "public"."envios" USING "btree" ("numero_seguimiento");
+CREATE INDEX "idx_envios_numero_seguimiento" ON "public"."shipments" USING "btree" ("tracking_number");
 
 
 
-CREATE INDEX "idx_envios_pickup_type" ON "public"."envios" USING "btree" ("pickup_type");
+CREATE INDEX "idx_envios_pickup_type" ON "public"."shipments" USING "btree" ("pickup_type");
 
 
 
-CREATE INDEX "idx_envios_return_qr" ON "public"."envios" USING "btree" ("return_qr_code") WHERE ("return_qr_code" IS NOT NULL);
+CREATE INDEX "idx_envios_return_qr" ON "public"."shipments" USING "btree" ("return_qr_code") WHERE ("return_qr_code" IS NOT NULL);
 
 
 
-CREATE INDEX "idx_envios_set_id" ON "public"."envios" USING "btree" ("set_id");
+CREATE INDEX "idx_envios_set_id" ON "public"."shipments" USING "btree" ("set_id");
 
 
 
-CREATE INDEX "idx_envios_user_id" ON "public"."envios" USING "btree" ("user_id");
+CREATE INDEX "idx_envios_user_id" ON "public"."shipments" USING "btree" ("user_id");
 
 
 
@@ -1901,15 +1484,15 @@ CREATE INDEX "idx_inventario_sets_set_ref" ON "public"."inventory_sets" USING "b
 
 
 
-CREATE INDEX "idx_operaciones_recepcion_event_id" ON "public"."operaciones_recepcion" USING "btree" ("event_id");
+CREATE INDEX "idx_operaciones_recepcion_event_id" ON "public"."reception_operations" USING "btree" ("event_id");
 
 
 
-CREATE INDEX "idx_operaciones_recepcion_set_id" ON "public"."operaciones_recepcion" USING "btree" ("set_id");
+CREATE INDEX "idx_operaciones_recepcion_set_id" ON "public"."reception_operations" USING "btree" ("set_id");
 
 
 
-CREATE INDEX "idx_operaciones_recepcion_user_id" ON "public"."operaciones_recepcion" USING "btree" ("user_id");
+CREATE INDEX "idx_operaciones_recepcion_user_id" ON "public"."reception_operations" USING "btree" ("user_id");
 
 
 
@@ -1945,10 +1528,6 @@ CREATE INDEX "idx_users_stripe_customer_id" ON "public"."users" USING "btree" ("
 
 
 
-CREATE UNIQUE INDEX "profiles_referral_code_lower" ON "public"."profiles" USING "btree" ("lower"("referral_code")) WHERE ("referral_code" IS NOT NULL);
-
-
-
 CREATE INDEX "referrals_referrer_id_idx" ON "public"."referrals" USING "btree" ("referrer_id", "status", "created_at" DESC);
 
 
@@ -1981,23 +1560,11 @@ CREATE INDEX "sets_year_idx" ON "public"."sets" USING "btree" ("year_released");
 
 
 
-CREATE OR REPLACE TRIGGER "on_envio_entregado" AFTER UPDATE ON "public"."envios" FOR EACH ROW EXECUTE FUNCTION "public"."handle_envio_entregado"();
+CREATE UNIQUE INDEX "users_referral_code_lower" ON "public"."users" USING "btree" ("lower"("referral_code")) WHERE ("referral_code" IS NOT NULL);
 
 
 
-CREATE OR REPLACE TRIGGER "on_envio_recibido_almacen" BEFORE UPDATE ON "public"."envios" FOR EACH ROW EXECUTE FUNCTION "public"."handle_envio_recibido_almacen"();
-
-
-
-CREATE OR REPLACE TRIGGER "on_envio_return_update" AFTER UPDATE ON "public"."envios" FOR EACH ROW EXECUTE FUNCTION "public"."handle_return_status_update"();
-
-
-
-CREATE OR REPLACE TRIGGER "on_envio_ruta_devolucion_inv" AFTER UPDATE ON "public"."envios" FOR EACH ROW EXECUTE FUNCTION "public"."handle_envio_ruta_devolucion_inventory"();
-
-
-
-CREATE OR REPLACE TRIGGER "on_recepcion_completada" AFTER UPDATE ON "public"."operaciones_recepcion" FOR EACH ROW EXECUTE FUNCTION "public"."handle_cierre_recepcion"();
+CREATE OR REPLACE TRIGGER "on_reception_completed" AFTER UPDATE ON "public"."reception_operations" FOR EACH ROW EXECUTE FUNCTION "public"."handle_reception_close"();
 
 
 
@@ -2005,15 +1572,23 @@ CREATE OR REPLACE TRIGGER "on_set_created" AFTER INSERT ON "public"."sets" FOR E
 
 
 
+CREATE OR REPLACE TRIGGER "on_shipment_delivered" AFTER UPDATE ON "public"."shipments" FOR EACH ROW EXECUTE FUNCTION "public"."handle_shipment_delivered"();
+
+
+
+CREATE OR REPLACE TRIGGER "on_shipment_return_transit_inv" AFTER UPDATE ON "public"."shipments" FOR EACH ROW EXECUTE FUNCTION "public"."handle_shipment_return_transit_inventory"();
+
+
+
+CREATE OR REPLACE TRIGGER "on_shipment_return_user_status" AFTER UPDATE ON "public"."shipments" FOR EACH ROW EXECUTE FUNCTION "public"."handle_return_user_status"();
+
+
+
+CREATE OR REPLACE TRIGGER "on_shipment_warehouse_received" BEFORE UPDATE ON "public"."shipments" FOR EACH ROW EXECUTE FUNCTION "public"."handle_shipment_warehouse_received"();
+
+
+
 CREATE OR REPLACE TRIGGER "on_shipping_orders_updated" BEFORE UPDATE ON "public"."shipping_orders" FOR EACH ROW EXECUTE FUNCTION "public"."handle_updated_at"();
-
-
-
-CREATE OR REPLACE TRIGGER "profiles_generate_referral_code" BEFORE INSERT ON "public"."profiles" FOR EACH ROW EXECUTE FUNCTION "public"."generate_referral_code"();
-
-
-
-CREATE OR REPLACE TRIGGER "profiles_updated_at" BEFORE UPDATE ON "public"."profiles" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
 
 
 
@@ -2033,15 +1608,11 @@ CREATE OR REPLACE TRIGGER "update_donations_updated_at" BEFORE UPDATE ON "public
 
 
 
-CREATE OR REPLACE TRIGGER "update_envios_updated_at" BEFORE UPDATE ON "public"."envios" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
-
-
-
 CREATE OR REPLACE TRIGGER "update_inventario_sets_updated_at" BEFORE UPDATE ON "public"."inventory_sets" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
 
 
 
-CREATE OR REPLACE TRIGGER "update_operaciones_recepcion_updated_at" BEFORE UPDATE ON "public"."operaciones_recepcion" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
+CREATE OR REPLACE TRIGGER "update_reception_operations_updated_at" BEFORE UPDATE ON "public"."reception_operations" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
 
 
 
@@ -2053,7 +1624,15 @@ CREATE OR REPLACE TRIGGER "update_sets_updated_at" BEFORE UPDATE ON "public"."se
 
 
 
+CREATE OR REPLACE TRIGGER "update_shipments_updated_at" BEFORE UPDATE ON "public"."shipments" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
+
+
+
 CREATE OR REPLACE TRIGGER "update_users_updated_at" BEFORE UPDATE ON "public"."users" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
+
+
+
+CREATE OR REPLACE TRIGGER "users_generate_referral_code" BEFORE INSERT ON "public"."users" FOR EACH ROW EXECUTE FUNCTION "public"."generate_referral_code_users"();
 
 
 
@@ -2067,17 +1646,17 @@ ALTER TABLE ONLY "public"."donations"
 
 
 
-ALTER TABLE ONLY "public"."envios"
+ALTER TABLE ONLY "public"."shipments"
     ADD CONSTRAINT "envios_set_id_fkey" FOREIGN KEY ("set_id") REFERENCES "public"."sets"("id") ON DELETE SET NULL;
 
 
 
-ALTER TABLE ONLY "public"."envios"
+ALTER TABLE ONLY "public"."shipments"
     ADD CONSTRAINT "envios_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
 
 
 
-ALTER TABLE ONLY "public"."envios"
+ALTER TABLE ONLY "public"."shipments"
     ADD CONSTRAINT "envios_user_id_fkey_public_users" FOREIGN KEY ("user_id") REFERENCES "public"."users"("user_id") ON DELETE CASCADE;
 
 
@@ -2087,28 +1666,18 @@ ALTER TABLE ONLY "public"."inventory_sets"
 
 
 
-ALTER TABLE ONLY "public"."operaciones_recepcion"
-    ADD CONSTRAINT "operaciones_recepcion_event_id_fkey" FOREIGN KEY ("event_id") REFERENCES "public"."envios"("id") ON DELETE SET NULL;
+ALTER TABLE ONLY "public"."reception_operations"
+    ADD CONSTRAINT "operaciones_recepcion_event_id_fkey" FOREIGN KEY ("event_id") REFERENCES "public"."shipments"("id") ON DELETE SET NULL;
 
 
 
-ALTER TABLE ONLY "public"."operaciones_recepcion"
+ALTER TABLE ONLY "public"."reception_operations"
     ADD CONSTRAINT "operaciones_recepcion_set_id_fkey" FOREIGN KEY ("set_id") REFERENCES "public"."sets"("id") ON DELETE CASCADE;
 
 
 
-ALTER TABLE ONLY "public"."operaciones_recepcion"
+ALTER TABLE ONLY "public"."reception_operations"
     ADD CONSTRAINT "operaciones_recepcion_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
-
-
-
-ALTER TABLE ONLY "public"."profiles"
-    ADD CONSTRAINT "profiles_id_fkey" FOREIGN KEY ("id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
-
-
-
-ALTER TABLE ONLY "public"."profiles"
-    ADD CONSTRAINT "profiles_referred_by_fkey" FOREIGN KEY ("referred_by") REFERENCES "auth"."users"("id") ON DELETE SET NULL;
 
 
 
@@ -2118,7 +1687,7 @@ ALTER TABLE ONLY "public"."users"
 
 
 ALTER TABLE ONLY "public"."qr_validation_logs"
-    ADD CONSTRAINT "qr_validation_logs_shipment_id_fkey" FOREIGN KEY ("shipment_id") REFERENCES "public"."envios"("id") ON DELETE CASCADE;
+    ADD CONSTRAINT "qr_validation_logs_shipment_id_fkey" FOREIGN KEY ("shipment_id") REFERENCES "public"."shipments"("id") ON DELETE CASCADE;
 
 
 
@@ -2133,7 +1702,7 @@ ALTER TABLE ONLY "public"."referrals"
 
 
 ALTER TABLE ONLY "public"."reviews"
-    ADD CONSTRAINT "reviews_envio_id_fkey" FOREIGN KEY ("envio_id") REFERENCES "public"."envios"("id") ON DELETE SET NULL;
+    ADD CONSTRAINT "reviews_envio_id_fkey" FOREIGN KEY ("envio_id") REFERENCES "public"."shipments"("id") ON DELETE SET NULL;
 
 
 
@@ -2172,22 +1741,17 @@ ALTER TABLE ONLY "public"."users_correos_dropping"
 
 
 
+ALTER TABLE ONLY "public"."users"
+    ADD CONSTRAINT "users_referred_by_fkey" FOREIGN KEY ("referred_by") REFERENCES "auth"."users"("id") ON DELETE SET NULL;
+
+
+
 ALTER TABLE ONLY "public"."wishlist"
     ADD CONSTRAINT "wishlist_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
 
 
 
-CREATE POLICY "Access for operators and admins" ON "public"."envios" USING ((EXISTS ( SELECT 1
-   FROM "public"."user_roles"
-  WHERE (("user_roles"."user_id" = "auth"."uid"()) AND (("user_roles"."role")::"text" = ANY (ARRAY['admin'::"text", 'operador'::"text"]))))));
-
-
-
 CREATE POLICY "Admins and Operadores can manage inventario" ON "public"."inventory_sets" TO "authenticated" USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") OR "public"."has_role"("auth"."uid"(), 'operador'::"public"."app_role")));
-
-
-
-CREATE POLICY "Admins and Operadores can view all shipments" ON "public"."envios" FOR SELECT USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") OR "public"."has_role"("auth"."uid"(), 'operador'::"public"."app_role")));
 
 
 
@@ -2200,6 +1764,18 @@ CREATE POLICY "Admins and Operators can log operations" ON "public"."backoffice_
 
 
 CREATE POLICY "Admins and Operators can view operations" ON "public"."backoffice_operations" FOR SELECT TO "authenticated" USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") OR "public"."has_role"("auth"."uid"(), 'operador'::"public"."app_role")));
+
+
+
+CREATE POLICY "Admins and operators can insert" ON "public"."reception_operations" FOR INSERT TO "authenticated" WITH CHECK (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") OR "public"."has_role"("auth"."uid"(), 'operador'::"public"."app_role")));
+
+
+
+CREATE POLICY "Admins and operators can update" ON "public"."reception_operations" FOR UPDATE TO "authenticated" USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") OR "public"."has_role"("auth"."uid"(), 'operador'::"public"."app_role"))) WITH CHECK (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") OR "public"."has_role"("auth"."uid"(), 'operador'::"public"."app_role")));
+
+
+
+CREATE POLICY "Admins and operators full access" ON "public"."shipments" USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") OR "public"."has_role"("auth"."uid"(), 'operador'::"public"."app_role")));
 
 
 
@@ -2216,10 +1792,6 @@ CREATE POLICY "Admins can manage all donations" ON "public"."donations" USING ("
 
 
 CREATE POLICY "Admins can manage all roles" ON "public"."user_roles" TO "authenticated" USING ("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role"));
-
-
-
-CREATE POLICY "Admins can manage all shipments" ON "public"."envios" USING ("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role"));
 
 
 
@@ -2251,15 +1823,7 @@ CREATE POLICY "Authenticated users can insert their own donations" ON "public"."
 
 
 
-CREATE POLICY "Enable insert for admins and operators" ON "public"."operaciones_recepcion" FOR INSERT TO "authenticated" WITH CHECK (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") OR "public"."has_role"("auth"."uid"(), 'operador'::"public"."app_role")));
-
-
-
-CREATE POLICY "Enable read access for authenticated users" ON "public"."operaciones_recepcion" FOR SELECT TO "authenticated" USING (true);
-
-
-
-CREATE POLICY "Enable update for admins and operators" ON "public"."operaciones_recepcion" FOR UPDATE TO "authenticated" USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") OR "public"."has_role"("auth"."uid"(), 'operador'::"public"."app_role"))) WITH CHECK (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") OR "public"."has_role"("auth"."uid"(), 'operador'::"public"."app_role")));
+CREATE POLICY "Authenticated users can read" ON "public"."reception_operations" FOR SELECT TO "authenticated" USING (true);
 
 
 
@@ -2267,11 +1831,11 @@ CREATE POLICY "Inventario is viewable by everyone" ON "public"."inventory_sets" 
 
 
 
-CREATE POLICY "Operadores can create shipments" ON "public"."envios" FOR INSERT WITH CHECK (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") OR "public"."has_role"("auth"."uid"(), 'operador'::"public"."app_role")));
+CREATE POLICY "Operators can create shipments" ON "public"."shipments" FOR INSERT WITH CHECK (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") OR "public"."has_role"("auth"."uid"(), 'operador'::"public"."app_role")));
 
 
 
-CREATE POLICY "Operadores can update shipments" ON "public"."envios" FOR UPDATE USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") OR "public"."has_role"("auth"."uid"(), 'operador'::"public"."app_role")));
+CREATE POLICY "Operators can update shipments" ON "public"."shipments" FOR UPDATE USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") OR "public"."has_role"("auth"."uid"(), 'operador'::"public"."app_role")));
 
 
 
@@ -2311,11 +1875,11 @@ CREATE POLICY "Users can update own profile" ON "public"."users" FOR UPDATE USIN
 
 
 
+CREATE POLICY "Users can update own shipment status" ON "public"."shipments" FOR UPDATE TO "authenticated" USING (("auth"."uid"() = "user_id")) WITH CHECK ((("auth"."uid"() = "user_id") AND ("shipment_status" = 'return_in_transit'::"text")));
+
+
+
 CREATE POLICY "Users can update their own Correos PUDO selection" ON "public"."users_correos_dropping" FOR UPDATE USING (("auth"."uid"() = "user_id")) WITH CHECK (("auth"."uid"() = "user_id"));
-
-
-
-CREATE POLICY "Users can update their own envios status" ON "public"."envios" FOR UPDATE TO "authenticated" USING (("auth"."uid"() = "user_id")) WITH CHECK ((("auth"."uid"() = "user_id") AND ("estado_envio" = 'ruta_devolucion'::"text")));
 
 
 
@@ -2327,15 +1891,11 @@ CREATE POLICY "Users can update their own wishlist" ON "public"."wishlist" FOR U
 
 
 
-CREATE POLICY "Users can view own envios" ON "public"."envios" FOR SELECT USING (("auth"."uid"() = "user_id"));
-
-
-
 CREATE POLICY "Users can view own profile" ON "public"."users" FOR SELECT USING (("auth"."uid"() = "user_id"));
 
 
 
-CREATE POLICY "Users can view own shipments" ON "public"."envios" FOR SELECT USING (("auth"."uid"() = "user_id"));
+CREATE POLICY "Users can view own shipments" ON "public"."shipments" FOR SELECT USING (("auth"."uid"() = "user_id"));
 
 
 
@@ -2362,7 +1922,7 @@ CREATE POLICY "Users can view their own shipping orders" ON "public"."shipping_o
 
 
 CREATE POLICY "Users can view their own validation logs" ON "public"."qr_validation_logs" FOR SELECT TO "authenticated" USING (("shipment_id" IN ( SELECT "s"."id"
-   FROM "public"."envios" "s"
+   FROM "public"."shipments" "s"
   WHERE ("s"."user_id" = "auth"."uid"()))));
 
 
@@ -2380,31 +1940,13 @@ ALTER TABLE "public"."brickshare_pudo_locations" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."donations" ENABLE ROW LEVEL SECURITY;
 
 
-ALTER TABLE "public"."envios" ENABLE ROW LEVEL SECURITY;
-
-
 ALTER TABLE "public"."inventory_sets" ENABLE ROW LEVEL SECURITY;
 
 
-ALTER TABLE "public"."operaciones_recepcion" ENABLE ROW LEVEL SECURITY;
-
-
-ALTER TABLE "public"."profiles" ENABLE ROW LEVEL SECURITY;
-
-
-CREATE POLICY "profiles_insert_own" ON "public"."profiles" FOR INSERT TO "authenticated" WITH CHECK (("id" = "auth"."uid"()));
-
-
-
-CREATE POLICY "profiles_select_own" ON "public"."profiles" FOR SELECT TO "authenticated" USING (("id" = "auth"."uid"()));
-
-
-
-CREATE POLICY "profiles_update_own" ON "public"."profiles" FOR UPDATE TO "authenticated" USING (("id" = "auth"."uid"()));
-
-
-
 ALTER TABLE "public"."qr_validation_logs" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."reception_operations" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."referrals" ENABLE ROW LEVEL SECURITY;
@@ -2459,6 +2001,9 @@ ALTER TABLE "public"."set_piece_list" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."sets" ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE "public"."shipments" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."shipping_orders" ENABLE ROW LEVEL SECURITY;
 
 
@@ -2471,6 +2016,10 @@ ALTER TABLE "public"."users" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."users_correos_dropping" ENABLE ROW LEVEL SECURITY;
 
 
+CREATE POLICY "users_select_own_referral" ON "public"."users" FOR SELECT TO "authenticated" USING (("user_id" = "auth"."uid"()));
+
+
+
 ALTER TABLE "public"."wishlist" ENABLE ROW LEVEL SECURITY;
 
 
@@ -2478,12 +2027,6 @@ GRANT USAGE ON SCHEMA "public" TO "postgres";
 GRANT USAGE ON SCHEMA "public" TO "anon";
 GRANT USAGE ON SCHEMA "public" TO "authenticated";
 GRANT USAGE ON SCHEMA "public" TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "public"."assign_sets_to_users"() TO "anon";
-GRANT ALL ON FUNCTION "public"."assign_sets_to_users"() TO "authenticated";
-GRANT ALL ON FUNCTION "public"."assign_sets_to_users"() TO "service_role";
 
 
 
@@ -2499,7 +2042,6 @@ GRANT ALL ON FUNCTION "public"."confirm_qr_validation"("p_qr_code" "text", "p_va
 
 
 
-REVOKE ALL ON FUNCTION "public"."delete_assignment_and_rollback"("p_envio_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."delete_assignment_and_rollback"("p_envio_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."delete_assignment_and_rollback"("p_envio_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."delete_assignment_and_rollback"("p_envio_id" "uuid") TO "service_role";
@@ -2518,39 +2060,15 @@ GRANT ALL ON FUNCTION "public"."generate_qr_code"() TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."generate_referral_code"() TO "anon";
-GRANT ALL ON FUNCTION "public"."generate_referral_code"() TO "authenticated";
-GRANT ALL ON FUNCTION "public"."generate_referral_code"() TO "service_role";
+GRANT ALL ON FUNCTION "public"."generate_referral_code_users"() TO "anon";
+GRANT ALL ON FUNCTION "public"."generate_referral_code_users"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."generate_referral_code_users"() TO "service_role";
 
 
 
 GRANT ALL ON FUNCTION "public"."generate_return_qr"("p_shipment_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."generate_return_qr"("p_shipment_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."generate_return_qr"("p_shipment_id" "uuid") TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "public"."handle_cierre_recepcion"() TO "anon";
-GRANT ALL ON FUNCTION "public"."handle_cierre_recepcion"() TO "authenticated";
-GRANT ALL ON FUNCTION "public"."handle_cierre_recepcion"() TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "public"."handle_envio_entregado"() TO "anon";
-GRANT ALL ON FUNCTION "public"."handle_envio_entregado"() TO "authenticated";
-GRANT ALL ON FUNCTION "public"."handle_envio_entregado"() TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "public"."handle_envio_recibido_almacen"() TO "anon";
-GRANT ALL ON FUNCTION "public"."handle_envio_recibido_almacen"() TO "authenticated";
-GRANT ALL ON FUNCTION "public"."handle_envio_recibido_almacen"() TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "public"."handle_envio_ruta_devolucion_inventory"() TO "anon";
-GRANT ALL ON FUNCTION "public"."handle_envio_ruta_devolucion_inventory"() TO "authenticated";
-GRANT ALL ON FUNCTION "public"."handle_envio_ruta_devolucion_inventory"() TO "service_role";
 
 
 
@@ -2566,9 +2084,33 @@ GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."handle_return_status_update"() TO "anon";
-GRANT ALL ON FUNCTION "public"."handle_return_status_update"() TO "authenticated";
-GRANT ALL ON FUNCTION "public"."handle_return_status_update"() TO "service_role";
+GRANT ALL ON FUNCTION "public"."handle_reception_close"() TO "anon";
+GRANT ALL ON FUNCTION "public"."handle_reception_close"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."handle_reception_close"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."handle_return_user_status"() TO "anon";
+GRANT ALL ON FUNCTION "public"."handle_return_user_status"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."handle_return_user_status"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."handle_shipment_delivered"() TO "anon";
+GRANT ALL ON FUNCTION "public"."handle_shipment_delivered"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."handle_shipment_delivered"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."handle_shipment_return_transit_inventory"() TO "anon";
+GRANT ALL ON FUNCTION "public"."handle_shipment_return_transit_inventory"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."handle_shipment_return_transit_inventory"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."handle_shipment_warehouse_received"() TO "anon";
+GRANT ALL ON FUNCTION "public"."handle_shipment_warehouse_received"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."handle_shipment_warehouse_received"() TO "service_role";
 
 
 
@@ -2650,9 +2192,9 @@ GRANT ALL ON TABLE "public"."brickshare_pudo_locations" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."envios" TO "anon";
-GRANT ALL ON TABLE "public"."envios" TO "authenticated";
-GRANT ALL ON TABLE "public"."envios" TO "service_role";
+GRANT ALL ON TABLE "public"."shipments" TO "anon";
+GRANT ALL ON TABLE "public"."shipments" TO "authenticated";
+GRANT ALL ON TABLE "public"."shipments" TO "service_role";
 
 
 
@@ -2674,21 +2216,15 @@ GRANT ALL ON TABLE "public"."inventory_sets" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."operaciones_recepcion" TO "anon";
-GRANT ALL ON TABLE "public"."operaciones_recepcion" TO "authenticated";
-GRANT ALL ON TABLE "public"."operaciones_recepcion" TO "service_role";
-
-
-
-GRANT ALL ON TABLE "public"."profiles" TO "anon";
-GRANT ALL ON TABLE "public"."profiles" TO "authenticated";
-GRANT ALL ON TABLE "public"."profiles" TO "service_role";
-
-
-
 GRANT ALL ON TABLE "public"."qr_validation_logs" TO "anon";
 GRANT ALL ON TABLE "public"."qr_validation_logs" TO "authenticated";
 GRANT ALL ON TABLE "public"."qr_validation_logs" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."reception_operations" TO "anon";
+GRANT ALL ON TABLE "public"."reception_operations" TO "authenticated";
+GRANT ALL ON TABLE "public"."reception_operations" TO "service_role";
 
 
 

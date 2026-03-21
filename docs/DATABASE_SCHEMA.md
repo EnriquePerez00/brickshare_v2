@@ -55,69 +55,19 @@ Output format is unaligned.
 |-------|------|------|---------|-------------|
 | `id` | uuid | ✗ | `gen_random_uuid()` | - |
 | `user_id` | uuid | ✓ | - | - |
-| `nombre` | text | ✗ | - | - |
+| `name` | text | ✗ | - | - |
 | `email` | text | ✗ | - | - |
-| `telefono` | text | ✓ | - | - |
-| `direccion` | text | ✓ | - | - |
-| `peso_estimado` | numeric | ✗ | - | - |
-| `metodo_entrega` | text | ✗ | - | - |
-| `recompensa` | text | ✗ | - | - |
-| `ninos_beneficiados` | integer | ✗ | - | - |
-| `co2_evitado` | numeric | ✗ | - | - |
+| `phone` | text | ✓ | - | - |
+| `address` | text | ✓ | - | - |
+| `estimated_weight` | numeric | ✗ | - | - |
+| `delivery_method` | text | ✗ | - | - |
+| `reward` | text | ✗ | - | - |
+| `children_benefited` | integer | ✗ | - | - |
+| `co2_avoided` | numeric | ✗ | - | - |
 | `status` | text | ✗ | `'pending'::text` | - |
 | `tracking_code` | text | ✓ | - | - |
 | `created_at` | timestamp with time zone | ✗ | `now()` | - |
 | `updated_at` | timestamp with time zone | ✗ | `now()` | - |
-
-
-### envios
-
-| Campo | Tipo | Nulo | Default | Descripción |
-|-------|------|------|---------|-------------|
-| `id` | uuid | ✗ | `gen_random_uuid()` | - |
-| `user_id` | uuid | ✗ | - | - |
-| `fecha_asignada` | timestamp with time zone | ✓ | - | - |
-| `fecha_entrega` | timestamp with time zone | ✓ | - | - |
-| `fecha_entrega_real` | timestamp with time zone | ✓ | - | - |
-| `fecha_entrega_usuario` | timestamp with time zone | ✓ | - | - |
-| `fecha_recepcion_almacen` | timestamp with time zone | ✓ | - | - |
-| `fecha_devolucion_estimada` | date | ✓ | - | - |
-| `estado_envio` | text | ✗ | `'pendiente'::text` | Allowed values: preparacion, ruta_envio, entregado, devuelto, ruta_devolucion, cancelado |
-| `direccion_envio` | text | ✗ | - | - |
-| `ciudad_envio` | text | ✗ | - | - |
-| `codigo_postal_envio` | text | ✗ | - | - |
-| `pais_envio` | text | ✗ | `'España'::text` | - |
-| `proveedor_envio` | text | ✓ | - | - |
-| `direccion_proveedor_recogida` | text | ✓ | - | - |
-| `numero_seguimiento` | text | ✓ | - | - |
-| `transportista` | text | ✓ | - | - |
-| `notas_adicionales` | text | ✓ | - | - |
-| `created_at` | timestamp with time zone | ✗ | `now()` | - |
-| `updated_at` | timestamp with time zone | ✗ | `now()` | - |
-| `fecha_recogida_almacen` | timestamp with time zone | ✓ | - | Date when the shipment was picked up from the warehouse |
-| `fecha_solicitud_devolucion` | timestamp with time zone | ✓ | - | Date when the user requested a return |
-| `proveedor_recogida` | text | ✓ | - | Carrier or entity in charge of the return pickup |
-| `set_ref` | text | ✓ | - | LEGO set reference (e.g., 75192) for quick reference |
-| `set_id` | uuid | ✓ | - | Direct reference to the set being shipped, eliminates need for orders table |
-| `estado_manipulacion` | boolean | ✓ | `false` | - |
-| `correos_shipment_id` | text | ✓ | - | External shipment identifier returned by Correos Preregister API |
-| `label_url` | text | ✓ | - | Path to the generated shipping label in storage |
-| `pickup_id` | text | ✓ | - | External identifier for the scheduled pickup |
-| `last_tracking_update` | timestamp with time zone | ✓ | - | Timestamp of the last synchronization with Correos Tracking API |
-| `swikly_wish_id` | text | ✓ | - | - |
-| `swikly_wish_url` | text | ✓ | - | - |
-| `swikly_status` | text | ✓ | `'pending'::text` | - |
-| `swikly_deposit_amount` | integer | ✓ | - | - |
-| `pickup_type` | text | ✓ | `'correos'::text` | - |
-| `brickshare_pudo_id` | text | ✓ | - | - |
-| `delivery_qr_code` | text | ✓ | - | - |
-| `delivery_qr_expires_at` | timestamp with time zone | ✓ | - | - |
-| `delivery_validated_at` | timestamp with time zone | ✓ | - | - |
-| `return_qr_code` | text | ✓ | - | - |
-| `return_qr_expires_at` | timestamp with time zone | ✓ | - | - |
-| `return_validated_at` | timestamp with time zone | ✓ | - | - |
-| `brickshare_metadata` | jsonb | ✓ | `'{}'::jsonb` | - |
-| `brickshare_package_id` | text | ✓ | - | ID del package en Brickshare_logistics. Usado cuando pickup_type="brickshare" para sincronización con el sistema de PUDO. |
 
 
 ### inventory_sets
@@ -130,46 +80,13 @@ Output format is unaligned.
 | `set_id` | uuid | ✗ | - | - |
 | `set_ref` | text | ✓ | - | Official LEGO reference number (sets.lego_ref) |
 | `inventory_set_total_qty` | integer | ✗ | `0` | - |
-| `en_envio` | integer | ✗ | `0` | - |
-| `en_uso` | integer | ✗ | `0` | - |
-| `en_devolucion` | integer | ✗ | `0` | - |
-| `en_reparacion` | integer | ✗ | `0` | - |
+| `in_shipping` | integer | ✗ | `0` | - |
+| `in_use` | integer | ✗ | `0` | - |
+| `in_return` | integer | ✗ | `0` | - |
+| `in_repair` | integer | ✗ | `0` | - |
 | `created_at` | timestamp with time zone | ✗ | `now()` | - |
 | `updated_at` | timestamp with time zone | ✗ | `now()` | - |
 | `spare_parts_order` | text | ✓ | - | - |
-
-
-### operaciones_recepcion
-
-**Descripción**: Table to record the reception and maintenance check of sets returned by users.
-
-| Campo | Tipo | Nulo | Default | Descripción |
-|-------|------|------|---------|-------------|
-| `id` | uuid | ✗ | `gen_random_uuid()` | - |
-| `event_id` | uuid | ✓ | - | - |
-| `user_id` | uuid | ✗ | - | - |
-| `set_id` | uuid | ✗ | - | - |
-| `weight_measured` | numeric(10,2) | ✓ | - | Actual weight of the set upon reception (in grams). |
-| `status_recepcion` | boolean | ✗ | `false` | True if the reception process is completed. |
-| `missing_parts` | text | ✓ | - | Details or notes about missing pieces found during reception. |
-| `created_at` | timestamp with time zone | ✗ | `now()` | - |
-| `updated_at` | timestamp with time zone | ✗ | `now()` | - |
-
-
-### profiles
-
-| Campo | Tipo | Nulo | Default | Descripción |
-|-------|------|------|---------|-------------|
-| `id` | uuid | ✗ | - | - |
-| `full_name` | text | ✓ | - | - |
-| `avatar_url` | text | ✓ | - | - |
-| `sub_status` | text | ✓ | `'free'::text` | - |
-| `impact_points` | integer | ✓ | `0` | - |
-| `referral_code` | text | ✓ | - | Unique shareable code (6 chars, auto-generated) |
-| `referred_by` | uuid | ✓ | - | auth.users.id of the user who referred this one |
-| `referral_credits` | integer | ✗ | `0` | Accumulated credits from successful referrals |
-| `created_at` | timestamp with time zone | ✗ | `now()` | - |
-| `updated_at` | timestamp with time zone | ✗ | `now()` | - |
 
 
 ### qr_validation_logs
@@ -187,6 +104,23 @@ Output format is unaligned.
 | `validation_status` | text | ✗ | - | - |
 | `metadata` | jsonb | ✓ | `'{}'::jsonb` | - |
 | `created_at` | timestamp with time zone | ✓ | `now()` | - |
+
+
+### reception_operations
+
+**Descripción**: Table to record the reception and maintenance check of sets returned by users.
+
+| Campo | Tipo | Nulo | Default | Descripción |
+|-------|------|------|---------|-------------|
+| `id` | uuid | ✗ | `gen_random_uuid()` | - |
+| `event_id` | uuid | ✓ | - | - |
+| `user_id` | uuid | ✗ | - | - |
+| `set_id` | uuid | ✗ | - | - |
+| `weight_measured` | numeric(10,2) | ✓ | - | Actual weight of the set upon reception (in grams). |
+| `reception_completed` | boolean | ✗ | `false` | True if the reception process is completed. |
+| `missing_parts` | text | ✓ | - | Details or notes about missing pieces found during reception. |
+| `created_at` | timestamp with time zone | ✗ | `now()` | - |
+| `updated_at` | timestamp with time zone | ✗ | `now()` | - |
 
 
 ### referrals
@@ -271,7 +205,7 @@ Output format is unaligned.
 | `set_ref` | text | ✓ | - | Official LEGO catalog reference number |
 | `set_weight` | numeric | ✓ | - | - |
 | `set_minifigs` | numeric | ✓ | - | - |
-| `set_status` | text | ✓ | `'inactivo'::text` | - |
+| `set_status` | text | ✓ | `'inactive'::text` | - |
 | `set_price` | numeric | ✓ | `100.00` | - |
 | `current_value_new` | numeric | ✓ | - | - |
 | `current_value_used` | numeric | ✓ | - | - |
@@ -279,6 +213,56 @@ Output format is unaligned.
 | `set_subtheme` | text | ✓ | - | - |
 | `barcode_upc` | text | ✓ | - | - |
 | `barcode_ean` | text | ✓ | - | - |
+
+
+### shipments
+
+| Campo | Tipo | Nulo | Default | Descripción |
+|-------|------|------|---------|-------------|
+| `id` | uuid | ✗ | `gen_random_uuid()` | - |
+| `user_id` | uuid | ✗ | - | - |
+| `assigned_date` | timestamp with time zone | ✓ | - | - |
+| `estimated_delivery_date` | timestamp with time zone | ✓ | - | - |
+| `actual_delivery_date` | timestamp with time zone | ✓ | - | - |
+| `user_delivery_date` | timestamp with time zone | ✓ | - | - |
+| `warehouse_reception_date` | timestamp with time zone | ✓ | - | - |
+| `estimated_return_date` | date | ✓ | - | - |
+| `shipment_status` | text | ✗ | `'pendiente'::text` | Allowed values: preparacion, ruta_envio, entregado, devuelto, ruta_devolucion, cancelado |
+| `shipping_address` | text | ✗ | - | - |
+| `shipping_city` | text | ✗ | - | - |
+| `shipping_zip_code` | text | ✗ | - | - |
+| `shipping_country` | text | ✗ | `'España'::text` | - |
+| `shipping_provider` | text | ✓ | - | - |
+| `pickup_provider_address` | text | ✓ | - | - |
+| `tracking_number` | text | ✓ | - | - |
+| `carrier` | text | ✓ | - | - |
+| `additional_notes` | text | ✓ | - | - |
+| `created_at` | timestamp with time zone | ✗ | `now()` | - |
+| `updated_at` | timestamp with time zone | ✗ | `now()` | - |
+| `warehouse_pickup_date` | timestamp with time zone | ✓ | - | Date when the shipment was picked up from the warehouse |
+| `return_request_date` | timestamp with time zone | ✓ | - | Date when the user requested a return |
+| `pickup_provider` | text | ✓ | - | Carrier or entity in charge of the return pickup |
+| `set_ref` | text | ✓ | - | LEGO set reference (e.g., 75192) for quick reference |
+| `set_id` | uuid | ✓ | - | Direct reference to the set being shipped, eliminates need for orders table |
+| `handling_processed` | boolean | ✓ | `false` | - |
+| `correos_shipment_id` | text | ✓ | - | External shipment identifier returned by Correos Preregister API |
+| `label_url` | text | ✓ | - | Path to the generated shipping label in storage |
+| `pickup_id` | text | ✓ | - | External identifier for the scheduled pickup |
+| `last_tracking_update` | timestamp with time zone | ✓ | - | Timestamp of the last synchronization with Correos Tracking API |
+| `swikly_wish_id` | text | ✓ | - | - |
+| `swikly_wish_url` | text | ✓ | - | - |
+| `swikly_status` | text | ✓ | `'pending'::text` | - |
+| `swikly_deposit_amount` | integer | ✓ | - | - |
+| `pickup_type` | text | ✓ | `'correos'::text` | - |
+| `brickshare_pudo_id` | text | ✓ | - | - |
+| `delivery_qr_code` | text | ✓ | - | - |
+| `delivery_qr_expires_at` | timestamp with time zone | ✓ | - | - |
+| `delivery_validated_at` | timestamp with time zone | ✓ | - | - |
+| `return_qr_code` | text | ✓ | - | - |
+| `return_qr_expires_at` | timestamp with time zone | ✓ | - | - |
+| `return_validated_at` | timestamp with time zone | ✓ | - | - |
+| `brickshare_metadata` | jsonb | ✓ | `'{}'::jsonb` | - |
+| `brickshare_package_id` | text | ✓ | - | ID del package en Brickshare_logistics. Usado cuando pickup_type="brickshare" para sincronización con el sistema de PUDO. |
 
 
 ### shipping_orders
@@ -319,22 +303,15 @@ Output format is unaligned.
 | `impact_points` | integer | ✓ | `0` | - |
 | `created_at` | timestamp with time zone | ✗ | `now()` | - |
 | `updated_at` | timestamp with time zone | ✗ | `now()` | - |
-| `address` | text | ✓ | - | - |
-| `address_extra` | text | ✓ | - | - |
-| `zip_code` | text | ✓ | - | - |
-| `city` | text | ✓ | - | - |
-| `province` | text | ✓ | - | - |
-| `phone` | text | ✓ | - | - |
 | `email` | text | ✓ | - | - |
 | `subscription_type` | text | ✓ | - | - |
 | `subscription_status` | text | ✓ | `'active'::text` | - |
-| `direccion` | text | ✓ | - | - |
-| `codigo_postal` | text | ✓ | - | - |
-| `ciudad` | text | ✓ | - | - |
-| `telefono` | text | ✓ | - | - |
 | `profile_completed` | boolean | ✓ | `false` | - |
-| `user_status` | text | ✓ | `'sin set'::text` | - |
+| `user_status` | text | ✓ | `'no_set'::text` | - |
 | `stripe_customer_id` | text | ✓ | - | - |
+| `referral_code` | text | ✓ | - | - |
+| `referred_by` | uuid | ✓ | - | Auth: Set this column to true when the account comes from SSO. These accounts can have duplicate emails. |
+| `referral_credits` | integer | ✗ | `0` | - |
 
 
 ### users
@@ -348,22 +325,15 @@ Output format is unaligned.
 | `impact_points` | integer | ✓ | `0` | - |
 | `created_at` | timestamp with time zone | ✗ | `now()` | - |
 | `updated_at` | timestamp with time zone | ✗ | `now()` | - |
-| `address` | text | ✓ | - | - |
-| `address_extra` | text | ✓ | - | - |
-| `zip_code` | text | ✓ | - | - |
-| `city` | text | ✓ | - | - |
-| `province` | text | ✓ | - | - |
-| `phone` | text | ✓ | - | - |
 | `email` | text | ✓ | - | - |
 | `subscription_type` | text | ✓ | - | The plan level (Brick Starter, Pro, Master) |
 | `subscription_status` | text | ✓ | `'active'::text` | Status of the subscription (OK, trialing, past_due, canceled, etc.) |
-| `direccion` | text | ✓ | - | - |
-| `codigo_postal` | text | ✓ | - | - |
-| `ciudad` | text | ✓ | - | - |
-| `telefono` | text | ✓ | - | - |
-| `profile_completed` | boolean | ✓ | `false` | - |
-| `user_status` | text | ✓ | `'sin set'::text` | Allowed values: set en envio, sin set, recibido, set en devolucion, suspendido, cancelado |
+| `profile_completed` | boolean | ✓ | `false` | Whether the user has completed their profile information |
+| `user_status` | text | ✓ | `'no_set'::text` | Allowed values: set en envio, sin set, recibido, con set, set en devolucion, suspendido, cancelado |
 | `stripe_customer_id` | text | ✓ | - | Stripe Customer ID associated with the user |
+| `referral_code` | text | ✓ | - | Unique shareable code (6 chars, auto-generated) |
+| `referred_by` | uuid | ✓ | - | auth.users.id of the user who referred this one |
+| `referral_credits` | integer | ✗ | `0` | Accumulated credits from successful referrals |
 
 
 ### users_correos_dropping
@@ -417,14 +387,6 @@ Output format is unaligned.
 
 ## ⚙️ Funciones RPC
 
-### `assign_sets_to_users`
-
-**Descripción**: Assigns available sets to users based on wishlist and returns full envio details for immediate display
-
-**Parámetros**: Ninguno
-**Retorna**: `TABLE(envio_id uuid, user_id uuid, set_id uuid, order_id uuid, user_name text, set_name text, set_ref text, created_at timestamp with time zone)`
-
-
 ### `confirm_assign_sets_to_users`
 
 **Parámetros**: `p_user_ids uuid[]`
@@ -433,15 +395,11 @@ Output format is unaligned.
 
 ### `confirm_qr_validation`
 
-**Descripción**: Confirms a QR validation and updates shipment status
-
 **Parámetros**: `p_qr_code text, p_validated_by text DEFAULT NULL::text`
 **Retorna**: `TABLE(success boolean, message text, shipment_id uuid)`
 
 
 ### `delete_assignment_and_rollback`
-
-**Descripción**: Deletes an assignment (envio) and rolls back all changes including inventory and wishlist restoration
 
 **Parámetros**: `p_envio_id uuid`
 **Retorna**: `void`
@@ -459,7 +417,7 @@ Output format is unaligned.
 **Retorna**: `text`
 
 
-### `generate_referral_code`
+### `generate_referral_code_users`
 
 **Parámetros**: Ninguno
 **Retorna**: `trigger`
@@ -469,30 +427,6 @@ Output format is unaligned.
 
 **Parámetros**: `p_shipment_id uuid`
 **Retorna**: `TABLE(qr_code text, expires_at timestamp with time zone)`
-
-
-### `handle_cierre_recepcion`
-
-**Parámetros**: Ninguno
-**Retorna**: `trigger`
-
-
-### `handle_envio_entregado`
-
-**Parámetros**: Ninguno
-**Retorna**: `trigger`
-
-
-### `handle_envio_recibido_almacen`
-
-**Parámetros**: Ninguno
-**Retorna**: `trigger`
-
-
-### `handle_envio_ruta_devolucion_inventory`
-
-**Parámetros**: Ninguno
-**Retorna**: `trigger`
 
 
 ### `handle_new_set_inventory`
@@ -507,7 +441,31 @@ Output format is unaligned.
 **Retorna**: `trigger`
 
 
-### `handle_return_status_update`
+### `handle_reception_close`
+
+**Parámetros**: Ninguno
+**Retorna**: `trigger`
+
+
+### `handle_return_user_status`
+
+**Parámetros**: Ninguno
+**Retorna**: `trigger`
+
+
+### `handle_shipment_delivered`
+
+**Parámetros**: Ninguno
+**Retorna**: `trigger`
+
+
+### `handle_shipment_return_transit_inventory`
+
+**Parámetros**: Ninguno
+**Retorna**: `trigger`
+
+
+### `handle_shipment_warehouse_received`
 
 **Parámetros**: Ninguno
 **Retorna**: `trigger`
@@ -571,15 +529,11 @@ Output format is unaligned.
 
 ### `uses_brickshare_pudo`
 
-**Descripción**: Retorna true si el shipment usa el sistema de PUDO de Brickshare_logistics
-
 **Parámetros**: `shipment_id uuid`
 **Retorna**: `boolean`
 
 
 ### `validate_qr_code`
-
-**Descripción**: Validates a QR code and returns shipment info without personal data
 
 **Parámetros**: `p_qr_code text`
 **Retorna**: `TABLE(shipment_id uuid, validation_type text, is_valid boolean, error_message text, shipment_info jsonb)`
@@ -598,34 +552,6 @@ Output format is unaligned.
   - Función: `EXECUTE FUNCTION update_updated_at_column()`
 
 
-### envios
-
-- **on_envio_recibido_almacen**
-  - Evento: UPDATE
-  - Timing: BEFORE
-  - Función: `EXECUTE FUNCTION handle_envio_recibido_almacen()`
-
-- **update_envios_updated_at**
-  - Evento: UPDATE
-  - Timing: BEFORE
-  - Función: `EXECUTE FUNCTION update_updated_at_column()`
-
-- **on_envio_return_update**
-  - Evento: UPDATE
-  - Timing: AFTER
-  - Función: `EXECUTE FUNCTION handle_return_status_update()`
-
-- **on_envio_entregado**
-  - Evento: UPDATE
-  - Timing: AFTER
-  - Función: `EXECUTE FUNCTION handle_envio_entregado()`
-
-- **on_envio_ruta_devolucion_inv**
-  - Evento: UPDATE
-  - Timing: AFTER
-  - Función: `EXECUTE FUNCTION handle_envio_ruta_devolucion_inventory()`
-
-
 ### inventory_sets
 
 - **update_inventario_sets_updated_at**
@@ -634,30 +560,17 @@ Output format is unaligned.
   - Función: `EXECUTE FUNCTION update_updated_at_column()`
 
 
-### operaciones_recepcion
+### reception_operations
 
-- **update_operaciones_recepcion_updated_at**
+- **update_reception_operations_updated_at**
   - Evento: UPDATE
   - Timing: BEFORE
   - Función: `EXECUTE FUNCTION update_updated_at_column()`
 
-- **on_recepcion_completada**
+- **on_reception_completed**
   - Evento: UPDATE
   - Timing: AFTER
-  - Función: `EXECUTE FUNCTION handle_cierre_recepcion()`
-
-
-### profiles
-
-- **profiles_generate_referral_code**
-  - Evento: INSERT
-  - Timing: BEFORE
-  - Función: `EXECUTE FUNCTION generate_referral_code()`
-
-- **profiles_updated_at**
-  - Evento: UPDATE
-  - Timing: BEFORE
-  - Función: `EXECUTE FUNCTION set_updated_at()`
+  - Función: `EXECUTE FUNCTION handle_reception_close()`
 
 
 ### referrals
@@ -686,12 +599,40 @@ Output format is unaligned.
 
 ### sets
 
+- **update_sets_updated_at**
+  - Evento: UPDATE
+  - Timing: BEFORE
+  - Función: `EXECUTE FUNCTION update_updated_at_column()`
+
 - **on_set_created**
   - Evento: INSERT
   - Timing: AFTER
   - Función: `EXECUTE FUNCTION handle_new_set_inventory()`
 
-- **update_sets_updated_at**
+
+### shipments
+
+- **on_shipment_warehouse_received**
+  - Evento: UPDATE
+  - Timing: BEFORE
+  - Función: `EXECUTE FUNCTION handle_shipment_warehouse_received()`
+
+- **on_shipment_delivered**
+  - Evento: UPDATE
+  - Timing: AFTER
+  - Función: `EXECUTE FUNCTION handle_shipment_delivered()`
+
+- **on_shipment_return_user_status**
+  - Evento: UPDATE
+  - Timing: AFTER
+  - Función: `EXECUTE FUNCTION handle_return_user_status()`
+
+- **on_shipment_return_transit_inv**
+  - Evento: UPDATE
+  - Timing: AFTER
+  - Función: `EXECUTE FUNCTION handle_shipment_return_transit_inventory()`
+
+- **update_shipments_updated_at**
   - Evento: UPDATE
   - Timing: BEFORE
   - Función: `EXECUTE FUNCTION update_updated_at_column()`
@@ -711,6 +652,11 @@ Output format is unaligned.
   - Evento: UPDATE
   - Timing: BEFORE
   - Función: `EXECUTE FUNCTION update_updated_at_column()`
+
+- **users_generate_referral_code**
+  - Evento: INSERT
+  - Timing: BEFORE
+  - Función: `EXECUTE FUNCTION generate_referral_code_users()`
 
 
 ### users_correos_dropping
@@ -752,14 +698,6 @@ Output format is unaligned.
 
 ### Tabla: `donations`
 
-- **Users can view their own donations**
-  - Comando: `SELECT`
-  - Roles: public
-  - Usando: `((auth.uid() = user_id) OR (email = (( SELECT users.email
-   FROM auth.users
-  WHERE (users.id = auth.uid())))::text))`
-
-
 - **Admins can manage all donations**
   - Comando: `ALL`
   - Roles: public
@@ -772,67 +710,16 @@ Output format is unaligned.
   - Usando: `true`
   - With check: `((auth.uid() IS NOT NULL) AND ((user_id IS NULL) OR (auth.uid() = user_id)))`
 
-
-### Tabla: `envios`
-
-- **Users can view own envios**
+- **Users can view their own donations**
   - Comando: `SELECT`
   - Roles: public
-  - Usando: `(auth.uid() = user_id)`
-
-
-- **Admins and Operadores can view all shipments**
-  - Comando: `SELECT`
-  - Roles: public
-  - Usando: `(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'operador'::app_role))`
-
-
-- **Users can view own shipments**
-  - Comando: `SELECT`
-  - Roles: public
-  - Usando: `(auth.uid() = user_id)`
-
-
-- **Admins can manage all shipments**
-  - Comando: `ALL`
-  - Roles: public
-  - Usando: `has_role(auth.uid(), 'admin'::app_role)`
-
-
-- **Operadores can create shipments**
-  - Comando: `INSERT`
-  - Roles: public
-  - Usando: `true`
-  - With check: `(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'operador'::app_role))`
-
-- **Operadores can update shipments**
-  - Comando: `UPDATE`
-  - Roles: public
-  - Usando: `(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'operador'::app_role))`
-
-
-- **Users can update their own envios status**
-  - Comando: `UPDATE`
-  - Roles: authenticated
-  - Usando: `(auth.uid() = user_id)`
-  - With check: `((auth.uid() = user_id) AND (estado_envio = 'ruta_devolucion'::text))`
-
-- **Access for operators and admins**
-  - Comando: `ALL`
-  - Roles: public
-  - Usando: `(EXISTS ( SELECT 1
-   FROM user_roles
-  WHERE ((user_roles.user_id = auth.uid()) AND ((user_roles.role)::text = ANY (ARRAY['admin'::text, 'operador'::text])))))`
+  - Usando: `((auth.uid() = user_id) OR (email = (( SELECT users.email
+   FROM auth.users
+  WHERE (users.id = auth.uid())))::text))`
 
 
 
 ### Tabla: `inventory_sets`
-
-- **Admins and Operadores can manage inventario**
-  - Comando: `ALL`
-  - Roles: authenticated
-  - Usando: `(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'operador'::app_role))`
-
 
 - **Inventario is viewable by everyone**
   - Comando: `SELECT`
@@ -840,47 +727,11 @@ Output format is unaligned.
   - Usando: `true`
 
 
-
-### Tabla: `operaciones_recepcion`
-
-- **Enable update for admins and operators**
-  - Comando: `UPDATE`
+- **Admins and Operadores can manage inventario**
+  - Comando: `ALL`
   - Roles: authenticated
   - Usando: `(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'operador'::app_role))`
-  - With check: `(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'operador'::app_role))`
 
-- **Enable insert for admins and operators**
-  - Comando: `INSERT`
-  - Roles: authenticated
-  - Usando: `true`
-  - With check: `(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'operador'::app_role))`
-
-- **Enable read access for authenticated users**
-  - Comando: `SELECT`
-  - Roles: authenticated
-  - Usando: `true`
-
-
-
-### Tabla: `profiles`
-
-- **profiles_select_own**
-  - Comando: `SELECT`
-  - Roles: authenticated
-  - Usando: `(id = auth.uid())`
-
-
-- **profiles_update_own**
-  - Comando: `UPDATE`
-  - Roles: authenticated
-  - Usando: `(id = auth.uid())`
-
-
-- **profiles_insert_own**
-  - Comando: `INSERT`
-  - Roles: authenticated
-  - Usando: `true`
-  - With check: `(id = auth.uid())`
 
 
 ### Tabla: `qr_validation_logs`
@@ -889,23 +740,44 @@ Output format is unaligned.
   - Comando: `SELECT`
   - Roles: authenticated
   - Usando: `(shipment_id IN ( SELECT s.id
-   FROM envios s
+   FROM shipments s
   WHERE (s.user_id = auth.uid())))`
 
 
 
-### Tabla: `referrals`
+### Tabla: `reception_operations`
 
-- **referrals_select_own**
+- **Admins and operators can insert**
+  - Comando: `INSERT`
+  - Roles: authenticated
+  - Usando: `true`
+  - With check: `(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'operador'::app_role))`
+
+- **Authenticated users can read**
   - Comando: `SELECT`
   - Roles: authenticated
-  - Usando: `(referrer_id = auth.uid())`
+  - Usando: `true`
 
+
+- **Admins and operators can update**
+  - Comando: `UPDATE`
+  - Roles: authenticated
+  - Usando: `(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'operador'::app_role))`
+  - With check: `(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'operador'::app_role))`
+
+
+### Tabla: `referrals`
 
 - **referrals_select_referee**
   - Comando: `SELECT`
   - Roles: authenticated
   - Usando: `(referee_id = auth.uid())`
+
+
+- **referrals_select_own**
+  - Comando: `SELECT`
+  - Roles: authenticated
+  - Usando: `(referrer_id = auth.uid())`
 
 
 - **referrals_admin_all**
@@ -925,12 +797,6 @@ Output format is unaligned.
   - Usando: `(is_published = true)`
 
 
-- **reviews_insert_own**
-  - Comando: `INSERT`
-  - Roles: authenticated
-  - Usando: `true`
-  - With check: `(auth.uid() = user_id)`
-
 - **reviews_admin_all**
   - Comando: `ALL`
   - Roles: authenticated
@@ -945,17 +811,23 @@ Output format is unaligned.
   - Usando: `(auth.uid() = user_id)`
 
 
-- **reviews_select_own**
-  - Comando: `SELECT`
-  - Roles: authenticated
-  - Usando: `(auth.uid() = user_id)`
-
-
 - **reviews_update_own**
   - Comando: `UPDATE`
   - Roles: authenticated
   - Usando: `(auth.uid() = user_id)`
   - With check: `(auth.uid() = user_id)`
+
+- **reviews_insert_own**
+  - Comando: `INSERT`
+  - Roles: authenticated
+  - Usando: `true`
+  - With check: `(auth.uid() = user_id)`
+
+- **reviews_select_own**
+  - Comando: `SELECT`
+  - Roles: authenticated
+  - Usando: `(auth.uid() = user_id)`
+
 
 
 ### Tabla: `set_piece_list`
@@ -975,16 +847,16 @@ Output format is unaligned.
 
 ### Tabla: `sets`
 
-- **Admins can insert sets**
-  - Comando: `INSERT`
-  - Roles: public
-  - Usando: `true`
-  - With check: `has_role(auth.uid(), 'admin'::app_role)`
-
 - **Sets are viewable by everyone**
   - Comando: `SELECT`
   - Roles: public
   - Usando: `true`
+
+
+- **Admins can delete sets**
+  - Comando: `DELETE`
+  - Roles: public
+  - Usando: `has_role(auth.uid(), 'admin'::app_role)`
 
 
 - **Admins can update sets**
@@ -993,11 +865,44 @@ Output format is unaligned.
   - Usando: `has_role(auth.uid(), 'admin'::app_role)`
 
 
-- **Admins can delete sets**
-  - Comando: `DELETE`
+- **Admins can insert sets**
+  - Comando: `INSERT`
   - Roles: public
-  - Usando: `has_role(auth.uid(), 'admin'::app_role)`
+  - Usando: `true`
+  - With check: `has_role(auth.uid(), 'admin'::app_role)`
 
+
+### Tabla: `shipments`
+
+- **Admins and operators full access**
+  - Comando: `ALL`
+  - Roles: public
+  - Usando: `(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'operador'::app_role))`
+
+
+- **Operators can create shipments**
+  - Comando: `INSERT`
+  - Roles: public
+  - Usando: `true`
+  - With check: `(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'operador'::app_role))`
+
+- **Operators can update shipments**
+  - Comando: `UPDATE`
+  - Roles: public
+  - Usando: `(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'operador'::app_role))`
+
+
+- **Users can view own shipments**
+  - Comando: `SELECT`
+  - Roles: public
+  - Usando: `(auth.uid() = user_id)`
+
+
+- **Users can update own shipment status**
+  - Comando: `UPDATE`
+  - Roles: authenticated
+  - Usando: `(auth.uid() = user_id)`
+  - With check: `((auth.uid() = user_id) AND (shipment_status = 'return_in_transit'::text))`
 
 
 ### Tabla: `shipping_orders`
@@ -1026,20 +931,8 @@ Output format is unaligned.
 
 ### Tabla: `users`
 
-- **Admins can update any user**
-  - Comando: `UPDATE`
-  - Roles: public
-  - Usando: `has_role(auth.uid(), 'admin'::app_role)`
-
-
 - **Users can delete their own profile**
   - Comando: `DELETE`
-  - Roles: authenticated
-  - Usando: `(auth.uid() = user_id)`
-
-
-- **Users can view their own profile**
-  - Comando: `SELECT`
   - Roles: authenticated
   - Usando: `(auth.uid() = user_id)`
 
@@ -1050,17 +943,17 @@ Output format is unaligned.
   - Usando: `has_role(auth.uid(), 'admin'::app_role)`
 
 
-- **Users can update their own profile**
-  - Comando: `UPDATE`
+- **users_select_own_referral**
+  - Comando: `SELECT`
+  - Roles: authenticated
+  - Usando: `(user_id = auth.uid())`
+
+
+- **Users can view their own profile**
+  - Comando: `SELECT`
   - Roles: authenticated
   - Usando: `(auth.uid() = user_id)`
 
-
-- **Users can insert their own profile**
-  - Comando: `INSERT`
-  - Roles: authenticated
-  - Usando: `true`
-  - With check: `(auth.uid() = user_id)`
 
 - **Admins and Operadores can view all users**
   - Comando: `SELECT`
@@ -1074,26 +967,32 @@ Output format is unaligned.
   - Usando: `(auth.uid() = user_id)`
 
 
+- **Admins can update any user**
+  - Comando: `UPDATE`
+  - Roles: public
+  - Usando: `has_role(auth.uid(), 'admin'::app_role)`
+
+
 - **Users can update own profile**
   - Comando: `UPDATE`
   - Roles: public
   - Usando: `(auth.uid() = user_id)`
 
 
+- **Users can insert their own profile**
+  - Comando: `INSERT`
+  - Roles: authenticated
+  - Usando: `true`
+  - With check: `(auth.uid() = user_id)`
+
+- **Users can update their own profile**
+  - Comando: `UPDATE`
+  - Roles: authenticated
+  - Usando: `(auth.uid() = user_id)`
+
+
 
 ### Tabla: `users_correos_dropping`
-
-- **Users can delete their own Correos PUDO selection**
-  - Comando: `DELETE`
-  - Roles: public
-  - Usando: `(auth.uid() = user_id)`
-
-
-- **Users can view their own Correos PUDO selection**
-  - Comando: `SELECT`
-  - Roles: public
-  - Usando: `(auth.uid() = user_id)`
-
 
 - **Users can insert their own Correos PUDO selection**
   - Comando: `INSERT`
@@ -1101,31 +1000,31 @@ Output format is unaligned.
   - Usando: `true`
   - With check: `(auth.uid() = user_id)`
 
+- **Users can delete their own Correos PUDO selection**
+  - Comando: `DELETE`
+  - Roles: public
+  - Usando: `(auth.uid() = user_id)`
+
+
 - **Users can update their own Correos PUDO selection**
   - Comando: `UPDATE`
   - Roles: public
   - Usando: `(auth.uid() = user_id)`
   - With check: `(auth.uid() = user_id)`
 
-
-### Tabla: `wishlist`
-
-- **Users can add to their own wishlist**
-  - Comando: `INSERT`
-  - Roles: public
-  - Usando: `true`
-  - With check: `(auth.uid() = user_id)`
-
-- **Users can view their own wishlist**
+- **Users can view their own Correos PUDO selection**
   - Comando: `SELECT`
   - Roles: public
   - Usando: `(auth.uid() = user_id)`
 
 
-- **Admins can view all wishlists**
-  - Comando: `SELECT`
+
+### Tabla: `wishlist`
+
+- **Users can remove from their own wishlist**
+  - Comando: `DELETE`
   - Roles: public
-  - Usando: `has_role(auth.uid(), 'admin'::app_role)`
+  - Usando: `(auth.uid() = user_id)`
 
 
 - **Users can update their own wishlist**
@@ -1134,11 +1033,23 @@ Output format is unaligned.
   - Usando: `(auth.uid() = user_id)`
   - With check: `(auth.uid() = user_id)`
 
-- **Users can remove from their own wishlist**
-  - Comando: `DELETE`
+- **Admins can view all wishlists**
+  - Comando: `SELECT`
+  - Roles: public
+  - Usando: `has_role(auth.uid(), 'admin'::app_role)`
+
+
+- **Users can view their own wishlist**
+  - Comando: `SELECT`
   - Roles: public
   - Usando: `(auth.uid() = user_id)`
 
+
+- **Users can add to their own wishlist**
+  - Comando: `INSERT`
+  - Roles: public
+  - Usando: `true`
+  - With check: `(auth.uid() = user_id)`
 
 
 

@@ -204,13 +204,13 @@ serve(async (req) => {
 
         switch (action) {
             case 'preregister': {
-                const { data: envio, error: envioError } = await supabaseClient
-                    .from('envios')
+                const { data: shipment, error: shipmentError } = await supabaseClient
+                    .from('shipments')
                     .select(`
                         id, 
-                        direccion_envio, 
-                        ciudad_envio, 
-                        codigo_postal_envio, 
+                        shipping_address, 
+                        shipping_city, 
+                        shipping_postal_code, 
                         user_id,
                         order_id,
                         orders (
@@ -231,8 +231,8 @@ serve(async (req) => {
                     .eq('id', p_envios_id)
                     .single();
 
-                if (envioError || !envio) {
-                    throw new Error(`Shipment not found: ${envioError?.message}`);
+                if (shipmentError || !shipment) {
+                    throw new Error(`Shipment not found: ${shipmentError?.message}`);
                 }
 
                 const preregisterPayload = {
@@ -240,7 +240,7 @@ serve(async (req) => {
                     fecha: new Date().toISOString().split('T')[0],
                     envio: {
                         codEtiquetado: "",
-                        referencia: envio.id,
+                        referencia: shipment.id,
                         remitente: {
                             nombre: "Brickshare Almacén",
                             direccion: OFFICE_ADDRESS.direccion,
@@ -249,17 +249,17 @@ serve(async (req) => {
                             provincia: OFFICE_ADDRESS.provincia,
                         },
                         destinatario: {
-                            nombre: envio.users?.full_name || "Cliente Brickshare",
-                            direccion: envio.direccion_envio,
-                            cp: envio.codigo_postal_envio,
-                            poblacion: envio.ciudad_envio,
-                            provincia: envio.ciudad_envio,
-                            email: envio.users?.email,
-                            telefono: envio.users?.phone,
+                            nombre: shipment.users?.full_name || "Cliente Brickshare",
+                            direccion: shipment.shipping_address,
+                            cp: shipment.shipping_postal_code,
+                            poblacion: shipment.shipping_city,
+                            provincia: shipment.shipping_city,
+                            email: shipment.users?.email,
+                            telefono: shipment.users?.phone,
                         },
                         bultos: [{
-                            peso: envio.orders?.sets?.set_weight || 1,
-                            ...parseDimensions(envio.orders?.sets?.set_dim)
+                            peso: shipment.orders?.sets?.set_weight || 1,
+                            ...parseDimensions(shipment.orders?.sets?.set_dim)
                         }],
                         añadidos: [
                             {
@@ -284,10 +284,10 @@ serve(async (req) => {
                 const correosShipmentId = preregisterData.codEtiquetado;
 
                 await supabaseClient
-                    .from('envios')
+                    .from('shipments')
                     .update({
                         correos_shipment_id: correosShipmentId,
-                        estado_envio: 'asignado',
+                        shipment_status: 'prepared',
                         updated_at: new Date().toISOString()
                     })
                     .eq('id', p_envios_id);
@@ -300,13 +300,13 @@ serve(async (req) => {
 
             case 'return_preregister': {
                 // 1. Fetch shipment, user and set data
-                const { data: envio, error: envioError } = await supabaseClient
-                    .from('envios')
+                const { data: shipment, error: shipmentError } = await supabaseClient
+                    .from('shipments')
                     .select(`
                         id, 
-                        direccion_envio, 
-                        ciudad_envio, 
-                        codigo_postal_envio, 
+                        shipping_address, 
+                        shipping_city, 
+                        shipping_postal_code, 
                         user_id,
                         order_id,
                         orders (
@@ -327,19 +327,19 @@ serve(async (req) => {
                     .eq('id', p_envios_id)
                     .single();
 
-                if (envioError || !envio) {
-                    throw new Error(`Shipment info not found: ${envioError?.message}`);
+                if (shipmentError || !shipment) {
+                    throw new Error(`Shipment info not found: ${shipmentError?.message}`);
                 }
 
                 // 2. Fetch PUDO info for this user
                 const { data: pudoData, error: pudoError } = await supabaseClient
                     .from('users_correos_dropping')
                     .select('*')
-                    .eq('user_id', envio.user_id)
+                    .eq('user_id', shipment.user_id)
                     .single();
 
                 if (pudoError) {
-                    console.warn(`PUDO info not found for user ${envio.user_id}: ${pudoError.message}`);
+                    console.warn(`PUDO info not found for user ${shipment.user_id}: ${pudoError.message}`);
                 }
 
                 const pudo = pudoData;
@@ -348,15 +348,15 @@ serve(async (req) => {
                     solicitante: config.contractId,
                     fecha: new Date().toISOString().split('T')[0],
                     envio: {
-                        referencia: `RET-${envio.id.substring(0, 8)}`,
+                        referencia: `RET-${shipment.id.substring(0, 8)}`,
                         remitente: {
-                            nombre: envio.users?.full_name || "Cliente Brickshare",
-                            direccion: pudo?.correos_direccion_completa || envio.direccion_envio,
-                            cp: pudo?.correos_codigo_postal || envio.codigo_postal_envio,
-                            poblacion: pudo?.correos_ciudad || envio.ciudad_envio,
-                            provincia: pudo?.correos_provincia || envio.ciudad_envio,
-                            email: envio.users?.email,
-                            telefono: envio.users?.phone,
+                            nombre: shipment.users?.full_name || "Cliente Brickshare",
+                            direccion: pudo?.correos_direccion_completa || shipment.shipping_address,
+                            cp: pudo?.correos_codigo_postal || shipment.shipping_postal_code,
+                            poblacion: pudo?.correos_ciudad || shipment.shipping_city,
+                            provincia: pudo?.correos_provincia || shipment.shipping_city,
+                            email: shipment.users?.email,
+                            telefono: shipment.users?.phone,
                         },
                         destinatario: {
                             nombre: OFFICE_ADDRESS.nombre,
@@ -366,8 +366,8 @@ serve(async (req) => {
                             provincia: OFFICE_ADDRESS.provincia,
                         },
                         bultos: [{
-                            peso: envio.orders?.sets?.set_weight || 1,
-                            ...parseDimensions(envio.orders?.sets?.set_dim)
+                            peso: shipment.orders?.sets?.set_weight || 1,
+                            ...parseDimensions(shipment.orders?.sets?.set_dim)
                         }],
                         caracteristicas: {
                             etiqueta_sin_etiqueta: "S"
@@ -391,23 +391,23 @@ serve(async (req) => {
                 const qrCodeSvg = returnData.qrCode; // Base64 SVG from Correos
 
                 await supabaseClient
-                    .from('envios')
+                    .from('shipments')
                     .update({
-                        numero_seguimiento: returnCode,
-                        estado_envio: 'ruta_devolucion',
-                        fecha_solicitud_devolucion: new Date().toISOString(),
-                        proveedor_recogida: 'Correos (Sin Etiqueta)',
+                        tracking_number: returnCode,
+                        shipment_status: 'return_in_transit',
+                        return_request_date: new Date().toISOString(),
+                        pickup_provider: 'Correos (Sin Etiqueta)',
                         updated_at: new Date().toISOString()
                     })
                     .eq('id', p_envios_id);
 
                 await sendReturnEmail(supabaseUrl, supabaseKey, {
-                    to: envio.users?.email,
+                    to: shipment.users?.email,
                     subject: "Tu código de devolución Brickshare",
                     html: `
                         <div style="font-family: sans-serif; max-width: 600px; margin: auto; color: #333;">
-                            <h2 style="color: #1a1a1a;">¡Hola ${envio.users?.full_name}!</h2>
-                            <p>Has solicitado la devolución de tu set de LEGO <strong>${envio.orders?.sets?.set_name}</strong>. Hemos activado el servicio <strong>"Etiqueta sin Etiqueta"</strong> para tu comodidad.</p>
+                            <h2 style="color: #1a1a1a;">¡Hola ${shipment.users?.full_name}!</h2>
+                            <p>Has solicitado la devolución de tu set de LEGO <strong>${shipment.orders?.sets?.set_name}</strong>. Hemos activado el servicio <strong>"Etiqueta sin Etiqueta"</strong> para tu comodidad.</p>
                             
                             <div style="background: #fdf6b2; padding: 30px; border-radius: 12px; border: 1px solid #facc15; text-align: center; margin: 24px 0;">
                                 <p style="margin: 0 0 10px 0; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #854d0e; font-weight: bold;">CÓDIGO DE DEVOLUCIÓN</p>
@@ -424,7 +424,7 @@ serve(async (req) => {
                                 <p style="margin: 0 0 10px 0; font-weight: bold; color: #4b5563;">PUNTO DE ENTREGA SELECCIONADO:</p>
                                 <p style="margin: 0; font-size: 16px;">
                                     <strong>${pudo?.correos_nombre || 'Oficina de Correos'}</strong><br/>
-                                    ${pudo?.correos_direccion_completa || envio.direccion_envio}
+                                    ${pudo?.correos_direccion_completa || shipment.shipping_address}
                                 </p>
                             </div>
 
@@ -449,21 +449,21 @@ serve(async (req) => {
             }
 
             case 'get_label': {
-                const { data: envio, error: envioError } = await supabaseClient
-                    .from('envios')
+                const { data: shipment, error: shipmentError } = await supabaseClient
+                    .from('shipments')
                     .select('correos_shipment_id')
                     .eq('id', p_envios_id)
                     .single();
 
-                if (envioError || !envio?.correos_shipment_id) {
-                    throw new Error(`Shipment or Correos ID not found: ${envioError?.message}`);
+                if (shipmentError || !shipment?.correos_shipment_id) {
+                    throw new Error(`Shipment or Correos ID not found: ${shipmentError?.message}`);
                 }
 
                 const labelResponse = await fetchWithAuth(`${config.baseUrl}/labels`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        shipmentId: envio.correos_shipment_id,
+                        shipmentId: shipment.correos_shipment_id,
                         format: 'PDF',
                     }),
                 }, config);
@@ -471,7 +471,7 @@ serve(async (req) => {
                 if (!labelResponse.ok) throw new Error(`Correos Label Error: ${labelResponse.statusText}`);
 
                 const labelBlob = await labelResponse.blob();
-                const fileName = `label_${envio.correos_shipment_id}.pdf`;
+                const fileName = `label_${shipment.correos_shipment_id}.pdf`;
                 const filePath = `${p_envios_id}/${fileName}`;
 
                 await supabaseClient.storage.from('shipping-labels').upload(filePath, labelBlob, {
@@ -481,7 +481,7 @@ serve(async (req) => {
 
                 const { data: { publicUrl } } = supabaseClient.storage.from('shipping-labels').getPublicUrl(filePath);
 
-                await supabaseClient.from('envios').update({
+                await supabaseClient.from('shipments').update({
                     label_url: publicUrl,
                     updated_at: new Date().toISOString()
                 }).eq('id', p_envios_id);
@@ -493,13 +493,13 @@ serve(async (req) => {
             }
 
             case 'request_pickup': {
-                const { data: envio, error: envioError } = await supabaseClient
-                    .from('envios')
-                    .select('*, profiles(full_name, email, phone)')
+                const { data: shipment, error: shipmentError } = await supabaseClient
+                    .from('shipments')
+                    .select('*, users:user_id(full_name, email, phone)')
                     .eq('id', p_envios_id)
                     .single();
 
-                if (envioError || !envio) throw new Error(`Shipment not found: ${envioError?.message}`);
+                if (shipmentError || !shipment) throw new Error(`Shipment not found: ${shipmentError?.message}`);
 
                 const pickupPayload = [{
                     codContract: config.contractId,
@@ -508,14 +508,14 @@ serve(async (req) => {
                     modalityType: 'S',
                     estimatedShipments: 1,
                     estimatedVolume: 20,
-                    address: envio.direccion_envio.split(',')[0].trim(),
+                    address: shipment.shipping_address.split(',')[0].trim(),
                     number: '1',
-                    locality: envio.ciudad_envio,
-                    province: envio.ciudad_envio,
-                    postalCode: envio.codigo_postal_envio,
-                    contactName: envio.profiles?.full_name || "Cliente Brickshare",
-                    contactEmail: envio.profiles?.email || "info@brickshare.es",
-                    phoneNumberContact: envio.profiles?.phone || "000000000",
+                    locality: shipment.shipping_city,
+                    province: shipment.shipping_city,
+                    postalCode: shipment.shipping_postal_code,
+                    contactName: shipment.users?.full_name || "Cliente Brickshare",
+                    contactEmail: shipment.users?.email || "info@brickshare.es",
+                    phoneNumberContact: shipment.users?.phone || "000000000",
                     originSystem: 'CEX'
                 }];
 
@@ -533,7 +533,7 @@ serve(async (req) => {
                 const pickupData = await pickupResponse.json();
                 const pickupId = pickupData[0]?.codRequests;
 
-                await supabaseClient.from('envios').update({
+                await supabaseClient.from('shipments').update({
                     pickup_id: pickupId,
                     updated_at: new Date().toISOString()
                 }).eq('id', p_envios_id);
@@ -545,17 +545,17 @@ serve(async (req) => {
             }
 
             case 'track': {
-                const { data: envio, error: envioError } = await supabaseClient
-                    .from('envios')
+                const { data: shipment, error: shipmentError } = await supabaseClient
+                    .from('shipments')
                     .select('correos_shipment_id')
                     .eq('id', p_envios_id)
                     .single();
 
-                if (envioError || !envio?.correos_shipment_id) {
-                    throw new Error(`Shipment or Correos ID not found: ${envioError?.message}`);
+                if (shipmentError || !shipment?.correos_shipment_id) {
+                    throw new Error(`Shipment or Correos ID not found: ${shipmentError?.message}`);
                 }
 
-                const trackResponse = await fetchWithAuth(`${config.baseUrl}/logistics/trackpub/api/v2/search/${envio.correos_shipment_id}`, {
+                const trackResponse = await fetchWithAuth(`${config.baseUrl}/logistics/trackpub/api/v2/search/${shipment.correos_shipment_id}`, {
                     method: 'GET',
                     headers: {
                         'client_id': config.clientId,
@@ -567,7 +567,7 @@ serve(async (req) => {
 
                 const trackData = await trackResponse.json();
 
-                await supabaseClient.from('envios').update({
+                await supabaseClient.from('shipments').update({
                     last_tracking_update: new Date().toISOString(),
                     updated_at: new Date().toISOString()
                 }).eq('id', p_envios_id);
@@ -591,4 +591,3 @@ serve(async (req) => {
         )
     }
 })
-

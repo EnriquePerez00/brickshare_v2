@@ -19,8 +19,7 @@ interface InventorySet {
     id: string; // inventory id
     set_id: string;
     set_ref: string;
-    en_reparacion: number;
-    // stock_central dropped in Jan 27 refactor
+    in_repair: number;
     updated_at: string;
     spare_parts_order: string | null;
 }
@@ -34,7 +33,7 @@ const MaintenanceList = () => {
             const { data, error } = await supabase
                 .from('inventory_sets')
                 .select('*')
-                .gt('en_reparacion', 0);
+                .gt('in_repair', 0);
 
             if (error) throw error;
             return data as InventorySet[];
@@ -43,11 +42,11 @@ const MaintenanceList = () => {
 
     const handleComplete = async (item: InventorySet) => {
         try {
-            // Move items from repair back to central stock (implicit by clearing en_reparacion)
+            // Move items from repair back to central stock (implicit by clearing in_repair)
             const { error } = await supabase
                 .from('inventory_sets')
                 .update({
-                    en_reparacion: 0
+                    in_repair: 0
                 })
                 .eq('id', item.id);
 

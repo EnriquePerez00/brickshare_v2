@@ -29,7 +29,14 @@ const ProfileCompletionModal = ({ open, onClose }: ProfileCompletionModalProps) 
     e.preventDefault();
     setIsSubmitting(true);
 
-    const { error } = await updateProfile(formData);
+    const { error } = await updateProfile({
+      full_name: formData.full_name,
+      address: formData.address,
+      zip_code: formData.zip_code,
+      city: formData.city,
+      phone: formData.phone,
+      profile_completed: true,
+    });
 
     if (error) {
       toast({
@@ -89,6 +96,7 @@ const ProfileCompletionModal = ({ open, onClose }: ProfileCompletionModalProps) 
                 value={formData.address}
                 onChange={(e) => handleChange("address", e.target.value)}
                 className="pl-10"
+                required
               />
             </div>
           </div>
@@ -101,6 +109,7 @@ const ProfileCompletionModal = ({ open, onClose }: ProfileCompletionModalProps) 
                 placeholder="28001"
                 value={formData.zip_code}
                 onChange={(e) => handleChange("zip_code", e.target.value)}
+                required
               />
             </div>
             <div className="space-y-2">
@@ -110,6 +119,7 @@ const ProfileCompletionModal = ({ open, onClose }: ProfileCompletionModalProps) 
                 placeholder="Madrid"
                 value={formData.city}
                 onChange={(e) => handleChange("city", e.target.value)}
+                required
               />
             </div>
           </div>
@@ -125,6 +135,7 @@ const ProfileCompletionModal = ({ open, onClose }: ProfileCompletionModalProps) 
                 value={formData.phone}
                 onChange={(e) => handleChange("phone", e.target.value)}
                 className="pl-10"
+                required
               />
             </div>
           </div>
