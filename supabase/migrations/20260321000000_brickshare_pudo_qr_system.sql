@@ -1,8 +1,8 @@
 -- Migration: Brickshare PUDO and QR Code System
 -- Description: Add support for Brickshare pickup points with QR code validation
 
--- Add new columns to shipments table for Brickshare PUDO flow
-ALTER TABLE shipments
+-- Add new columns to envios table for Brickshare PUDO flow
+ALTER TABLE envios
 ADD COLUMN IF NOT EXISTS pickup_type TEXT CHECK (pickup_type IN ('correos', 'brickshare')) DEFAULT 'correos',
 ADD COLUMN IF NOT EXISTS brickshare_pudo_id TEXT,
 ADD COLUMN IF NOT EXISTS delivery_qr_code TEXT UNIQUE,
@@ -14,9 +14,9 @@ ADD COLUMN IF NOT EXISTS return_validated_at TIMESTAMPTZ,
 ADD COLUMN IF NOT EXISTS brickshare_metadata JSONB DEFAULT '{}'::jsonb;
 
 -- Create index for QR code lookups
-CREATE INDEX IF NOT EXISTS idx_shipments_delivery_qr ON shipments(delivery_qr_code) WHERE delivery_qr_code IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_shipments_return_qr ON shipments(return_qr_code) WHERE return_qr_code IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_shipments_pickup_type ON shipments(pickup_type);
+CREATE INDEX IF NOT EXISTS idx_envios_delivery_qr ON envios(delivery_qr_code) WHERE delivery_qr_code IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_envios_return_qr ON envios(return_qr_code) WHERE return_qr_code IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_envios_pickup_type ON envios(pickup_type);
 
 -- Create table for Brickshare PUDO locations
 CREATE TABLE IF NOT EXISTS brickshare_pudo_locations (
@@ -44,7 +44,7 @@ CREATE INDEX IF NOT EXISTS idx_brickshare_pudo_active ON brickshare_pudo_locatio
 -- Create table for QR validation logs
 CREATE TABLE IF NOT EXISTS qr_validation_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    shipment_id UUID NOT NULL REFERENCES shipments(id) ON DELETE CASCADE,
+    shipment_id UUID NOT NULL REFERENCES envios(id) ON DELETE CASCADE,
     qr_code TEXT NOT NULL,
     validation_type TEXT NOT NULL CHECK (validation_type IN ('delivery', 'return')),
     validated_by TEXT, -- Could be user_id or pudo_location_id
@@ -89,7 +89,7 @@ BEGIN
         
         -- Check if QR code is unique
         IF NOT EXISTS (
-            SELECT 1 FROM shipments 
+            SELECT 1 FROM envios 
             WHERE delivery_qr_code = v_qr_code OR return_qr_code = v_qr_code
         ) THEN
             EXIT;
@@ -100,7 +100,7 @@ BEGIN
         END IF;
     END LOOP;
     
-    UPDATE shipments
+    UPDATE envios
     SET 
         delivery_qr_code = v_qr_code,
         delivery_qr_expires_at = v_expires_at,
@@ -128,7 +128,7 @@ BEGIN
         
         -- Check if QR code is unique
         IF NOT EXISTS (
-            SELECT 1 FROM shipments 
+            SELECT 1 FROM envios 
             WHERE delivery_qr_code = v_qr_code OR return_qr_code = v_qr_code
         ) THEN
             EXIT;
@@ -139,7 +139,7 @@ BEGIN
         END IF;
     END LOOP;
     
-    UPDATE shipments
+    UPDATE envios
     SET 
         return_qr_code = v_qr_code,
         return_qr_expires_at = v_expires_at,
@@ -169,8 +169,8 @@ BEGIN
     -- Find shipment by QR code
     SELECT 
         s.id,
-        s.assignment_id,
-        s.status,
+        s.order_id,
+        s.estado_envio as status,
         s.pickup_type,
         s.delivery_qr_code,
         s.delivery_qr_expires_at,
@@ -179,14 +179,14 @@ BEGIN
         s.return_qr_expires_at,
         s.return_validated_at,
         s.brickshare_pudo_id,
-        a.set_id,
-        p.name as set_name,
-        p.set_number,
-        p.theme
+        o.set_id,
+        st.set_name,
+        st.set_ref as set_number,
+        st.theme
     INTO v_shipment
-    FROM shipments s
-    JOIN assignments a ON s.assignment_id = a.id
-    LEFT JOIN products p ON a.set_id = p.id
+    FROM envios s
+    JOIN orders o ON s.order_id = o.id
+    LEFT JOIN sets st ON o.set_id = st.id
     WHERE s.delivery_qr_code = p_qr_code OR s.return_qr_code = p_qr_code;
     
     IF NOT FOUND THEN
@@ -238,7 +238,7 @@ BEGIN
     
     -- Build shipment info (excluding personal data)
     v_shipment_info := jsonb_build_object(
-        'assignment_id', v_shipment.assignment_id,
+        'order_id', v_shipment.order_id,
         'set_id', v_shipment.set_id,
         'set_name', v_shipment.set_name,
         'set_number', v_shipment.set_number,
@@ -287,20 +287,20 @@ BEGIN
     IF v_validation.validation_type = 'delivery' THEN
         v_new_status := 'delivered';
         
-        UPDATE shipments
+        UPDATE envios
         SET 
             delivery_validated_at = now(),
-            status = v_new_status,
+            estado_envio = v_new_status,
             updated_at = now()
         WHERE id = v_validation.shipment_id;
         
     ELSIF v_validation.validation_type = 'return' THEN
         v_new_status := 'returned';
         
-        UPDATE shipments
+        UPDATE envios
         SET 
             return_validated_at = now(),
-            status = v_new_status,
+            estado_envio = v_new_status,
             updated_at = now()
         WHERE id = v_validation.shipment_id;
     END IF;
@@ -361,9 +361,8 @@ CREATE POLICY "Users can view their own validation logs"
     TO authenticated
     USING (
         shipment_id IN (
-            SELECT s.id FROM shipments s
-            JOIN assignments a ON s.assignment_id = a.id
-            WHERE a.user_id = auth.uid()
+            SELECT s.id FROM envios s
+            WHERE s.user_id = auth.uid()
         )
     );
 

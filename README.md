@@ -1,13 +1,12 @@
 # Brickshare
 
-Monorepo: **frontend web** (Vite + React) y **app iOS** (Expo), con un mismo **backend** (Supabase).
+Aplicación web de alquiler de sets de LEGO construida con **Vite + React** y **backend Supabase**.
 
 ## Estructura
 
 ```
 ├── apps/
-│   ├── web/          # Frontend web (Vite, React, shadcn, Tailwind)
-│   └── ios/          # App móvil iOS (Expo, React Native)
+│   └── web/          # Frontend web (Vite, React, shadcn, Tailwind)
 ├── packages/
 │   └── shared/       # Tipos y contratos API compartidos
 ├── supabase/         # Backend (Auth, DB, Edge Functions)
@@ -31,36 +30,22 @@ npm install
 
 ```bash
 npm run dev
-# o
-npm run dev:web
 ```
 
 El frontend web está en `apps/web`. Se sirve en `http://localhost:8080` (o el puerto que use Vite).
 
-**App iOS** (Expo):
+**Build:**
 
 ```bash
-# Opcional: compilar tipos compartidos
-npm run build -w @brickshare/shared
-
-# Arrancar Expo
-npm run ios
-```
-
-Configura `apps/ios/.env` con `EXPO_PUBLIC_SUPABASE_URL` y `EXPO_PUBLIC_SUPABASE_ANON_KEY` (mismos valores que la web). Ver `apps/ios/README.md`.
-
-**Build web:**
-
-```bash
-npm run build:web
+npm run build
 ```
 
 ## Backend (Supabase)
 
-El backend es común para web e iOS: mismo proyecto Supabase, mismas tablas y Edge Functions.
+El backend utiliza Supabase con Auth, base de datos PostgreSQL y Edge Functions.
 
-- Migraciones y funciones: `supabase/`
-- Plan detallado web + iOS: `docs/PLAN_MONOREPO_WEB_IOS.md`
+- Migraciones: `supabase/migrations/`
+- Edge Functions: `supabase/functions/`
 
 ---
 
@@ -72,4 +57,4 @@ Puedes seguir editando con Lovable; los cambios se reflejan en este repo. El có
 
 Deploy: Lovable → Share → Publish.
 
-Technologías: Vite, TypeScript, React, shadcn-ui, Tailwind CSS, Supabase, Expo (app iOS).
+Tecnologías: Vite, TypeScript, React, shadcn-ui, Tailwind CSS, Supabase.

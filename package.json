@@ -2,7 +2,7 @@
   "name": "brickshare",
   "private": true,
   "version": "1.0.0",
-  "description": "Monorepo Brickshare: web + iOS, backend Supabase",
+  "description": "Monorepo Brickshare: aplicación web con backend Supabase",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -17,8 +17,7 @@
     "lint:web": "npm run lint -w @brickshare/web",
     "test": "npm run test -w @brickshare/web",
     "test:watch": "npm run test:watch -w @brickshare/web",
-    "ios": "npm run start -w @brickshare/ios",
-    "start:ios": "npm run start -w @brickshare/ios"
+    "dump-schema": "supabase db dump --schema public --file docs/schema.sql || echo '⚠️  Error: Ejecuta primero: supabase login && supabase link --project-ref tevoogkifiszfontzkgd'"
   },
   "engines": {
     "node": ">=18"

@@ -44,6 +44,10 @@ token_*.json
 label_QR_CODE_GENERATED.pdf
 push_*.log
 
+# Database backups
+backups/
+*.sql.backup
+
 # Keep schema documentation (auto-generated but versioned)
 !docs/DATABASE_SCHEMA.md
 !docs/schema_dump.sql
