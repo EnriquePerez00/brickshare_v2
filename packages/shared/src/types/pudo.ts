@@ -1,32 +1,32 @@
 /**
- * Punto PUDO Correos (tabla users_correos_dropping).
- * Compartido entre web e iOS.
+ * Correos PUDO Point (table: users_correos_dropping).
+ * Shared between web and iOS.
  */
 export interface CorreosPudoPoint {
   user_id: string;
   correos_id_pudo: string;
-  correos_nombre: string;
-  correos_tipo_punto: 'Oficina' | 'Citypaq' | 'Locker';
-  correos_direccion_calle: string;
-  correos_direccion_numero?: string;
-  correos_codigo_postal: string;
-  correos_ciudad: string;
-  correos_provincia: string;
-  correos_pais: string;
-  correos_direccion_completa: string;
-  correos_latitud: number;
-  correos_longitud: number;
-  correos_horario_apertura?: string;
-  correos_horario_estructurado?: unknown;
-  correos_disponible: boolean;
-  correos_telefono?: string;
+  correos_name: string;
+  correos_point_type: 'Oficina' | 'Citypaq' | 'Locker';
+  correos_street: string;
+  correos_street_number?: string;
+  correos_zip_code: string;
+  correos_city: string;
+  correos_province: string;
+  correos_country: string;
+  correos_full_address: string;
+  correos_latitude: number;
+  correos_longitude: number;
+  correos_opening_hours?: string;
+  correos_structured_hours?: unknown;
+  correos_available: boolean;
+  correos_phone?: string;
   correos_email?: string;
-  correos_codigo_interno?: string;
-  correos_capacidad_lockers?: number;
-  correos_servicios_adicionales?: string[];
-  correos_accesibilidad?: boolean;
+  correos_internal_code?: string;
+  correos_locker_capacity?: number;
+  correos_additional_services?: string[];
+  correos_accessibility?: boolean;
   correos_parking?: boolean;
   created_at?: string;
   updated_at?: string;
-  correos_fecha_seleccion?: string;
+  correos_selection_date?: string;
 }

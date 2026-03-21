@@ -344,30 +344,30 @@ Output format is unaligned.
 |-------|------|------|---------|-------------|
 | `user_id` | uuid | ✗ | - | - |
 | `correos_id_pudo` | text | ✗ | - | - |
-| `correos_nombre` | text | ✗ | - | - |
-| `correos_tipo_punto` | text | ✗ | - | - |
-| `correos_direccion_calle` | text | ✗ | - | - |
-| `correos_direccion_numero` | text | ✓ | - | - |
-| `correos_codigo_postal` | text | ✗ | - | - |
-| `correos_ciudad` | text | ✗ | - | - |
-| `correos_provincia` | text | ✗ | - | - |
-| `correos_pais` | text | ✗ | `'España'::text` | - |
-| `correos_direccion_completa` | text | ✗ | - | - |
-| `correos_latitud` | numeric(10,8) | ✗ | - | - |
-| `correos_longitud` | numeric(11,8) | ✗ | - | - |
-| `correos_horario_apertura` | text | ✓ | - | - |
-| `correos_horario_estructurado` | jsonb | ✓ | - | - |
-| `correos_disponible` | boolean | ✗ | `true` | - |
-| `correos_telefono` | text | ✓ | - | - |
+| `correos_name` | text | ✗ | - | - |
+| `correos_point_type` | text | ✗ | - | - |
+| `correos_street` | text | ✗ | - | - |
+| `correos_street_number` | text | ✓ | - | - |
+| `correos_zip_code` | text | ✗ | - | - |
+| `correos_city` | text | ✗ | - | - |
+| `correos_province` | text | ✗ | - | - |
+| `correos_country` | text | ✗ | `'España'::text` | - |
+| `correos_full_address` | text | ✗ | - | - |
+| `correos_latitude` | numeric(10,8) | ✗ | - | - |
+| `correos_longitude` | numeric(11,8) | ✗ | - | - |
+| `correos_opening_hours` | text | ✓ | - | - |
+| `correos_structured_hours` | jsonb | ✓ | - | - |
+| `correos_available` | boolean | ✗ | `true` | - |
+| `correos_phone` | text | ✓ | - | - |
 | `correos_email` | text | ✓ | - | - |
-| `correos_codigo_interno` | text | ✓ | - | - |
-| `correos_capacidad_lockers` | integer | ✓ | - | - |
-| `correos_servicios_adicionales` | ARRAY | ✓ | - | - |
-| `correos_accesibilidad` | boolean | ✓ | `false` | - |
+| `correos_internal_code` | text | ✓ | - | - |
+| `correos_locker_capacity` | integer | ✓ | - | - |
+| `correos_additional_services` | ARRAY | ✓ | - | - |
+| `correos_accessibility` | boolean | ✓ | `false` | - |
 | `correos_parking` | boolean | ✓ | `false` | - |
 | `created_at` | timestamp with time zone | ✗ | `now()` | - |
 | `updated_at` | timestamp with time zone | ✗ | `now()` | - |
-| `correos_fecha_seleccion` | timestamp with time zone | ✗ | `now()` | - |
+| `correos_selection_date` | timestamp with time zone | ✗ | `now()` | - |
 
 
 ### wishlist
