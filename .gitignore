@@ -27,6 +27,10 @@ dist-ssr
 .vercel
 .env*.local
 
+# Python virtual environment
+.venv
+venv
+
 # Test Scripts
 probe_*.js
 test_*.js
@@ -39,3 +43,7 @@ token_*.json
 *.pdf
 label_QR_CODE_GENERATED.pdf
 push_*.log
+
+# Keep schema documentation (auto-generated but versioned)
+!docs/DATABASE_SCHEMA.md
+!docs/schema_dump.sql
