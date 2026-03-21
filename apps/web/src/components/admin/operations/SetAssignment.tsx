@@ -35,8 +35,8 @@ interface PreviewAssignment {
     current_stock: number;
 }
 
-interface ConfirmedEnvio {
-    envio_id: string;
+interface ConfirmedShipment {
+    shipment_id: string;
     user_id: string;
     set_id: string;
     user_name: string;
@@ -62,7 +62,7 @@ const SetAssignment = () => {
     const queryClient = useQueryClient();
     const [viewMode, setViewMode] = useState<ViewMode>("initial");
     const [previewAssignments, setPreviewAssignments] = useState<PreviewAssignment[]>([]);
-    const [confirmedEnvios, setConfirmedEnvios] = useState<ConfirmedEnvio[]>([]);
+    const [confirmedShipments, setConfirmedShipments] = useState<ConfirmedShipment[]>([]);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [envioToDelete, setEnvioToDelete] = useState<string | null>(null);
     const [paymentErrorDialog, setPaymentErrorDialog] = useState<PaymentErrorInfo>({
@@ -159,10 +159,10 @@ const SetAssignment = () => {
                 throw new Error(`Error en base de datos: ${error.message}. Los pagos fueron procesados pero las asignaciones no se guardaron. Revisa Stripe Dashboard.`);
             }
 
-            return data as ConfirmedEnvio[];
+            return data as ConfirmedShipment[];
         },
-        onSuccess: async (data: ConfirmedEnvio[]) => {
-            setConfirmedEnvios(data);
+        onSuccess: async (data: ConfirmedShipment[]) => {
+            setConfirmedShipments(data);
             setViewMode("confirmed");
             setPreviewAssignments([]);
             toast.success(`¡Éxito! Se procesaron ${data.length} pagos y asignaciones`);
@@ -170,30 +170,30 @@ const SetAssignment = () => {
             // Phase 3: Automatic Correos Preregistration
             toast.info("Iniciando preregistros en Correos...");
 
-            for (const envio of data) {
+            for (const shipment of data) {
                 try {
                     const { data: preregResult, error: preregError } = await supabase.functions.invoke('correos-logistics', {
-                        body: { action: 'preregister', p_envios_id: envio.envio_id }
+                        body: { action: 'preregister', p_envios_id: shipment.shipment_id }
                     });
 
                     if (preregError) throw preregError;
 
                     // Fetch label automatically
                     await supabase.functions.invoke('correos-logistics', {
-                        body: { action: 'get_label', p_envios_id: envio.envio_id }
+                        body: { action: 'get_label', p_envios_id: shipment.shipment_id }
                     });
 
                     // Update local state with tracking info
-                    setConfirmedEnvios(current => current.map(e =>
-                        e.envio_id === envio.envio_id
+                    setConfirmedShipments(current => current.map(e =>
+                        e.shipment_id === shipment.shipment_id
                             ? { ...e, correos_shipment_id: preregResult.correos_shipment_id }
                             : e
                     ));
 
-                    toast.success(`Preregistro completado para ${envio.user_name}`);
+                    toast.success(`Preregistro completado para ${shipment.user_name}`);
                 } catch (err) {
-                    console.error(`Error en preregistro para ${envio.user_name}:`, err);
-                    toast.error(`Error en preregistro de ${envio.user_name}`);
+                    console.error(`Error en preregistro para ${shipment.user_name}:`, err);
+                    toast.error(`Error en preregistro de ${shipment.user_name}`);
                 }
             }
 
@@ -227,7 +227,7 @@ const SetAssignment = () => {
         onSuccess: () => {
             toast.success("Asignación eliminada correctamente");
             if (envioToDelete) {
-                setConfirmedEnvios((prev) => prev.filter((e) => e.envio_id !== envioToDelete));
+                setConfirmedShipments((prev) => prev.filter((e) => e.shipment_id !== envioToDelete));
             }
             queryClient.invalidateQueries({ queryKey: ["admin-set-assignment-inventory"] });
             queryClient.invalidateQueries({ queryKey: ["admin-shipments"] });
@@ -238,7 +238,7 @@ const SetAssignment = () => {
     });
 
     const handleGenerateProposal = () => {
-        setConfirmedEnvios([]);
+        setConfirmedShipments([]);
         previewMutation.mutate();
     };
 
@@ -376,7 +376,7 @@ const SetAssignment = () => {
 
                     {viewMode === "confirmed" && (
                         <div>
-                            {confirmedEnvios.length === 0 ? (
+                            {confirmedShipments.length === 0 ? (
                                 <div className="text-center py-12">
                                     <Package2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                                     <p className="text-muted-foreground">
@@ -395,33 +395,33 @@ const SetAssignment = () => {
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                            {confirmedEnvios.map((envio) => (
-                                                <TableRow key={envio.envio_id}>
+                                            {confirmedShipments.map((shipment) => (
+                                                <TableRow key={shipment.shipment_id}>
                                                     <TableCell className="font-medium">
-                                                        {envio.user_name}
+                                                        {shipment.user_name}
                                                     </TableCell>
                                                     <TableCell>
-                                                        {envio.set_name} ({envio.set_ref})
+                                                        {shipment.set_name} ({shipment.set_ref})
                                                     </TableCell>
                                                     <TableCell>
                                                         <div className="flex flex-col gap-1">
-                                                            <span>{new Date(envio.created_at).toLocaleDateString()}</span>
-                                                            {envio.correos_shipment_id && (
+                                                            <span>{new Date(shipment.created_at).toLocaleDateString()}</span>
+                                                            {shipment.correos_shipment_id && (
                                                                 <Badge variant="outline" className="w-fit text-[10px] font-mono">
-                                                                    {envio.correos_shipment_id}
+                                                                    {shipment.correos_shipment_id}
                                                                 </Badge>
                                                             )}
                                                         </div>
                                                     </TableCell>
                                                     <TableCell className="text-center">
                                                         <div className="flex justify-center gap-1">
-                                                            {envio.correos_shipment_id ? (
+                                                            {shipment.correos_shipment_id ? (
                                                                 <Button
                                                                     variant="ghost"
                                                                     size="sm"
                                                                     onClick={() => {
                                                                         supabase.functions.invoke('correos-logistics', {
-                                                                            body: { action: 'get_label', p_envios_id: envio.envio_id }
+                                                                            body: { action: 'get_label', p_envios_id: shipment.shipment_id }
                                                                         }).then(({ data }) => {
                                                                             if (data?.label_url) window.open(data.label_url, '_blank');
                                                                         });
@@ -438,7 +438,7 @@ const SetAssignment = () => {
                                                                     onClick={() => {
                                                                         toast.info("Reintentando preregistro...");
                                                                         supabase.functions.invoke('correos-logistics', {
-                                                                            body: { action: 'preregister', p_envios_id: envio.envio_id }
+                                                                            body: { action: 'preregister', p_envios_id: shipment.shipment_id }
                                                                         }).then(() => toast.success("Preregistro solicitado"));
                                                                     }}
                                                                 >
@@ -448,7 +448,7 @@ const SetAssignment = () => {
                                                             <Button
                                                                 variant="ghost"
                                                                 size="sm"
-                                                                onClick={() => handleDeleteClick(envio.envio_id)}
+                                                                onClick={() => handleDeleteClick(shipment.shipment_id)}
                                                                 disabled={deleteMutation.isPending}
                                                                 className="text-destructive hover:text-destructive hover:bg-destructive/10"
                                                             >
@@ -473,7 +473,7 @@ const SetAssignment = () => {
                         <AlertDialogTitle>¿Eliminar asignación?</AlertDialogTitle>
                         <AlertDialogDescription>
                             Esta acción eliminará el envío, el pedido asociado y devolverá el set al inventario.
-                            El estado del usuario se actualizará a "sin set".
+                            El estado del usuario se actualizará a "no_set".
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

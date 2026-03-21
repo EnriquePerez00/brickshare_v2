@@ -166,40 +166,40 @@ export type Database = {
         }
         Relationships: []
       }
-      envios: {
+      shipments: {
         Row: {
           brickshare_metadata: Json | null
           brickshare_package_id: string | null
           brickshare_pudo_id: string | null
-          ciudad_envio: string
-          codigo_postal_envio: string
+          shipping_city: string
+          shipping_postal_code: string
           correos_shipment_id: string | null
           created_at: string
           delivery_qr_code: string | null
           delivery_qr_expires_at: string | null
           delivery_validated_at: string | null
-          direccion_envio: string
-          direccion_proveedor_recogida: string | null
-          estado_envio: string
-          estado_manipulacion: boolean | null
-          fecha_asignada: string | null
-          fecha_devolucion_estimada: string | null
-          fecha_entrega: string | null
-          fecha_entrega_real: string | null
-          fecha_entrega_usuario: string | null
-          fecha_recepcion_almacen: string | null
-          fecha_recogida_almacen: string | null
-          fecha_solicitud_devolucion: string | null
+          shipping_address: string
+          pickup_provider_address: string | null
+          shipment_status: string
+          handling_status: boolean | null
+          assigned_date: string | null
+          estimated_return_date: string | null
+          delivery_date: string | null
+          actual_delivery_date: string | null
+          user_delivery_date: string | null
+          warehouse_reception_date: string | null
+          warehouse_pickup_date: string | null
+          return_request_date: string | null
           id: string
           label_url: string | null
           last_tracking_update: string | null
-          notas_adicionales: string | null
-          numero_seguimiento: string | null
-          pais_envio: string
+          additional_notes: string | null
+          tracking_number: string | null
+          shipping_country: string
           pickup_id: string | null
           pickup_type: string | null
-          proveedor_envio: string | null
-          proveedor_recogida: string | null
+          shipping_provider: string | null
+          pickup_provider: string | null
           return_qr_code: string | null
           return_qr_expires_at: string | null
           return_validated_at: string | null
@@ -209,7 +209,7 @@ export type Database = {
           swikly_status: string | null
           swikly_wish_id: string | null
           swikly_wish_url: string | null
-          transportista: string | null
+          carrier: string | null
           updated_at: string
           user_id: string
         }
@@ -217,35 +217,35 @@ export type Database = {
           brickshare_metadata?: Json | null
           brickshare_package_id?: string | null
           brickshare_pudo_id?: string | null
-          ciudad_envio: string
-          codigo_postal_envio: string
+          shipping_city: string
+          shipping_postal_code: string
           correos_shipment_id?: string | null
           created_at?: string
           delivery_qr_code?: string | null
           delivery_qr_expires_at?: string | null
           delivery_validated_at?: string | null
-          direccion_envio: string
-          direccion_proveedor_recogida?: string | null
-          estado_envio?: string
-          estado_manipulacion?: boolean | null
-          fecha_asignada?: string | null
-          fecha_devolucion_estimada?: string | null
-          fecha_entrega?: string | null
-          fecha_entrega_real?: string | null
-          fecha_entrega_usuario?: string | null
-          fecha_recepcion_almacen?: string | null
-          fecha_recogida_almacen?: string | null
-          fecha_solicitud_devolucion?: string | null
+          shipping_address: string
+          pickup_provider_address?: string | null
+          shipment_status?: string
+          handling_status?: boolean | null
+          assigned_date?: string | null
+          estimated_return_date?: string | null
+          delivery_date?: string | null
+          actual_delivery_date?: string | null
+          user_delivery_date?: string | null
+          warehouse_reception_date?: string | null
+          warehouse_pickup_date?: string | null
+          return_request_date?: string | null
           id?: string
           label_url?: string | null
           last_tracking_update?: string | null
-          notas_adicionales?: string | null
-          numero_seguimiento?: string | null
-          pais_envio?: string
+          additional_notes?: string | null
+          tracking_number?: string | null
+          shipping_country?: string
           pickup_id?: string | null
           pickup_type?: string | null
-          proveedor_envio?: string | null
-          proveedor_recogida?: string | null
+          shipping_provider?: string | null
+          pickup_provider?: string | null
           return_qr_code?: string | null
           return_qr_expires_at?: string | null
           return_validated_at?: string | null
@@ -255,7 +255,7 @@ export type Database = {
           swikly_status?: string | null
           swikly_wish_id?: string | null
           swikly_wish_url?: string | null
-          transportista?: string | null
+          carrier?: string | null
           updated_at?: string
           user_id: string
         }
@@ -263,35 +263,35 @@ export type Database = {
           brickshare_metadata?: Json | null
           brickshare_package_id?: string | null
           brickshare_pudo_id?: string | null
-          ciudad_envio?: string
-          codigo_postal_envio?: string
+          shipping_city?: string
+          shipping_postal_code?: string
           correos_shipment_id?: string | null
           created_at?: string
           delivery_qr_code?: string | null
           delivery_qr_expires_at?: string | null
           delivery_validated_at?: string | null
-          direccion_envio?: string
-          direccion_proveedor_recogida?: string | null
-          estado_envio?: string
-          estado_manipulacion?: boolean | null
-          fecha_asignada?: string | null
-          fecha_devolucion_estimada?: string | null
-          fecha_entrega?: string | null
-          fecha_entrega_real?: string | null
-          fecha_entrega_usuario?: string | null
-          fecha_recepcion_almacen?: string | null
-          fecha_recogida_almacen?: string | null
-          fecha_solicitud_devolucion?: string | null
+          shipping_address?: string
+          pickup_provider_address?: string | null
+          shipment_status?: string
+          handling_status?: boolean | null
+          assigned_date?: string | null
+          estimated_return_date?: string | null
+          delivery_date?: string | null
+          actual_delivery_date?: string | null
+          user_delivery_date?: string | null
+          warehouse_reception_date?: string | null
+          warehouse_pickup_date?: string | null
+          return_request_date?: string | null
           id?: string
           label_url?: string | null
           last_tracking_update?: string | null
-          notas_adicionales?: string | null
-          numero_seguimiento?: string | null
-          pais_envio?: string
+          additional_notes?: string | null
+          tracking_number?: string | null
+          shipping_country?: string
           pickup_id?: string | null
           pickup_type?: string | null
-          proveedor_envio?: string | null
-          proveedor_recogida?: string | null
+          shipping_provider?: string | null
+          pickup_provider?: string | null
           return_qr_code?: string | null
           return_qr_expires_at?: string | null
           return_validated_at?: string | null
@@ -301,20 +301,20 @@ export type Database = {
           swikly_status?: string | null
           swikly_wish_id?: string | null
           swikly_wish_url?: string | null
-          transportista?: string | null
+          carrier?: string | null
           updated_at?: string
           user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "envios_set_id_fkey"
+            foreignKeyName: "shipments_set_id_fkey"
             columns: ["set_id"]
             isOneToOne: false
             referencedRelation: "sets"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "envios_user_id_fkey_public_users"
+            foreignKeyName: "shipments_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
@@ -325,10 +325,10 @@ export type Database = {
       inventory_sets: {
         Row: {
           created_at: string
-          en_devolucion: number
-          en_envio: number
-          en_reparacion: number
-          en_uso: number
+          in_return: number
+          in_shipping: number
+          in_repair: number
+          in_use: number
           id: string
           inventory_set_total_qty: number
           set_id: string
@@ -338,10 +338,10 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          en_devolucion?: number
-          en_envio?: number
-          en_reparacion?: number
-          en_uso?: number
+          in_return?: number
+          in_shipping?: number
+          in_repair?: number
+          in_use?: number
           id?: string
           inventory_set_total_qty?: number
           set_id: string
@@ -351,10 +351,10 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          en_devolucion?: number
-          en_envio?: number
-          en_reparacion?: number
-          en_uso?: number
+          in_return?: number
+          in_shipping?: number
+          in_repair?: number
+          in_use?: number
           id?: string
           inventory_set_total_qty?: number
           set_id?: string
@@ -372,14 +372,14 @@ export type Database = {
           },
         ]
       }
-      operaciones_recepcion: {
+      reception_operations: {
         Row: {
           created_at: string
           event_id: string | null
           id: string
           missing_parts: string | null
           set_id: string
-          status_recepcion: boolean
+          reception_status: boolean
           updated_at: string
           user_id: string
           weight_measured: number | null
@@ -390,7 +390,7 @@ export type Database = {
           id?: string
           missing_parts?: string | null
           set_id: string
-          status_recepcion?: boolean
+          reception_status?: boolean
           updated_at?: string
           user_id: string
           weight_measured?: number | null
@@ -401,28 +401,28 @@ export type Database = {
           id?: string
           missing_parts?: string | null
           set_id?: string
-          status_recepcion?: boolean
+          reception_status?: boolean
           updated_at?: string
           user_id?: string
           weight_measured?: number | null
         }
         Relationships: [
           {
-            foreignKeyName: "operaciones_recepcion_event_id_fkey"
+            foreignKeyName: "reception_operations_event_id_fkey"
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "brickshare_pudo_shipments"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "operaciones_recepcion_event_id_fkey"
+            foreignKeyName: "reception_operations_event_id_fkey"
             columns: ["event_id"]
             isOneToOne: false
-            referencedRelation: "envios"
+            referencedRelation: "shipments"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "operaciones_recepcion_set_id_fkey"
+            foreignKeyName: "reception_operations_set_id_fkey"
             columns: ["set_id"]
             isOneToOne: false
             referencedRelation: "sets"
@@ -515,7 +515,7 @@ export type Database = {
             foreignKeyName: "qr_validation_logs_shipment_id_fkey"
             columns: ["shipment_id"]
             isOneToOne: false
-            referencedRelation: "envios"
+            referencedRelation: "shipments"
             referencedColumns: ["id"]
           },
         ]
@@ -562,7 +562,7 @@ export type Database = {
           comment: string | null
           created_at: string
           difficulty: number | null
-          envio_id: string | null
+          shipment_id: string | null
           id: string
           is_published: boolean
           rating: number
@@ -576,7 +576,7 @@ export type Database = {
           comment?: string | null
           created_at?: string
           difficulty?: number | null
-          envio_id?: string | null
+          shipment_id?: string | null
           id?: string
           is_published?: boolean
           rating: number
@@ -590,7 +590,7 @@ export type Database = {
           comment?: string | null
           created_at?: string
           difficulty?: number | null
-          envio_id?: string | null
+          shipment_id?: string | null
           id?: string
           is_published?: boolean
           rating?: number
@@ -601,17 +601,17 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "reviews_envio_id_fkey"
-            columns: ["envio_id"]
+            foreignKeyName: "reviews_shipment_id_fkey"
+            columns: ["shipment_id"]
             isOneToOne: false
             referencedRelation: "brickshare_pudo_shipments"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "reviews_envio_id_fkey"
-            columns: ["envio_id"]
+            foreignKeyName: "reviews_shipment_id_fkey"
+            columns: ["shipment_id"]
             isOneToOne: false
-            referencedRelation: "envios"
+            referencedRelation: "shipments"
             referencedColumns: ["id"]
           },
           {
@@ -850,10 +850,7 @@ export type Database = {
           address_extra: string | null
           avatar_url: string | null
           city: string | null
-          ciudad: string | null
-          codigo_postal: string | null
           created_at: string
-          direccion: string | null
           email: string | null
           full_name: string | null
           id: string
@@ -864,7 +861,6 @@ export type Database = {
           stripe_customer_id: string | null
           subscription_status: string | null
           subscription_type: string | null
-          telefono: string | null
           updated_at: string
           user_id: string
           user_status: string | null
@@ -875,10 +871,7 @@ export type Database = {
           address_extra?: string | null
           avatar_url?: string | null
           city?: string | null
-          ciudad?: string | null
-          codigo_postal?: string | null
           created_at?: string
-          direccion?: string | null
           email?: string | null
           full_name?: string | null
           id?: string
@@ -889,7 +882,6 @@ export type Database = {
           stripe_customer_id?: string | null
           subscription_status?: string | null
           subscription_type?: string | null
-          telefono?: string | null
           updated_at?: string
           user_id: string
           user_status?: string | null
@@ -900,10 +892,7 @@ export type Database = {
           address_extra?: string | null
           avatar_url?: string | null
           city?: string | null
-          ciudad?: string | null
-          codigo_postal?: string | null
           created_at?: string
-          direccion?: string | null
           email?: string | null
           full_name?: string | null
           id?: string
@@ -914,7 +903,6 @@ export type Database = {
           stripe_customer_id?: string | null
           subscription_status?: string | null
           subscription_type?: string | null
-          telefono?: string | null
           updated_at?: string
           user_id?: string
           user_status?: string | null
@@ -1094,7 +1082,7 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "envios_user_id_fkey_public_users"
+            foreignKeyName: "shipments_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
@@ -1147,7 +1135,7 @@ export type Database = {
         Args: never
         Returns: {
           created_at: string
-          envio_id: string
+          shipment_id: string
           order_id: string
           set_id: string
           set_name: string
@@ -1160,7 +1148,7 @@ export type Database = {
         Args: { p_user_ids: string[] }
         Returns: {
           created_at: string
-          envio_id: string
+          shipment_id: string
           order_id: string
           pudo_address: string
           pudo_city: string
@@ -1399,4 +1387,3 @@ export const Constants = {
     },
   },
 } as const
-

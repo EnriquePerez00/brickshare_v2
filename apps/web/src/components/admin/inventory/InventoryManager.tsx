@@ -111,15 +111,15 @@ const InventoryManager = () => {
   const handleSave = () => {
     if (!editingInventory) return;
 
-    const { id, inventory_set_total_qty, en_envio, en_uso, en_devolucion, en_reparacion } = editingInventory;
+    const { id, inventory_set_total_qty, in_shipping, in_use, in_return, in_repair } = editingInventory;
 
     updateMutation.mutate({
       id,
       inventory_set_total_qty: parseInt(inventory_set_total_qty),
-      en_envio: parseInt(en_envio),
-      en_uso: parseInt(en_uso),
-      en_devolucion: parseInt(en_devolucion),
-      en_reparacion: parseInt(en_reparacion),
+      in_shipping: parseInt(in_shipping),
+      in_use: parseInt(in_use),
+      in_return: parseInt(in_return),
+      in_repair: parseInt(in_repair),
     });
   };
 
@@ -288,16 +288,16 @@ const InventoryManager = () => {
                         {item.inventory_set_total_qty}
                       </TableCell>
                       <TableCell className="text-center">
-                        {item.en_envio}
+                        {item.in_shipping}
                       </TableCell>
                       <TableCell className="text-center">
-                        {item.en_uso}
+                        {item.in_use}
                       </TableCell>
                       <TableCell className="text-center">
-                        {item.en_devolucion}
+                        {item.in_return}
                       </TableCell>
                       <TableCell className="text-center">
-                        {item.en_reparacion}
+                        {item.in_repair}
                       </TableCell>
                       <TableCell>
                         <Badge variant={status.variant}>{status.label}</Badge>
@@ -352,8 +352,8 @@ const InventoryManager = () => {
                 id="envio"
                 type="number"
                 className="col-span-3"
-                value={editingInventory?.en_envio || 0}
-                onChange={(e) => setEditingInventory({ ...editingInventory, en_envio: e.target.value })}
+                value={editingInventory?.in_shipping || 0}
+                onChange={(e) => setEditingInventory({ ...editingInventory, in_shipping: e.target.value })}
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
@@ -362,8 +362,8 @@ const InventoryManager = () => {
                 id="uso"
                 type="number"
                 className="col-span-3"
-                value={editingInventory?.en_uso || 0}
-                onChange={(e) => setEditingInventory({ ...editingInventory, en_uso: e.target.value })}
+                value={editingInventory?.in_use || 0}
+                onChange={(e) => setEditingInventory({ ...editingInventory, in_use: e.target.value })}
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
@@ -372,8 +372,8 @@ const InventoryManager = () => {
                 id="devolucion"
                 type="number"
                 className="col-span-3"
-                value={editingInventory?.en_devolucion || 0}
-                onChange={(e) => setEditingInventory({ ...editingInventory, en_devolucion: e.target.value })}
+                value={editingInventory?.in_return || 0}
+                onChange={(e) => setEditingInventory({ ...editingInventory, in_return: e.target.value })}
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
@@ -382,8 +382,8 @@ const InventoryManager = () => {
                 id="reparacion"
                 type="number"
                 className="col-span-3"
-                value={editingInventory?.en_reparacion || 0}
-                onChange={(e) => setEditingInventory({ ...editingInventory, en_reparacion: e.target.value })}
+                value={editingInventory?.in_repair || 0}
+                onChange={(e) => setEditingInventory({ ...editingInventory, in_repair: e.target.value })}
               />
             </div>
           </div>

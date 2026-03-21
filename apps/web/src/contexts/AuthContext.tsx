@@ -11,13 +11,12 @@ export interface Profile {
   user_status: string | null;
   impact_points: number | null;
   address: string | null;
-  address_extra: string | null;
   zip_code: string | null;
   city: string | null;
-  province: string | null;
   phone: string | null;
   subscription_status: string | null;
   subscription_type: string | null;
+  profile_completed: boolean | null;
 }
 
 interface AuthContextType {

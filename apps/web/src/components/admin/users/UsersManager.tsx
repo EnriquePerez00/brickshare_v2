@@ -58,7 +58,7 @@ const UsersManager = () => {
         resolver: zodResolver(userSchema),
         defaultValues: {
             full_name: "",
-            user_status: "sin set",
+            user_status: "no_set",
             subscription_status: "inactive",
             subscription_type: "Brick Starter",
             impact_points: 0,
@@ -107,7 +107,7 @@ const UsersManager = () => {
         setEditingUser(user);
         form.reset({
             full_name: user.full_name || "",
-            user_status: user.user_status || "sin set",
+            user_status: user.user_status || "no_set",
             subscription_status: user.subscription_status || "inactive",
             subscription_type: user.subscription_type || "Brick Starter",
             impact_points: user.impact_points || 0,
@@ -215,10 +215,10 @@ const UsersManager = () => {
                                                         </SelectTrigger>
                                                     </FormControl>
                                                     <SelectContent>
-                                                        <SelectItem value="sin set">Sin set</SelectItem>
-                                                        <SelectItem value="con set">Con set</SelectItem>
-                                                        <SelectItem value="en transito">En tránsito</SelectItem>
-                                                        <SelectItem value="esperando recepcion">Esperando recepción</SelectItem>
+                                                        <SelectItem value="no_set">Sin set</SelectItem>
+                                                        <SelectItem value="with_set">Con set</SelectItem>
+                                                        <SelectItem value="in_transit">En tránsito</SelectItem>
+                                                        <SelectItem value="awaiting_reception">Esperando recepción</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                                 <FormMessage />

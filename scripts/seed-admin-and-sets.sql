@@ -1,0 +1,504 @@
+-- =========================================
+-- Brickshare - Seed Admin User and Sample Sets
+-- =========================================
+-- This script creates:
+-- 1. Admin user (admin@brickshare.com) - password: Admin2test
+-- 2. 5 City sets from Rebrickable API
+-- 3. 5 Star Wars sets from Rebrickable API
+-- 4. 5 Architecture sets from Rebrickable API
+--
+-- EXECUTION:
+-- 1. Run this SQL script first to create the sets
+-- 2. Then sign up manually at your Supabase dashboard or app with:
+--    Email: admin@brickshare.com
+--    Password: Admin2test
+-- 3. The user profile and admin role will be created automatically via triggers
+--
+-- OR use this curl command to create the user via Supabase API:
+-- See README_SEED_ADMIN_SETS.md for details
+-- =========================================
+-- =========================================
+-- STEP 1: Insert City Sets (Theme ID: 52)
+-- =========================================
+
+-- Set 1: Small Satellite (30016-1)
+INSERT INTO public.sets (
+  set_name,
+  set_description,
+  set_image_url,
+  set_theme,
+  set_age_range,
+  set_piece_count,
+  year_released,
+  catalogue_visibility,
+  set_ref,
+  set_status,
+  set_price,
+  set_weight,
+  set_minifigs
+) VALUES (
+  'Small Satellite',
+  'LEGO City mini polybag set featuring a compact satellite model.',
+  'https://cdn.rebrickable.com/media/sets/30016-1/2781.jpg',
+  'City',
+  '6-12',
+  35,
+  2011,
+  true,
+  '30016',
+  'activo',
+  85.00,
+  50,
+  0
+);
+
+-- Set 2: Lawn Mower (30224-1)
+INSERT INTO public.sets (
+  set_name,
+  set_description,
+  set_image_url,
+  set_theme,
+  set_age_range,
+  set_piece_count,
+  year_released,
+  catalogue_visibility,
+  set_ref,
+  set_status,
+  set_price,
+  set_weight,
+  set_minifigs
+) VALUES (
+  'Lawn Mower',
+  'LEGO City polybag featuring a small lawn mower with minifigure.',
+  'https://cdn.rebrickable.com/media/sets/30224-1/7931.jpg',
+  'City',
+  '5-12',
+  42,
+  2013,
+  true,
+  '30224',
+  'activo',
+  90.00,
+  60,
+  1
+);
+
+-- Set 3: Go-Kart Racer (30314-1)
+INSERT INTO public.sets (
+  set_name,
+  set_description,
+  set_image_url,
+  set_theme,
+  set_age_range,
+  set_piece_count,
+  year_released,
+  catalogue_visibility,
+  set_ref,
+  set_status,
+  set_price,
+  set_weight,
+  set_minifigs
+) VALUES (
+  'Go-Kart Racer',
+  'LEGO City racing go-kart with driver minifigure.',
+  'https://cdn.rebrickable.com/media/sets/30314-1/75543.jpg',
+  'City',
+  '5-12',
+  45,
+  2015,
+  true,
+  '30314',
+  'activo',
+  95.00,
+  65,
+  1
+);
+
+-- Set 4: Space Utility Vehicle (30315-1)
+INSERT INTO public.sets (
+  set_name,
+  set_description,
+  set_image_url,
+  set_theme,
+  set_age_range,
+  set_piece_count,
+  year_released,
+  catalogue_visibility,
+  set_ref,
+  set_status,
+  set_price,
+  set_weight,
+  set_minifigs
+) VALUES (
+  'Space Utility Vehicle',
+  'LEGO City space-themed utility vehicle for exploration missions.',
+  'https://cdn.rebrickable.com/media/sets/30315-1/800.jpg',
+  'City',
+  '5-12',
+  39,
+  2015,
+  true,
+  '30315',
+  'activo',
+  88.00,
+  55,
+  1
+);
+
+-- Set 5: Volcano Jackhammer (30350-1)
+INSERT INTO public.sets (
+  set_name,
+  set_description,
+  set_image_url,
+  set_theme,
+  set_age_range,
+  set_piece_count,
+  year_released,
+  catalogue_visibility,
+  set_ref,
+  set_status,
+  set_price,
+  set_weight,
+  set_minifigs
+) VALUES (
+  'Volcano Jackhammer',
+  'LEGO City volcano exploration vehicle with jackhammer equipment.',
+  'https://cdn.rebrickable.com/media/sets/30350-1/33660.jpg',
+  'City',
+  '5-12',
+  53,
+  2016,
+  true,
+  '30350',
+  'activo',
+  100.00,
+  75,
+  1
+);
+-- =========================================
+-- STEP 2: Insert Star Wars Sets (Theme ID: 158)
+-- =========================================
+
+-- Set 6: Clone Turbo Tank (20006-1)
+INSERT INTO public.sets (
+  set_name,
+  set_description,
+  set_image_url,
+  set_theme,
+  set_age_range,
+  set_piece_count,
+  year_released,
+  catalogue_visibility,
+  set_ref,
+  set_status,
+  set_price,
+  set_weight,
+  set_minifigs
+) VALUES (
+  'Clone Turbo Tank',
+  'LEGO Star Wars mini Clone Turbo Tank from The Clone Wars era.',
+  'https://cdn.rebrickable.com/media/sets/20006-1/233.jpg',
+  'Star Wars',
+  '7-14',
+  64,
+  2008,
+  true,
+  '20006',
+  'activo',
+  110.00,
+  90,
+  0
+);
+
+-- Set 7: Republic Attack Cruiser (20007-1)
+INSERT INTO public.sets (
+  set_name,
+  set_description,
+  set_image_url,
+  set_theme,
+  set_age_range,
+  set_piece_count,
+  year_released,
+  catalogue_visibility,
+  set_ref,
+  set_status,
+  set_price,
+  set_weight,
+  set_minifigs
+) VALUES (
+  'Republic Attack Cruiser',
+  'LEGO Star Wars mini Republic Attack Cruiser from the Clone Wars.',
+  'https://cdn.rebrickable.com/media/sets/20007-1/5508.jpg',
+  'Star Wars',
+  '7-14',
+  84,
+  2009,
+  true,
+  '20007',
+  'activo',
+  125.00,
+  110,
+  0
+);
+
+-- Set 8: AT-TE Walker (20009-1)
+INSERT INTO public.sets (
+  set_name,
+  set_description,
+  set_image_url,
+  set_theme,
+  set_age_range,
+  set_piece_count,
+  year_released,
+  catalogue_visibility,
+  set_ref,
+  set_status,
+  set_price,
+  set_weight,
+  set_minifigs
+) VALUES (
+  'AT-TE Walker',
+  'LEGO Star Wars mini All Terrain Tactical Enforcer walker.',
+  'https://cdn.rebrickable.com/media/sets/20009-1/120124.jpg',
+  'Star Wars',
+  '7-14',
+  94,
+  2009,
+  true,
+  '20009',
+  'activo',
+  130.00,
+  125,
+  0
+);
+
+-- Set 9: Republic Gunship (20010-1)
+INSERT INTO public.sets (
+  set_name,
+  set_description,
+  set_image_url,
+  set_theme,
+  set_age_range,
+  set_piece_count,
+  year_released,
+  catalogue_visibility,
+  set_ref,
+  set_status,
+  set_price,
+  set_weight,
+  set_minifigs
+) VALUES (
+  'Republic Gunship',
+  'LEGO Star Wars mini Republic Gunship from the Clone Wars.',
+  'https://cdn.rebrickable.com/media/sets/20010-1/120117.jpg',
+  'Star Wars',
+  '7-14',
+  94,
+  2009,
+  true,
+  '20010',
+  'activo',
+  130.00,
+  125,
+  0
+);
+
+-- Set 10: Imperial Shuttle (20016-1)
+INSERT INTO public.sets (
+  set_name,
+  set_description,
+  set_image_url,
+  set_theme,
+  set_age_range,
+  set_piece_count,
+  year_released,
+  catalogue_visibility,
+  set_ref,
+  set_status,
+  set_price,
+  set_weight,
+  set_minifigs
+) VALUES (
+  'Imperial Shuttle',
+  'LEGO Star Wars mini Imperial Shuttle from the original trilogy.',
+  'https://cdn.rebrickable.com/media/sets/20016-1/120129.jpg',
+  'Star Wars',
+  '7-14',
+  70,
+  2010,
+  true,
+  '20016',
+  'activo',
+  115.00,
+  95,
+  0
+);
+-- =========================================
+-- STEP 3: Insert Architecture Sets (Theme ID: 252)
+-- =========================================
+
+-- Set 11: Sears Tower Brickstructures (19710-1)
+INSERT INTO public.sets (
+  set_name,
+  set_description,
+  set_image_url,
+  set_theme,
+  set_age_range,
+  set_piece_count,
+  year_released,
+  catalogue_visibility,
+  set_ref,
+  set_status,
+  set_price,
+  set_weight,
+  set_minifigs
+) VALUES (
+  'Sears Tower (Brickstructures Version)',
+  'LEGO Architecture Sears Tower - iconic Chicago skyscraper replica.',
+  'https://cdn.rebrickable.com/media/sets/19710-1/15322.jpg',
+  'Architecture',
+  '12+',
+  68,
+  2008,
+  true,
+  '19710',
+  'activo',
+  110.00,
+  95,
+  0
+);
+
+-- Set 12: John Hancock Center Brickstructures (19720-1)
+INSERT INTO public.sets (
+  set_name,
+  set_description,
+  set_image_url,
+  set_theme,
+  set_age_range,
+  set_piece_count,
+  year_released,
+  catalogue_visibility,
+  set_ref,
+  set_status,
+  set_price,
+  set_weight,
+  set_minifigs
+) VALUES (
+  'John Hancock Center (Brickstructures Version)',
+  'LEGO Architecture John Hancock Center - Chicago landmark model.',
+  'https://cdn.rebrickable.com/media/sets/19720-1/14927.jpg',
+  'Architecture',
+  '12+',
+  69,
+  2008,
+  true,
+  '19720',
+  'activo',
+  110.00,
+  95,
+  0
+);
+
+-- Set 13: Sears Tower (21000-1)
+INSERT INTO public.sets (
+  set_name,
+  set_description,
+  set_image_url,
+  set_theme,
+  set_age_range,
+  set_piece_count,
+  year_released,
+  catalogue_visibility,
+  set_ref,
+  set_status,
+  set_price,
+  set_weight,
+  set_minifigs
+) VALUES (
+  'Sears Tower',
+  'LEGO Architecture official Sears Tower model from the Architecture series.',
+  'https://cdn.rebrickable.com/media/sets/21000-1/15217.jpg',
+  'Architecture',
+  '12+',
+  69,
+  2008,
+  true,
+  '21000',
+  'activo',
+  110.00,
+  95,
+  0
+);
+
+-- Set 14: Willis Tower (21000-2)
+INSERT INTO public.sets (
+  set_name,
+  set_description,
+  set_image_url,
+  set_theme,
+  set_age_range,
+  set_piece_count,
+  year_released,
+  catalogue_visibility,
+  set_ref,
+  set_status,
+  set_price,
+  set_weight,
+  set_minifigs
+) VALUES (
+  'Willis Tower',
+  'LEGO Architecture Willis Tower (formerly Sears Tower) - rebranded version.',
+  'https://cdn.rebrickable.com/media/sets/21000-2/15213.jpg',
+  'Architecture',
+  '12+',
+  69,
+  2011,
+  true,
+  '21000-2',
+  'activo',
+  110.00,
+  95,
+  0
+);
+
+-- Set 15: John Hancock Center (21001-1)
+INSERT INTO public.sets (
+  set_name,
+  set_description,
+  set_image_url,
+  set_theme,
+  set_age_range,
+  set_piece_count,
+  year_released,
+  catalogue_visibility,
+  set_ref,
+  set_status,
+  set_price,
+  set_weight,
+  set_minifigs
+) VALUES (
+  'John Hancock Center',
+  'LEGO Architecture John Hancock Center - official Architecture series model.',
+  'https://cdn.rebrickable.com/media/sets/21001-1/17482.jpg',
+  'Architecture',
+  '12+',
+  72,
+  2008,
+  true,
+  '21001',
+  'activo',
+  115.00,
+  100,
+  0
+);
+
+
+-- =========================================
+-- VERIFICATION QUERIES
+-- =========================================
+-- Uncomment these to verify the data was inserted correctly
+
+-- SELECT * FROM public.users WHERE email = 'admin@brickshare.com';
+-- SELECT * FROM public.user_roles WHERE user_id = 'REPLACE_WITH_ACTUAL_USER_ID';
+-- SELECT set_ref, set_name, set_theme, set_piece_count FROM public.sets ORDER BY set_theme, set_ref;
+-- SELECT set_id, set_ref, inventory_set_total_qty FROM public.inventory_sets;

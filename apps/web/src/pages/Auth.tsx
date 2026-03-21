@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
+import ProfileCompletionModal from "@/components/ProfileCompletionModal";
 
 const emailSchema = z.string().email("Email no válido");
 const passwordSchema = z.string()
@@ -32,8 +33,9 @@ const Auth = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string; confirmPassword?: string; policy?: string }>({});
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
-  const { signIn, signUp, signInWithGoogle, resetPassword, updateUserPassword, user, isAdmin, isOperador, isLoading: authLoading } = useAuth();
+  const { signIn, signUp, signInWithGoogle, resetPassword, updateUserPassword, user, profile, isAdmin, isOperador, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
@@ -54,6 +56,13 @@ const Auth = () => {
       redirectBasedOnRole();
     }
   }, [user, isAdmin, isOperador, authLoading, navigate]);
+
+  // Check if user just signed up and needs to complete profile
+  useEffect(() => {
+    if (user && profile && !profile.profile_completed && mode === "signup") {
+      setShowProfileModal(true);
+    }
+  }, [user, profile, mode]);
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string; confirmPassword?: string; policy?: string } = {};
@@ -125,9 +134,9 @@ const Auth = () => {
       } else {
         toast({
           title: "¡Cuenta creada!",
-          description: "Revisa tu email para confirmar la cuenta",
+          description: "Por favor, completa tu perfil para continuar",
         });
-        setMode("login");
+        // Profile modal will be shown automatically via useEffect
       }
     } else if (mode === "forgot-password") {
       const { error } = await resetPassword(email);
@@ -447,6 +456,14 @@ const Auth = () => {
             )}
           </div>
         </div>
+
+        <ProfileCompletionModal 
+          open={showProfileModal} 
+          onClose={() => {
+            setShowProfileModal(false);
+            navigate("/catalogo");
+          }} 
+        />
       </motion.div>
     </div>
   );

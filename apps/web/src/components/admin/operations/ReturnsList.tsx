@@ -30,22 +30,22 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface ReturnItem {
-    id: string; // envio uuid
+    id: string;
     user_id: string;
-    set_id: string; // we need set_id to update status
+    set_id: string;
     created_at: string;
-    estado_envio: string;
+    shipment_status: string;
     users: {
         full_name: string | null;
         email: string | null;
     };
-    sets: { // Joining sets
+    sets: {
         id: string;
-        set_ref: string | null; // set_ref
+        set_ref: string | null;
         set_name: string;
-        set_weight: number | null; // Changed from set_status to set_weight
-        set_status: string | null; // Keeping status for internal logic if needed
-    } | null; // It might be null if left join fails, but shouldn't
+        set_weight: number | null;
+        set_status: string | null;
+    } | null;
 }
 
 const ReturnsList = () => {
@@ -56,19 +56,18 @@ const ReturnsList = () => {
     const [newStatus, setNewStatus] = useState<string>("");
     const [isUpdating, setIsUpdating] = useState(false);
     const { toast } = useToast();
-    const { user } = useAuth(); // Ensure auth context is ready
+    const { user } = useAuth();
 
     const fetchReturns = async () => {
         setIsLoading(true);
         try {
-            // Fetch envios with status 'devuelto'
             const { data, error } = await supabase
-                .from("envios")
+                .from("shipments" as any)
                 .select(`
                     id,
                     user_id,
                     created_at,
-                    estado_envio,
+                    shipment_status,
                     set_id,
                     users (
                         full_name,
@@ -82,18 +81,16 @@ const ReturnsList = () => {
                         set_status
                     )
                 `)
-                .eq("estado_envio", "devuelto") // Filtering by returned shipments
-                .eq("estado_manipulacion", false) // Show only unprocessed returns
+                .eq("shipment_status", "returned")
+                .eq("handling_processed", false)
                 .order("created_at", { ascending: false });
 
             if (error) throw error;
-
-            console.log("Returns fetched:", data);
-            setReturns(data as any); // Type casting for simplicity here
+            setReturns(data as any);
         } catch (error: any) {
             console.error("Error fetching returns:", error);
             toast({
-                title: "Error al cargar devoluciones",
+                title: "Error loading returns",
                 description: `Error: ${error.message || error.code || JSON.stringify(error)}`,
                 variant: "destructive",
             });
@@ -104,12 +101,11 @@ const ReturnsList = () => {
 
     useEffect(() => {
         fetchReturns();
-        console.log("ReturnsList mounted - Checking devuelto");
     }, []);
 
     const handleEditClick = (item: ReturnItem) => {
         setSelectedItem(item);
-        setNewStatus(item.sets?.set_status || "inactivo");
+        setNewStatus(item.sets?.set_status || "inactive");
         setIsDialogOpen(true);
     };
 
@@ -127,19 +123,18 @@ const ReturnsList = () => {
             if (error) throw error;
 
             toast({
-                title: "Estado actualizado",
-                description: `El set ha pasado a estado "${newStatus}".`,
+                title: "Status updated",
+                description: `The set status has been changed to "${newStatus}".`,
                 className: "bg-green-100 border-green-200 dark:bg-green-900/30 dark:border-green-800",
             });
 
-            // Refresh list
             await fetchReturns();
             setIsDialogOpen(false);
         } catch (error: any) {
             console.error("Error updating status:", error);
             toast({
                 title: "Error",
-                description: error.message || "No se pudo actualizar el estado.",
+                description: error.message || "Could not update status.",
                 variant: "destructive",
             });
         } finally {
@@ -149,9 +144,9 @@ const ReturnsList = () => {
 
     const getStatusBadgeVariant = (status: string) => {
         switch (status) {
-            case "activo": return "default"; // green-ish usually or default primary
-            case "inactivo": return "secondary"; // gray
-            case "en reparacion": return "destructive"; // red/orange or maybe we want a warning color?
+            case "active": return "default";
+            case "inactive": return "secondary";
+            case "in_repair": return "destructive";
             default: return "outline";
         }
     };
@@ -168,11 +163,10 @@ const ReturnsList = () => {
         return (
             <div className="text-center p-8 bg-muted/20 rounded-xl border border-dashed border-muted-foreground/30">
                 <ClipboardList className="h-12 w-12 mx-auto text-muted-foreground mb-3 opacity-50" />
-                <h3 className="text-lg font-medium text-foreground">No hay devoluciones pendientes</h3>
-                <p className="text-muted-foreground">No se encontraron envíos en estado 'devuelto'.</p>
-                {/* Debug hint */}
+                <h3 className="text-lg font-medium text-foreground">No pending returns</h3>
+                <p className="text-muted-foreground">No shipments found in 'returned' status.</p>
                 <Button variant="ghost" size="sm" onClick={fetchReturns} className="mt-4">
-                    Refrescar
+                    Refresh
                 </Button>
             </div>
         );
@@ -184,11 +178,11 @@ const ReturnsList = () => {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Fecha</TableHead>
-                            <TableHead>Usuario</TableHead>
+                            <TableHead>Date</TableHead>
+                            <TableHead>User</TableHead>
                             <TableHead>Set Ref</TableHead>
-                            <TableHead>Peso Referencia</TableHead>
-                            <TableHead className="text-right">Acciones</TableHead>
+                            <TableHead>Reference Weight</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -199,7 +193,7 @@ const ReturnsList = () => {
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex flex-col">
-                                        <span className="font-medium">{item.users?.full_name || "Sin nombre"}</span>
+                                        <span className="font-medium">{item.users?.full_name || "No name"}</span>
                                         <span className="text-xs text-muted-foreground">{item.users?.email}</span>
                                     </div>
                                 </TableCell>
@@ -223,7 +217,7 @@ const ReturnsList = () => {
                                         variant="ghost"
                                         size="icon"
                                         onClick={() => handleEditClick(item)}
-                                        title="Editar estado del set"
+                                        title="Edit set status"
                                     >
                                         <Edit2 className="h-4 w-4" />
                                     </Button>
@@ -237,55 +231,51 @@ const ReturnsList = () => {
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Actualizar Estado del Set</DialogTitle>
+                        <DialogTitle>Update Set Status</DialogTitle>
                         <DialogDescription>
-                            Cambia el estado del set <strong>{selectedItem?.sets?.set_ref}</strong>.
-                            Esta acción actualizará el inventario automáticamente.
+                            Change the status of set <strong>{selectedItem?.sets?.set_ref}</strong>.
+                            This action will automatically update the inventory.
                         </DialogDescription>
                     </DialogHeader>
 
                     <div className="grid gap-4 py-4">
                         <div className="space-y-2">
                             <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                Situacion test
+                                Test Result
                             </label>
                             <Select value={newStatus} onValueChange={setNewStatus}>
                                 <SelectTrigger>
-                                    <SelectValue placeholder="Selecciona resultado del test" />
+                                    <SelectValue placeholder="Select test result" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="activo">Peso OK (Mover a Stock)</SelectItem>
-                                    <SelectItem value="en reparacion">Faltan Piezas (Mover a Reparación)</SelectItem>
+                                    <SelectItem value="active">Weight OK (Move to Stock)</SelectItem>
+                                    <SelectItem value="in_repair">Missing Pieces (Move to Repair)</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
 
-                        {newStatus === "en reparacion" && (
+                        {newStatus === "in_repair" && (
                             <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg p-3 flex gap-3 text-amber-800 dark:text-amber-200 text-sm">
                                 <AlertCircle className="h-5 w-5 flex-shrink-0" />
-                                <p>
-                                    Se marcará como "En Reparación" (+1 Ud).
-                                </p>
+                                <p>Will be marked as "In Repair" (+1 unit).</p>
                             </div>
                         )}
 
-                        {newStatus === "activo" && (
+                        {newStatus === "active" && (
                             <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-lg p-3 flex gap-3 text-blue-800 dark:text-blue-200 text-sm">
                                 <AlertCircle className="h-5 w-5 flex-shrink-0" />
-                                <p>
-                                    Se marcará como "Activo/Stock".
-                                </p>
+                                <p>Will be marked as "Active/Stock".</p>
                             </div>
                         )}
                     </div>
 
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isUpdating}>
-                            Cancelar
+                            Cancel
                         </Button>
                         <Button onClick={handleConfirmUpdate} disabled={isUpdating}>
                             {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Confirmar Cambio
+                            Confirm Change
                         </Button>
                     </DialogFooter>
                 </DialogContent>
