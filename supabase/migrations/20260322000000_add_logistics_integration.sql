@@ -4,15 +4,15 @@
 -- ============================================================
 
 -- Añadir campo para almacenar el ID del package en Brickshare_logistics
-ALTER TABLE shipments
+ALTER TABLE envios
   ADD COLUMN brickshare_package_id TEXT;
 
-COMMENT ON COLUMN shipments.brickshare_package_id IS
+COMMENT ON COLUMN envios.brickshare_package_id IS
   'ID del package en Brickshare_logistics. Usado cuando pickup_type="brickshare" para sincronización con el sistema de PUDO.';
 
 -- Crear índice para consultas rápidas
-CREATE INDEX idx_shipments_brickshare_package_id 
-  ON shipments(brickshare_package_id) 
+CREATE INDEX idx_envios_brickshare_package_id 
+  ON envios(brickshare_package_id) 
   WHERE brickshare_package_id IS NOT NULL;
 
 -- ============================================================
@@ -25,7 +25,7 @@ LANGUAGE sql
 STABLE
 AS $$
   SELECT pickup_type = 'brickshare' AND brickshare_pudo_id IS NOT NULL
-  FROM shipments
+  FROM envios
   WHERE id = shipment_id;
 $$;
 
@@ -39,23 +39,19 @@ COMMENT ON FUNCTION public.uses_brickshare_pudo IS
 CREATE OR REPLACE VIEW public.brickshare_pudo_shipments AS
 SELECT
   s.id,
-  s.assignment_id,
-  s.direction,
-  s.status,
+  s.user_id,
+  s.estado_envio as status,
   s.pickup_type,
   s.brickshare_pudo_id,
   s.brickshare_package_id,
   s.delivery_qr_code,
-  s.delivery_qr_validated_at,
+  s.delivery_validated_at as delivery_qr_validated_at,
   s.return_qr_code,
-  s.return_qr_validated_at,
-  s.tracking_number,
+  s.return_validated_at as return_qr_validated_at,
+  s.numero_seguimiento as tracking_number,
   s.created_at,
-  s.updated_at,
-  a.user_id,
-  a.product_id
-FROM shipments s
-JOIN assignments a ON a.id = s.assignment_id
+  s.updated_at
+FROM envios s
 WHERE s.pickup_type = 'brickshare'
   AND s.brickshare_pudo_id IS NOT NULL;
 
