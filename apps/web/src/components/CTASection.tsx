@@ -2,8 +2,10 @@ import { motion } from "framer-motion";
 import { ArrowRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 const CTASection = () => {
+  const { openAuthModal } = useAuth();
   const benefits = [
     "Sets ilimitados cada mes",
     "Entrega y recogida flexible",
@@ -72,11 +74,14 @@ const CTASection = () => {
                 transition={{ duration: 0.5, delay: 0.4 }}
                 className="flex flex-col sm:flex-row gap-4 justify-center"
               >
-                <Button size="lg" className="gradient-hero text-lg px-8" asChild>
-                  <Link to="/auth" data-testid="cta-register-link">
-                    Comenzar ahora
-                    <ArrowRight className="h-5 w-5 ml-2" />
-                  </Link>
+                <Button 
+                  size="lg" 
+                  className="gradient-hero text-lg px-8" 
+                  onClick={() => openAuthModal("signup")}
+                  data-testid="cta-register-link"
+                >
+                  Comenzar ahora
+                  <ArrowRight className="h-5 w-5 ml-2" />
                 </Button>
                 <Button size="lg" variant="outline" className="text-lg px-8" asChild>
                   <Link to="/como-funciona">

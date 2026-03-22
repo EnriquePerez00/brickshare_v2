@@ -1,0 +1,253 @@
+# ═══════════════════════════════════════════════════════════════
+# BRICKSHARE — Cline Project Rules
+# ═══════════════════════════════════════════════════════════════
+# Este archivo proporciona contexto persistente a Cline para
+# evitar preguntas repetitivas y ahorrar tokens en cada sesión.
+# ═══════════════════════════════════════════════════════════════
+
+## 1. Identidad del Proyecto
+
+- **Nombre**: Brickshare
+- **Descripción**: Plataforma de alquiler/préstamo circular de sets LEGO para familias
+- **Modelo de Negocio**: Suscripción mensual (Basic / Standard / Premium). El usuario selecciona sets del catálogo, los recibe en un punto de recogida (PUDO), los disfruta y los devuelve para obtener el siguiente.
+- **Repositorio**: https://github.com/EnriquePerez00/brickshare_v2.git
+- **Rama principal de desarrollo**: `develop`
+
+---
+
+## 2. Stack Tecnológico
+
+| Capa | Tecnología |
+|---|---|
+| **Frontend** | React 18 + TypeScript + Vite 7 |
+| **Estilos** | Tailwind CSS 3 + shadcn/ui (Radix UI) |
+| **Routing** | React Router DOM 6 |
+| **Data Fetching / Caché** | TanStack Query (@tanstack/react-query v5) |
+| **Formularios** | React Hook Form + Zod |
+| **Backend / DB** | Supabase (PostgreSQL 17 + Auth + Storage + Edge Functions) |
+| **Pagos** | Stripe (Checkout Sessions, Subscriptions, Webhooks) |
+| **Logística** | Correos API (PUDO points, envíos, tracking) |
+| **Garantías** | Swikly (depósitos de garantía) |
+| **Email** | Resend |
+| **Testing** | Vitest + Testing Library |
+| **Deploy** | Vercel (web) |
+
+> **IMPORTANTE**: NO usamos Redux ni RTK Query. El estado del servidor se gestiona con TanStack Query y el estado global con React Context (AuthContext).
+
+---
+
+## 3. Estructura del Monorepo
+
+```
+Brickshare/
+├── apps/web/src/           # 🎯 Frontend principal (aquí está el código activo)
+│   ├── pages/              # Páginas/rutas (Index, Catalogo, Dashboard, Admin, Auth…)
+│   ├── components/         # Componentes React
+│   │   ├── admin/          # Componentes de backoffice (inventory, operations, users, products)
+│   │   └── ui/             # shadcn/ui components (NO MODIFICAR a mano)
+│   ├── hooks/              # Custom hooks (useProducts, useOrders, useShipments, useWishlist…)
+│   ├── contexts/           # AuthContext (único context global)
+│   ├── integrations/       # Cliente Supabase tipado
+│   │   └── supabase/       # client.ts + types.ts
+│   └── lib/                # Utilidades (pudoService, resend, utils)
+├── packages/shared/        # Tipos compartidos (web + iOS)
+├── supabase/
+│   ├── functions/          # Edge Functions (Deno runtime)
+│   ├── migrations/         # ⚠️ Migraciones SQL históricas (NUNCA ELIMINAR)
+│   └── config.toml         # Configuración de Supabase local
+├── scripts/                # Scripts de utilidad (seed, check, verify)
+├── docs/                   # 📚 Documentación técnica completa
+├── src/types/supabase.ts   # Tipos TypeScript auto-generados de la BD
+└── .env.local              # Variables de entorno (NO commitear)
+```
+
+---
+
+## 4. Roles de Usuario
+
+| Rol | Acceso |
+|---|---|
+| `user` | Cliente suscriptor — Dashboard, catálogo, wishlist, envíos propios |
+| `admin` | Acceso total — Backoffice, gestión de sets, usuarios, inventario, envíos |
+| `operador` | Panel de operaciones logísticas — envíos, recepciones, mantenimiento |
+
+Los roles se almacenan en la tabla `user_roles` y se verifican con la función `has_role(auth.uid(), 'admin'::app_role)`.
+
+---
+
+## 5. Tablas Principales de la Base de Datos
+
+| Tabla | Propósito |
+|---|---|
+| `users` | Perfil del usuario (auth, suscripción, stripe, referral) |
+| `user_roles` | Roles asignados (user, admin, operador) |
+| `sets` | Catálogo de sets LEGO (nombre, tema, piezas, precio, estado) |
+| `set_piece_list` | Lista de piezas por set (detalle de cada pieza) |
+| `inventory_sets` | Inventario físico (stock, en_envio, en_uso, en_reparacion) |
+| `shipments` | Envíos y tracking (estado, direcciones, QR, Correos, Swikly) |
+| `wishlist` | Lista de deseos del usuario |
+| `reviews` | Reseñas y valoraciones de sets |
+| `referrals` | Programa de referidos |
+| `donations` | Donaciones de LEGO |
+| `users_correos_dropping` | Punto PUDO seleccionado por el usuario |
+| `brickshare_pudo_locations` | Puntos PUDO propios de Brickshare |
+| `reception_operations` | Operaciones de recepción y mantenimiento |
+| `backoffice_operations` | Log de operaciones administrativas |
+| `shipping_orders` | Órdenes de envío con transportistas |
+| `qr_validation_logs` | Logs de validación QR |
+
+> **⚠️ DEPRECADO**: La tabla `orders` ya NO existe. Los pedidos se gestionan directamente en `shipments` con `set_id` y `set_ref`.
+
+---
+
+## 6. Edge Functions (Supabase — Deno Runtime)
+
+| Función | Propósito | JWT |
+|---|---|---|
+| `create-checkout-session` | Crear sesión de pago Stripe | ✅ |
+| `create-subscription-intent` | Iniciar suscripción | ✅ |
+| `change-subscription` | Cambiar/cancelar plan | ✅ |
+| `stripe-webhook` | Recibir eventos de Stripe | ❌ |
+| `process-assignment-payment` | Pago de asignación | ✅ |
+| `correos-logistics` | Crear envíos con Correos API | ✅ |
+| `correos-pudo` | Consultar puntos PUDO | ❌ |
+| `send-email` | Enviar emails vía Resend | ✅ |
+| `send-brickshare-qr-email` | Email con QR de entrega/devolución | ✅ |
+| `submit-donation` | Registrar donaciones | ❌ |
+| `fetch-lego-data` | Enriquecer datos de sets | ✅ |
+| `delete-user` | Eliminar cuenta | ✅ |
+| `brickshare-qr-api` | API de validación QR | ✅ |
+| `create-logistics-package` | Crear paquete logístico | ✅ |
+| `create-swikly-wish` | Crear garantía Swikly | ✅ |
+| `swikly-manage-wish` | Gestionar garantías | ✅ |
+| `swikly-webhook` | Recibir eventos Swikly | ❌ |
+
+---
+
+## 7. Flujos de Negocio Principales
+
+### Suscripción
+```
+Usuario → Selecciona plan → Stripe Checkout → Webhook confirma pago → Perfil actualizado
+```
+
+### Asignación y Envío de Sets
+```
+Admin ejecuta preview_assign_sets_to_users() → Revisa propuesta →
+confirm_assign_sets_to_users(user_ids) → Crea shipment →
+correos-logistics genera envío → QR generado → PUDO entrega → Tracking
+```
+
+### Devolución
+```
+Usuario solicita devolución → QR de retorno generado →
+PUDO recoge → Correos devuelve → Recepción en almacén →
+Mantenimiento → Set vuelve a inventario
+```
+
+---
+
+## 8. Comandos de Desarrollo
+
+```bash
+# Desarrollo
+npm run dev                    # Frontend → http://localhost:5173
+supabase start                 # Backend Docker local
+supabase status                # Ver credenciales
+
+# Base de datos
+supabase db reset              # Reset + aplicar todas las migraciones
+supabase gen types typescript --local > src/types/supabase.ts  # Regenerar tipos
+psql postgresql://postgres:postgres@127.0.0.1:54322/postgres   # Conectar a BD
+
+# Testing
+npm run test                   # Vitest
+npm run lint                   # ESLint
+
+# Documentación
+npm run dump-schema            # Actualizar docs/DATABASE_SCHEMA.md y schema_dump.sql
+```
+
+---
+
+## 9. Convenciones y Reglas Estrictas
+
+### Código
+- **TypeScript estricto** en todo el proyecto
+- **Componentes funcionales** con hooks (no clases)
+- **shadcn/ui** para componentes UI — NO crear componentes custom si ya existe en shadcn
+- **TanStack Query** para todo data fetching — usar `staleTime` para caché
+- **Zod** para validación de formularios con `react-hook-form`
+- **date-fns** para manipulación de fechas (no moment.js)
+- **Sonner** para toast notifications
+
+### Base de Datos
+- **NUNCA eliminar** archivos en `supabase/migrations/`
+- **SIEMPRE** crear nuevas migraciones con `supabase migration new <nombre>`
+- **RLS habilitado** en todas las tablas — verificar políticas al crear tablas nuevas
+- **set_ref** (ej: "75192") es el identificador humano de sets LEGO
+- **user_id** siempre referencia `auth.users.id`
+
+### Edge Functions
+- **Deno runtime** — usar `Deno.env.get()` para variables de entorno
+- **CORS headers** necesarios en todas las respuestas
+- **JWT verificación** configurable en `supabase/config.toml`
+- **Service Role Key** solo en funciones servidor — NUNCA en frontend
+
+### Git
+- Convención de commits: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`
+- Pre-commit hook auto-actualiza `docs/DATABASE_SCHEMA.md`
+
+---
+
+## 10. Variables de Entorno
+
+```bash
+# Frontend (prefijo VITE_)
+VITE_SUPABASE_URL=http://127.0.0.1:54321
+VITE_SUPABASE_ANON_KEY=<de supabase status>
+VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...
+VITE_APP_URL=http://localhost:5173
+
+# Backend (Edge Functions)
+SUPABASE_SERVICE_ROLE_KEY=<de supabase status>
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+RESEND_API_KEY=re_...
+CORREOS_API_USER=...
+CORREOS_API_PASSWORD=...
+CORREOS_SENDER_CODE=...
+```
+
+---
+
+## 11. Documentación de Referencia
+
+Antes de preguntar, consulta estos archivos:
+
+| Archivo | Contenido |
+|---|---|
+| `docs/PROJECT_OVERVIEW.md` | Visión general, flujos, estado del proyecto |
+| `docs/ARCHITECTURE.md` | Diseño técnico, diagramas, estado global |
+| `docs/DATABASE_SCHEMA.md` | Esquema completo auto-generado (tablas, RPC, triggers, RLS) |
+| `docs/LOCAL_DEVELOPMENT.md` | Setup, comandos, workflow, troubleshooting |
+| `docs/API_REFERENCE.md` | Endpoints y funciones |
+| `docs/BRICKSHARE_PUDO.md` | Integración PUDO/Correos |
+| `docs/BRICKSHARE_LOGISTICS_INTEGRATION.md` | Integración logística completa |
+| `README.md` | Quick start |
+
+---
+
+## 12. Estado Actual y Limitaciones
+
+- ✅ Frontend web completo y funcional
+- ✅ Autenticación con Supabase Auth
+- ✅ Catálogo con enriquecimiento desde Rebrickable/BrickSet
+- ✅ Suscripciones Stripe
+- ✅ Integración logística Correos + PUDO + QR
+- ✅ Backoffice admin y panel operador
+- ✅ Wishlist, reviews, referidos, donaciones
+- ⚠️ App iOS incompleta (React Native/Expo en apps/ios/)
+- ⚠️ Cobertura de tests mínima
+- ⚠️ Sin CI/CD configurado
+- ⚠️ Desarrollo 100% local (Docker) — no hay Supabase cloud configurado

@@ -163,7 +163,7 @@ import { useToast } from "@/hooks/use-toast";
 
 const ComoFunciona = () => {
   const { startSubscription, isLoading: subscriptionLoading } = useSubscription();
-  const { isLoading: authLoading, user, profile, refreshProfile } = useAuth(); // Added user, profile, refreshProfile
+  const { isLoading: authLoading, user, profile, refreshProfile, openAuthModal } = useAuth(); // Added openAuthModal
   const navigate = useNavigate();
   const { toast } = useToast(); // Added toast
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
@@ -175,7 +175,7 @@ const ComoFunciona = () => {
 
   const handleSubscribe = async (plan: any) => {
     if (!user) {
-      navigate("/auth");
+      openAuthModal("login");
       return;
     }
 
