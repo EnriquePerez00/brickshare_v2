@@ -31,7 +31,7 @@ BEGIN
                 -- Wait, the trigger might not have run if we are inserting manually into auth.users in some environments.
                 -- Let's double check or do a manual insert if it doesn't exist.
                 
-                INSERT INTO public.profiles (user_id, full_name, estado_usuario)
+                INSERT INTO public.users (user_id, full_name, estado_usuario)
                 VALUES (new_user_id, 'Sample User ' || i, 'sin set')
                 ON CONFLICT (user_id) DO UPDATE SET estado_usuario = 'sin set';
 

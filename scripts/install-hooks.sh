@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script to install git hooks for automatic schema documentation updates
+# Script to install git hooks for automatic local DB migration and schema documentation
 # Run this script after cloning the repository
 
 echo "📦 Installing Git Hooks for Brickshare..."
@@ -37,21 +37,38 @@ if [ "$INSTALL_PRECOMMIT" = true ]; then
     cat > .git/hooks/pre-commit << 'EOF'
 #!/bin/bash
 
-# Git hook pre-commit: Automatically update database schema documentation
+# Git hook pre-commit: Automatically apply pending migrations and update schema docs
 # This hook runs before each commit if migrations are detected
 
+# Verificar si hay migraciones en el commit
 if git diff --cached --name-only | grep -q "supabase/migrations/"; then
-    echo "🔍 Migration detected, updating schema documentation..."
+    echo "🔍 Detectada migración en el commit..."
 
-    if bash scripts/update-schema-docs.sh; then
-        git add docs/DATABASE_SCHEMA.md docs/schema_dump.sql 2>/dev/null
-        echo "✅ Schema documentation updated and added to commit"
+    # ── 1. Aplicar migraciones pendientes a la BBDD local ──
+    echo "  → Aplicando migraciones pendientes a la BBDD local..."
+    if supabase migration up --local 2>&1; then
+        echo "  ✅ Migraciones aplicadas correctamente a la BBDD local"
     else
-        echo "⚠️  Could not update schema documentation"
-        echo "   The commit will continue, but documentation may be outdated"
+        echo "  ❌ Error al aplicar migraciones a la BBDD local"
+        echo "     Revisa el error y corrige la migración antes de hacer commit"
+        exit 1
     fi
+
+    # ── 2. Actualizar documentación del esquema ──
+    echo "  → Actualizando documentación del esquema..."
+    if bash scripts/update-schema-docs.sh; then
+        # Añadir documentación actualizada al commit
+        git add docs/DATABASE_SCHEMA.md docs/schema_dump.sql 2>/dev/null
+        echo "  ✅ Documentación del esquema actualizada y añadida al commit"
+    else
+        echo "  ⚠️  No se pudo actualizar la documentación del esquema"
+        echo "     El commit continuará, pero la documentación puede estar desactualizada"
+    fi
+
+    echo ""
+    echo "🎉 BBDD local actualizada y documentación regenerada"
 else
-    echo "ℹ️  No migration changes detected, skipping schema update"
+    echo "ℹ️  No se detectaron cambios en migraciones, saltando actualización"
 fi
 
 echo ""
@@ -70,7 +87,7 @@ if [ -f ".git/hooks/pre-push" ]; then
     echo ""
     echo "── Removing legacy pre-push hook ────────"
     rm -f .git/hooks/pre-push
-    echo "✅ Legacy pre-push hook removed (Supabase remote is no longer used)"
+    echo "✅ Legacy pre-push hook removed"
 fi
 
 # ─────────────────────────────────────────────
@@ -82,13 +99,18 @@ echo "════════════════════════�
 echo "📋 Hooks installed:"
 echo ""
 echo "  🔹 pre-commit:"
-echo "     - Detects commits with migrations"
+echo "     - Detects commits with new migrations"
+echo "     - Applies pending migrations to local DB (supabase migration up --local)"
 echo "     - Updates docs/DATABASE_SCHEMA.md and docs/schema_dump.sql"
 echo "     - Adds updated documentation to the commit"
+echo "     - Blocks commit if migration fails"
 echo ""
 echo "💡 To update documentation manually:"
-echo "   bash scripts/update-schema-docs.sh"
+echo "   npm run dump-schema"
 echo ""
-echo "ℹ️  Note: This project uses local Supabase only."
-echo "   Migrations are applied via 'supabase db reset' locally."
+echo "💡 To apply migrations manually:"
+echo "   supabase migration up --local"
+echo ""
+echo "ℹ️  Note: This project uses local Supabase only (Docker)."
+echo "   No remote database exists."
 echo "════════════════════════════════════════════"

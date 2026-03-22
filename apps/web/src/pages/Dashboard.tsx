@@ -82,7 +82,9 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
-    // Profile completion check removed as field doesn't exist in new schema
+    if (!authLoading && profile && !profile.profile_completed) {
+      setShowProfileModal(true);
+    }
   }, [profile, authLoading]);
 
   useEffect(() => {

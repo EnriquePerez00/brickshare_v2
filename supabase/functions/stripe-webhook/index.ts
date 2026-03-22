@@ -45,7 +45,7 @@ async function processReferralCredit(
 
   // Credit the referrer
   const { data: referrer } = await supabase
-    .from("profiles")
+    .from("users")
     .select("id, full_name, email:id")
     .eq("id", referral.referrer_id)
     .maybeSingle();
@@ -73,13 +73,13 @@ async function processReferralCredit(
   // Notify referrer by email
   if (referrer) {
     const { data: referrerProfile } = await supabase
-      .from("profiles")
+      .from("users")
       .select("full_name")
       .eq("id", referral.referrer_id)
       .maybeSingle();
 
     const { data: refereeProfile } = await supabase
-      .from("profiles")
+      .from("users")
       .select("full_name")
       .eq("id", userId)
       .maybeSingle();
@@ -141,9 +141,9 @@ serve(async (req) => {
           };
           if (plan) updateData.subscription_type = plan;
 
-          // Update profiles (not legacy "users" table)
+          // Update users (not legacy "users" table)
           const { error } = await supabase
-            .from("profiles")
+            .from("users")
             .update(updateData)
             .eq("stripe_customer_id", customerId);
 
@@ -160,7 +160,7 @@ serve(async (req) => {
           // Send subscription_activated email
           const { data: authUser } = await supabase.auth.admin.getUserById(userId);
           const { data: profile } = await supabase
-            .from("profiles")
+            .from("users")
             .select("full_name, correos_name")
             .eq("id", userId)
             .maybeSingle();
@@ -222,7 +222,7 @@ serve(async (req) => {
           if (userId) {
             const { data: authUser } = await supabase.auth.admin.getUserById(userId);
             const { data: profile } = await supabase
-              .from("profiles")
+              .from("users")
               .select("full_name")
               .eq("id", userId)
               .maybeSingle();
@@ -253,7 +253,7 @@ serve(async (req) => {
 
         if (customerId) {
           const { error } = await supabase
-            .from("profiles")
+            .from("users")
             .update({ subscription_status: "canceled", subscription_type: "none" })
             .eq("stripe_customer_id", customerId);
 
@@ -274,7 +274,7 @@ serve(async (req) => {
           if (plan) updateData.subscription_type = plan;
 
           await supabase
-            .from("profiles")
+            .from("users")
             .update(updateData)
             .eq("stripe_customer_id", customerId);
         }

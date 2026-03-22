@@ -2,12 +2,12 @@
 -- Purpose:   Referral program — users generate unique referral codes and earn
 --            credits when referred users subscribe. Rewards are tracked as
 --            discount credits applied to next billing cycle.
--- Fixed:     Use auth.users(id) for referrer/referee FKs instead of profiles(id)
+-- Fixed:     Use auth.users(id) for referrer/referee FKs instead of users (id)
 --            Ensure profiles table exists before modifying it
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- ── Ensure profiles table exists (Supabase standard: id = auth.uid()) ─────────
-CREATE TABLE IF NOT EXISTS public.profiles (
+CREATE TABLE IF NOT EXISTS public.users (
     id              UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     full_name       TEXT,
     avatar_url      TEXT,
@@ -28,7 +28,7 @@ ALTER TABLE public.profiles
 
 -- Unique index on referral_code (case-insensitive lookup)
 CREATE UNIQUE INDEX IF NOT EXISTS profiles_referral_code_lower
-    ON public.profiles (LOWER(referral_code))
+    ON public.users (LOWER(referral_code))
     WHERE referral_code IS NOT NULL;
 
 -- ── Referrals table ───────────────────────────────────────────────────────────
@@ -227,7 +227,7 @@ CREATE POLICY "referrals_admin_all"
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
-    INSERT INTO public.profiles (id, full_name, avatar_url)
+    INSERT INTO public.users (id, full_name, avatar_url)
     VALUES (
         NEW.id,
         NEW.raw_user_meta_data ->> 'full_name',

@@ -16,7 +16,7 @@ CREATE TABLE public.products (
 );
 
 -- Create profiles table
-CREATE TABLE public.profiles (
+CREATE TABLE public.users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL UNIQUE,
     full_name TEXT,
@@ -160,7 +160,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-    INSERT INTO public.profiles (user_id, full_name)
+    INSERT INTO public.users (user_id, full_name)
     VALUES (NEW.id, NEW.raw_user_meta_data ->> 'full_name');
     
     -- Assign default 'user' role

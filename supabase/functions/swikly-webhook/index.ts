@@ -101,7 +101,7 @@ serve(async (req) => {
     .select(
       `id, user_id, swikly_status, swikly_deposit_amount,
        sets (name, lego_ref),
-       profiles (full_name, email)`
+       users (full_name, email)`
     )
     .eq("swikly_wish_id", wishId)
     .single();
@@ -122,7 +122,7 @@ serve(async (req) => {
   );
 
   // ── Resolve user email ────────────────────────────────────────────────────
-  let userEmail: string = (assignment.profiles as any)?.email ?? "";
+  let userEmail: string = (assignment.users as any)?.email ?? "";
   if (!userEmail) {
     const { data: authUser } = await supabase.auth.admin.getUserById(
       assignment.user_id
@@ -130,7 +130,7 @@ serve(async (req) => {
     userEmail = authUser?.user?.email ?? "";
   }
 
-  const userName: string = (assignment.profiles as any)?.full_name ?? "Cliente";
+  const userName: string = (assignment.users as any)?.full_name ?? "Cliente";
   const set = assignment.sets as any;
   const depositEur = ((assignment.swikly_deposit_amount ?? 0) / 100).toFixed(2);
 
