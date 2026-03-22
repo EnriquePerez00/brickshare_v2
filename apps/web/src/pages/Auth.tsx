@@ -46,7 +46,7 @@ const Auth = () => {
     } else if (isOperador) {
       navigate("/operaciones");
     } else {
-      navigate("/");
+      navigate("/dashboard");
     }
   };
 

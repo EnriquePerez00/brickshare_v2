@@ -59,8 +59,8 @@ DECLARE
 BEGIN
     FOR r IN (
         SELECT u.user_id, u.full_name, u.email, u.phone,
-               p.correos_id_pudo, p.correos_nombre, p.correos_direccion_completa,
-               p.correos_codigo_postal, p.correos_ciudad, p.correos_provincia
+               p.correos_id_pudo, p.correos_name, p.correos_full_address,
+               p.correos_zip_code, p.correos_city, p.correos_province
         FROM public.users u
         LEFT JOIN public.users_correos_dropping p ON u.user_id = p.user_id
         WHERE u.user_id = ANY(p_user_ids)
@@ -83,9 +83,9 @@ BEGIN
 
             INSERT INTO public.shipments (order_id, user_id, shipment_status, shipping_address, shipping_city, shipping_zip_code, shipping_country)
             VALUES (new_order_id, r.user_id, 'pending',
-                    COALESCE(r.correos_direccion_completa, 'Pending assignment'),
-                    COALESCE(r.correos_ciudad, 'Pending'),
-                    COALESCE(r.correos_codigo_postal, '00000'), 'España')
+                    COALESCE(r.correos_full_address, 'Pending assignment'),
+                    COALESCE(r.correos_city, 'Pending'),
+                    COALESCE(r.correos_zip_code, '00000'), 'España')
             RETURNING shipments.id, shipments.created_at INTO new_envio_id, v_created_at;
 
             UPDATE public.users SET user_status = 'set_shipping' WHERE users.user_id = r.user_id;
@@ -105,11 +105,11 @@ BEGIN
             confirm_assign_sets_to_users.set_weight := v_set_weight;
             confirm_assign_sets_to_users.set_dim := v_set_dim;
             confirm_assign_sets_to_users.pudo_id := r.correos_id_pudo;
-            confirm_assign_sets_to_users.pudo_name := r.correos_nombre;
-            confirm_assign_sets_to_users.pudo_address := r.correos_direccion_completa;
-            confirm_assign_sets_to_users.pudo_cp := r.correos_codigo_postal;
-            confirm_assign_sets_to_users.pudo_city := r.correos_ciudad;
-            confirm_assign_sets_to_users.pudo_province := r.correos_provincia;
+            confirm_assign_sets_to_users.pudo_name := r.correos_name;
+            confirm_assign_sets_to_users.pudo_address := r.correos_full_address;
+            confirm_assign_sets_to_users.pudo_cp := r.correos_zip_code;
+            confirm_assign_sets_to_users.pudo_city := r.correos_city;
+            confirm_assign_sets_to_users.pudo_province := r.correos_province;
             confirm_assign_sets_to_users.created_at := v_created_at;
             RETURN NEXT;
         END IF;
@@ -1181,15 +1181,21 @@ CREATE TABLE IF NOT EXISTS "public"."users" (
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "email" "text",
     "subscription_type" "text",
-    "subscription_status" "text" DEFAULT 'active'::"text",
+    "subscription_status" "text" DEFAULT 'inactive'::"text",
     "profile_completed" boolean DEFAULT false,
     "user_status" "text" DEFAULT 'no_set'::"text",
     "stripe_customer_id" "text",
     "referral_code" "text",
     "referred_by" "uuid",
     "referral_credits" integer DEFAULT 0 NOT NULL,
+    "address" "text",
+    "address_extra" "text",
+    "zip_code" "text",
+    "city" "text",
+    "province" "text",
+    "phone" "text",
     CONSTRAINT "check_user_status" CHECK (("user_status" = ANY (ARRAY['no_set'::"text", 'set_shipping'::"text", 'received'::"text", 'has_set'::"text", 'set_returning'::"text", 'suspended'::"text", 'cancelled'::"text"]))),
-    CONSTRAINT "users_subscription_status_check" CHECK (("subscription_status" = ANY (ARRAY['active'::"text", 'inactive'::"text"])))
+    CONSTRAINT "users_subscription_status_check" CHECK (("subscription_status" = ANY (ARRAY['active'::"text", 'inactive'::"text", 'trialing'::"text", 'past_due'::"text", 'canceled'::"text"])))
 );
 
 
@@ -1208,7 +1214,7 @@ COMMENT ON COLUMN "public"."users"."profile_completed" IS 'Whether the user has 
 
 
 
-COMMENT ON COLUMN "public"."users"."user_status" IS 'Allowed values: set en envio, sin set, recibido, con set, set en devolucion, suspendido, cancelado';
+COMMENT ON COLUMN "public"."users"."user_status" IS 'Allowed values: no_set, set_shipping, received, has_set, set_returning, suspended, cancelled';
 
 
 

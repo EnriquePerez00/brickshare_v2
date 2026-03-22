@@ -46,8 +46,8 @@ function RatingBar({ label, count, total }: { label: string; count: number; tota
 
 function ReviewCard({ review }: { review: Review }) {
   const authorName =
-    review.profiles?.full_name
-      ? review.profiles.full_name.split(" ")[0]
+    review.users?.full_name
+      ? review.users.full_name.split(" ")[0]
       : "Usuario";
   const date = new Date(review.created_at).toLocaleDateString("es-ES", {
     year: "numeric",

@@ -41,7 +41,7 @@ export const useMyReferral = () => {
 
       // Get profile with referral fields
       const { data: profile, error: profileError } = await supabase
-        .from("profiles")
+        .from("users")
         .select("referral_code, referral_credits")
         .eq("id", user.id)
         .single();
@@ -90,7 +90,7 @@ export const useApplyReferralCode = () => {
 
       // 1. Look up the referrer by code
       const { data: referrerProfile, error: lookupError } = await supabase
-        .from("profiles")
+        .from("users")
         .select("id, full_name, referral_code")
         .ilike("referral_code", code)
         .maybeSingle();
@@ -120,7 +120,7 @@ export const useApplyReferralCode = () => {
 
       // 4. Mark on own profile who referred us
       const { error: profileError } = await supabase
-        .from("profiles")
+        .from("users")
         .update({ referred_by: referrerProfile.id })
         .eq("id", user.id);
 

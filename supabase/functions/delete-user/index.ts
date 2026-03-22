@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
 
     // Delete profile
     await supabaseAdmin
-      .from('profiles')
+      .from('users')
       .delete()
       .eq('user_id', userId);
 

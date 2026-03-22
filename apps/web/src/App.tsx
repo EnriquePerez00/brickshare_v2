@@ -4,7 +4,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
-import ChatWidget from "./components/ChatWidget";
 import Index from "./pages/Index";
 import Catalogo from "./pages/Catalogo";
 import ComoFunciona from "./pages/ComoFunciona";
@@ -26,15 +25,6 @@ import TerminosCondiciones from "./pages/TerminosCondiciones";
 
 const queryClient = new QueryClient();
 
-// Only show the chat widget on public-facing pages
-const PRIVATE_PATHS = ["/dashboard", "/admin", "/operaciones"];
-
-function BrickmanChat() {
-  const { pathname } = useLocation();
-  const isPrivatePage = PRIVATE_PATHS.some((p) => pathname.startsWith(p));
-  if (isPrivatePage) return null;
-  return <ChatWidget />;
-}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -65,7 +55,6 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
           <CookieBanner />
-          <BrickmanChat />
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>

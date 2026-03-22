@@ -59,7 +59,7 @@ serve(async (req) => {
           id,
           user_id,
           set_id,
-          user:profiles!inner(
+          user:users!inner(
             email,
             full_name
           ),

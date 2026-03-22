@@ -61,7 +61,7 @@ serve(async (req) => {
         `
         id, set_id, user_id, swikly_status, swikly_wish_url, swikly_deposit_amount,
         sets (name, lego_ref, retail_price),
-        profiles (full_name, email)
+        users (full_name, email)
       `
       )
       .eq("id", assignment_id)
@@ -77,14 +77,14 @@ serve(async (req) => {
       // If wish_url exists, re-send preparatory email without creating a new wish
       if (assignment.swikly_status === "wish_created") {
         const wishUrl = (assignment as any).swikly_wish_url ?? "";
-        let userEmail: string = (assignment.profiles as any)?.email ?? "";
+        let userEmail: string = (assignment.users as any)?.email ?? "";
         if (!userEmail) {
           const { data: authUser } = await supabase.auth.admin.getUserById(assignment.user_id);
           userEmail = authUser?.user?.email ?? "";
         }
         if (userEmail) {
           await sendEmail("swikly_wish_created", userEmail, {
-            name: (assignment.profiles as any)?.full_name ?? "Cliente",
+            name: (assignment.users as any)?.full_name ?? "Cliente",
             set_name: (assignment.sets as any)?.name ?? "",
             set_ref: (assignment.sets as any)?.lego_ref ?? "",
             deposit_amount: (((assignment as any).swikly_deposit_amount ?? 0) / 100).toFixed(2),
@@ -99,7 +99,7 @@ serve(async (req) => {
     }
 
     // ── 2. Resolve user email (profiles may not store email directly) ─────────
-    let userEmail: string = (assignment.profiles as any)?.email ?? "";
+    let userEmail: string = (assignment.users as any)?.email ?? "";
     if (!userEmail) {
       const { data: authUser } = await supabase.auth.admin.getUserById(
         assignment.user_id
@@ -109,7 +109,7 @@ serve(async (req) => {
     if (!userEmail) throw new Error("Could not resolve user email");
 
     const userName: string =
-      (assignment.profiles as any)?.full_name ?? "Cliente";
+      (assignment.users as any)?.full_name ?? "Cliente";
     const set = assignment.sets as any;
     const setName: string = set?.name ?? "Set LEGO";
     const retailPriceCents: number = Math.round((set?.retail_price ?? 0) * 100);

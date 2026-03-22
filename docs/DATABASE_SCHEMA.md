@@ -305,13 +305,19 @@ Output format is unaligned.
 | `updated_at` | timestamp with time zone | ✗ | `now()` | - |
 | `email` | text | ✓ | - | - |
 | `subscription_type` | text | ✓ | - | - |
-| `subscription_status` | text | ✓ | `'active'::text` | - |
+| `subscription_status` | text | ✓ | `'inactive'::text` | - |
 | `profile_completed` | boolean | ✓ | `false` | - |
 | `user_status` | text | ✓ | `'no_set'::text` | - |
 | `stripe_customer_id` | text | ✓ | - | - |
 | `referral_code` | text | ✓ | - | - |
 | `referred_by` | uuid | ✓ | - | Auth: Set this column to true when the account comes from SSO. These accounts can have duplicate emails. |
 | `referral_credits` | integer | ✗ | `0` | - |
+| `address` | text | ✓ | - | - |
+| `address_extra` | text | ✓ | - | - |
+| `zip_code` | text | ✓ | - | - |
+| `city` | text | ✓ | - | - |
+| `province` | text | ✓ | - | - |
+| `phone` | text | ✓ | - | - |
 
 
 ### users
@@ -327,13 +333,19 @@ Output format is unaligned.
 | `updated_at` | timestamp with time zone | ✗ | `now()` | - |
 | `email` | text | ✓ | - | - |
 | `subscription_type` | text | ✓ | - | The plan level (Brick Starter, Pro, Master) |
-| `subscription_status` | text | ✓ | `'active'::text` | Status of the subscription (OK, trialing, past_due, canceled, etc.) |
+| `subscription_status` | text | ✓ | `'inactive'::text` | Status of the subscription (OK, trialing, past_due, canceled, etc.) |
 | `profile_completed` | boolean | ✓ | `false` | Whether the user has completed their profile information |
-| `user_status` | text | ✓ | `'no_set'::text` | Allowed values: set en envio, sin set, recibido, con set, set en devolucion, suspendido, cancelado |
+| `user_status` | text | ✓ | `'no_set'::text` | Allowed values: no_set, set_shipping, received, has_set, set_returning, suspended, cancelled |
 | `stripe_customer_id` | text | ✓ | - | Stripe Customer ID associated with the user |
 | `referral_code` | text | ✓ | - | Unique shareable code (6 chars, auto-generated) |
 | `referred_by` | uuid | ✓ | - | auth.users.id of the user who referred this one |
 | `referral_credits` | integer | ✗ | `0` | Accumulated credits from successful referrals |
+| `address` | text | ✓ | - | - |
+| `address_extra` | text | ✓ | - | - |
+| `zip_code` | text | ✓ | - | - |
+| `city` | text | ✓ | - | - |
+| `province` | text | ✓ | - | - |
+| `phone` | text | ✓ | - | - |
 
 
 ### users_correos_dropping

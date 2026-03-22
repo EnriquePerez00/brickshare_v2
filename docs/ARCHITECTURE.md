@@ -112,7 +112,7 @@ Todas las tablas tienen RLS habilitado. Los patrones principales son:
 ### Esquema Simplificado
 ```sql
 -- Identidad
-profiles (id, email, full_name, role, address, subscription_plan, ...)
+users (id, email, full_name, role, address, subscription_plan, ...)
 
 -- Catálogo
 sets (id, name, lego_ref, theme, piece_count, age_range, img_url, ...)

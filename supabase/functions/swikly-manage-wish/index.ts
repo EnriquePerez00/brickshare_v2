@@ -59,7 +59,7 @@ serve(async (req) => {
       .select(
         `id, user_id, swikly_wish_id, swikly_status, swikly_deposit_amount,
          sets (name, lego_ref),
-         profiles (full_name, email)`
+         users (full_name, email)`
       )
       .eq("id", assignment_id)
       .single();
@@ -110,7 +110,7 @@ serve(async (req) => {
       .eq("id", assignment_id);
 
     // ── Send email notification to user ─────────────────────────────────────
-    let userEmail: string = (assignment.profiles as any)?.email ?? "";
+    let userEmail: string = (assignment.users as any)?.email ?? "";
     if (!userEmail) {
       const { data: authUser } = await supabase.auth.admin.getUserById(
         assignment.user_id
@@ -125,7 +125,7 @@ serve(async (req) => {
       const emailType =
         action === "release" ? "swikly_deposit_released" : "swikly_deposit_captured";
       await sendEmail(emailType, userEmail, {
-        name: (assignment.profiles as any)?.full_name ?? "Cliente",
+        name: (assignment.users as any)?.full_name ?? "Cliente",
         set_name: set?.name ?? "",
         deposit_amount: depositEur,
       });
