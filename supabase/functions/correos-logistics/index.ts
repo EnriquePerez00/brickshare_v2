@@ -397,7 +397,7 @@ serve(async (req) => {
                     .from('shipments')
                     .update({
                         tracking_number: returnCode,
-                        shipment_status: 'return_in_transit',
+                        shipment_status: 'in_return_pudo',
                         return_request_date: new Date().toISOString(),
                         pickup_provider: 'Correos (Sin Etiqueta)',
                         updated_at: new Date().toISOString()

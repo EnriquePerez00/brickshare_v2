@@ -574,15 +574,15 @@ Output format is unaligned.
 
 ### reception_operations
 
-- **update_reception_operations_updated_at**
-  - Evento: UPDATE
-  - Timing: BEFORE
-  - Función: `EXECUTE FUNCTION update_updated_at_column()`
-
 - **on_reception_completed**
   - Evento: UPDATE
   - Timing: AFTER
   - Función: `EXECUTE FUNCTION handle_reception_close()`
+
+- **update_reception_operations_updated_at**
+  - Evento: UPDATE
+  - Timing: BEFORE
+  - Función: `EXECUTE FUNCTION update_updated_at_column()`
 
 
 ### referrals
@@ -624,15 +624,15 @@ Output format is unaligned.
 
 ### shipments
 
-- **on_shipment_warehouse_received**
-  - Evento: UPDATE
-  - Timing: BEFORE
-  - Función: `EXECUTE FUNCTION handle_shipment_warehouse_received()`
-
 - **on_shipment_delivered**
   - Evento: UPDATE
   - Timing: AFTER
   - Función: `EXECUTE FUNCTION handle_shipment_delivered()`
+
+- **on_shipment_warehouse_received**
+  - Evento: UPDATE
+  - Timing: BEFORE
+  - Función: `EXECUTE FUNCTION handle_shipment_warehouse_received()`
 
 - **on_shipment_return_user_status**
   - Evento: UPDATE
@@ -886,6 +886,12 @@ Output format is unaligned.
 
 ### Tabla: `shipments`
 
+- **Users can update own shipment status**
+  - Comando: `UPDATE`
+  - Roles: authenticated
+  - Usando: `(auth.uid() = user_id)`
+  - With check: `((auth.uid() = user_id) AND (shipment_status = 'in_return_pudo'::text))`
+
 - **Admins and operators full access**
   - Comando: `ALL`
   - Roles: public
@@ -909,12 +915,6 @@ Output format is unaligned.
   - Roles: public
   - Usando: `(auth.uid() = user_id)`
 
-
-- **Users can update own shipment status**
-  - Comando: `UPDATE`
-  - Roles: authenticated
-  - Usando: `(auth.uid() = user_id)`
-  - With check: `((auth.uid() = user_id) AND (shipment_status = 'return_in_transit'::text))`
 
 
 ### Tabla: `shipping_orders`
@@ -943,6 +943,12 @@ Output format is unaligned.
 
 ### Tabla: `users`
 
+- **Users can update their own profile**
+  - Comando: `UPDATE`
+  - Roles: authenticated
+  - Usando: `(auth.uid() = user_id)`
+
+
 - **Users can delete their own profile**
   - Comando: `DELETE`
   - Roles: authenticated
@@ -961,6 +967,24 @@ Output format is unaligned.
   - Usando: `(user_id = auth.uid())`
 
 
+- **Users can view own profile**
+  - Comando: `SELECT`
+  - Roles: public
+  - Usando: `(auth.uid() = user_id)`
+
+
+- **Users can update own profile**
+  - Comando: `UPDATE`
+  - Roles: public
+  - Usando: `(auth.uid() = user_id)`
+
+
+- **Admins can update any user**
+  - Comando: `UPDATE`
+  - Roles: public
+  - Usando: `has_role(auth.uid(), 'admin'::app_role)`
+
+
 - **Users can view their own profile**
   - Comando: `SELECT`
   - Roles: authenticated
@@ -973,35 +997,11 @@ Output format is unaligned.
   - Usando: `(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'operador'::app_role))`
 
 
-- **Users can view own profile**
-  - Comando: `SELECT`
-  - Roles: public
-  - Usando: `(auth.uid() = user_id)`
-
-
-- **Admins can update any user**
-  - Comando: `UPDATE`
-  - Roles: public
-  - Usando: `has_role(auth.uid(), 'admin'::app_role)`
-
-
-- **Users can update own profile**
-  - Comando: `UPDATE`
-  - Roles: public
-  - Usando: `(auth.uid() = user_id)`
-
-
 - **Users can insert their own profile**
   - Comando: `INSERT`
   - Roles: authenticated
   - Usando: `true`
   - With check: `(auth.uid() = user_id)`
-
-- **Users can update their own profile**
-  - Comando: `UPDATE`
-  - Roles: authenticated
-  - Usando: `(auth.uid() = user_id)`
-
 
 
 ### Tabla: `users_correos_dropping`

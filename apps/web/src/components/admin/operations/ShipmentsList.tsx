@@ -22,7 +22,7 @@ const ShipmentsList = () => {
     // Filter active shipments and sort by updated_at DESC (most recent first)
     const activeShipments = shipments
         ?.filter(s =>
-            ['preparation', 'in_transit', 'returned', 'return_in_transit', 'pending', 'assigned'].includes(s.shipment_status)
+            ['preparation', 'in_transit_pudo', 'delivered_pudo', 'in_return_pudo', 'in_return', 'returned', 'pending'].includes(s.shipment_status)
         )
         .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
 
@@ -57,16 +57,20 @@ const ShipmentsList = () => {
         switch (status) {
             case 'pending':
                 return <Badge variant="outline" className="bg-gray-100 text-gray-800 border-gray-300">Pending</Badge>;
-            case 'assigned':
-                return <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-300">Assigned</Badge>;
             case 'preparation':
                 return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300">In Preparation</Badge>;
-            case 'in_transit':
-                return <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">In Transit</Badge>;
+            case 'in_transit_pudo':
+                return <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">In Transit → PUDO</Badge>;
+            case 'delivered_pudo':
+                return <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-300">Delivered PUDO</Badge>;
+            case 'delivered_user':
+                return <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">Delivered User</Badge>;
+            case 'in_return_pudo':
+                return <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-300">Return at PUDO</Badge>;
+            case 'in_return':
+                return <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300">In Return Transit</Badge>;
             case 'returned':
-                return <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-300">Return Requested</Badge>;
-            case 'return_in_transit':
-                return <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">Return In Transit</Badge>;
+                return <Badge variant="outline" className="bg-teal-100 text-teal-800 border-teal-300">Returned</Badge>;
             default:
                 return <Badge variant="outline">{status}</Badge>;
         }

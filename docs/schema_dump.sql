@@ -134,7 +134,7 @@ BEGIN
     END IF;
 
     IF v_validation.validation_type = 'delivery' THEN
-        v_new_status := 'delivered';
+        v_new_status := 'delivered_user';
         UPDATE shipments SET delivery_validated_at = now(), shipment_status = v_new_status, updated_at = now() WHERE id = v_validation.shipment_id;
     ELSIF v_validation.validation_type = 'return' THEN
         v_new_status := 'returned';
@@ -173,7 +173,7 @@ BEGIN
 
     UPDATE public.users
     SET user_status = CASE 
-        WHEN EXISTS (SELECT 1 FROM public.shipments WHERE user_id = v_user_id AND shipment_status IN ('preparation', 'in_transit'))
+        WHEN EXISTS (SELECT 1 FROM public.shipments WHERE user_id = v_user_id AND shipment_status IN ('preparation', 'in_transit_pudo'))
         THEN user_status ELSE 'no_set' END
     WHERE user_id = v_user_id;
 END;
@@ -310,6 +310,7 @@ CREATE OR REPLACE FUNCTION "public"."handle_new_user"() RETURNS "trigger"
     SET "search_path" TO 'public'
     AS $$
 BEGIN
+    -- Create record in users table
     INSERT INTO public.users (
         user_id,
         full_name,
@@ -323,6 +324,12 @@ BEGIN
         NEW.email
     )
     ON CONFLICT (user_id) DO NOTHING;
+
+    -- Assign default 'user' role
+    INSERT INTO public.user_roles (user_id, role)
+    VALUES (NEW.id, 'user'::app_role)
+    ON CONFLICT (user_id, role) DO NOTHING;
+
     RETURN NEW;
 END;
 $$;
@@ -361,7 +368,7 @@ CREATE OR REPLACE FUNCTION "public"."handle_return_user_status"() RETURNS "trigg
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 BEGIN
-    IF NEW.shipment_status = 'return_in_transit' AND OLD.shipment_status != 'return_in_transit' THEN
+    IF NEW.shipment_status = 'in_return_pudo' AND OLD.shipment_status != 'in_return_pudo' THEN
         UPDATE public.users SET user_status = 'no_set' WHERE user_id = NEW.user_id;
     END IF;
     RETURN NEW;
@@ -376,7 +383,7 @@ CREATE OR REPLACE FUNCTION "public"."handle_shipment_delivered"() RETURNS "trigg
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 BEGIN
-    IF NEW.shipment_status = 'delivered' AND OLD.shipment_status != 'delivered' THEN
+    IF NEW.shipment_status = 'delivered_user' AND OLD.shipment_status != 'delivered_user' THEN
         UPDATE public.users SET user_status = 'has_set' WHERE user_id = NEW.user_id;
     END IF;
     RETURN NEW;
@@ -391,7 +398,7 @@ CREATE OR REPLACE FUNCTION "public"."handle_shipment_return_transit_inventory"()
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 BEGIN
-    IF NEW.shipment_status = 'return_in_transit' AND OLD.shipment_status != 'return_in_transit' THEN
+    IF NEW.shipment_status = 'in_return_pudo' AND OLD.shipment_status != 'in_return_pudo' THEN
         UPDATE public.inventory_sets
         SET in_return = COALESCE(in_return, 0) + 1, updated_at = now()
         WHERE set_id = NEW.set_id;
@@ -796,7 +803,7 @@ CREATE TABLE IF NOT EXISTS "public"."shipments" (
     "return_validated_at" timestamp with time zone,
     "brickshare_metadata" "jsonb" DEFAULT '{}'::"jsonb",
     "brickshare_package_id" "text",
-    CONSTRAINT "check_shipment_status" CHECK (("shipment_status" = ANY (ARRAY['pending'::"text", 'preparation'::"text", 'assigned'::"text", 'in_transit'::"text", 'delivered'::"text", 'returned'::"text", 'return_in_transit'::"text", 'cancelled'::"text"]))),
+    CONSTRAINT "check_shipment_status" CHECK (("shipment_status" = ANY (ARRAY['pending'::"text", 'preparation'::"text", 'in_transit_pudo'::"text", 'delivered_pudo'::"text", 'delivered_user'::"text", 'in_return_pudo'::"text", 'in_return'::"text", 'returned'::"text", 'cancelled'::"text"]))),
     CONSTRAINT "envios_pickup_type_check" CHECK (("pickup_type" = ANY (ARRAY['correos'::"text", 'brickshare'::"text"]))),
     CONSTRAINT "envios_swikly_status_check" CHECK (("swikly_status" = ANY (ARRAY['pending'::"text", 'wish_created'::"text", 'accepted'::"text", 'released'::"text", 'captured'::"text", 'expired'::"text", 'cancelled'::"text"])))
 );
@@ -1881,7 +1888,7 @@ CREATE POLICY "Users can update own profile" ON "public"."users" FOR UPDATE USIN
 
 
 
-CREATE POLICY "Users can update own shipment status" ON "public"."shipments" FOR UPDATE TO "authenticated" USING (("auth"."uid"() = "user_id")) WITH CHECK ((("auth"."uid"() = "user_id") AND ("shipment_status" = 'return_in_transit'::"text")));
+CREATE POLICY "Users can update own shipment status" ON "public"."shipments" FOR UPDATE TO "authenticated" USING (("auth"."uid"() = "user_id")) WITH CHECK ((("auth"."uid"() = "user_id") AND ("shipment_status" = 'in_return_pudo'::"text")));
 
 
 

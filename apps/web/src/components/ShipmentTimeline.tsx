@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
+  MapPin,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -14,10 +15,11 @@ import { cn } from "@/lib/utils";
 export type ShipmentStatus =
   | "pending"
   | "prepared"
-  | "in_transit"
-  | "delivered"
-  | "return_requested"
-  | "return_in_transit"
+  | "in_transit_pudo"
+  | "delivered_pudo"
+  | "delivered_user"
+  | "in_return_pudo"
+  | "in_return"
   | "returned"
   | "cancelled";
 
@@ -44,13 +46,19 @@ const OUTBOUND_STEPS: TimelineStep[] = [
     icon: PackageCheck,
   },
   {
-    key: "in_transit",
-    label: "En camino",
-    description: "Tu set está en tránsito con Correos.",
+    key: "in_transit_pudo",
+    label: "En camino al punto PUDO",
+    description: "Tu set está en tránsito con Correos hacia tu punto de recogida.",
     icon: Truck,
   },
   {
-    key: "delivered",
+    key: "delivered_pudo",
+    label: "Disponible en PUDO",
+    description: "Tu set te espera en el punto de recogida. ¡Ve a recogerlo!",
+    icon: MapPin,
+  },
+  {
+    key: "delivered_user",
     label: "Entregado",
     description: "Set entregado. ¡Disfrútalo!",
     icon: Home,
@@ -59,21 +67,21 @@ const OUTBOUND_STEPS: TimelineStep[] = [
 
 const RETURN_STEPS: TimelineStep[] = [
   {
-    key: "return_requested",
-    label: "Devolución solicitada",
-    description: "Hemos generado tu etiqueta de devolución.",
-    icon: RotateCcw,
+    key: "in_return_pudo",
+    label: "Depositado en PUDO",
+    description: "El set ha sido depositado en el punto PUDO. Esperando recogida.",
+    icon: MapPin,
   },
   {
-    key: "return_in_transit",
-    label: "Devolución en tránsito",
-    description: "El set está de camino a nuestro almacén.",
+    key: "in_return",
+    label: "En tránsito (retorno)",
+    description: "El set está en camino desde el PUDO hacia nuestro almacén.",
     icon: Truck,
   },
   {
     key: "returned",
     label: "Devolución completada",
-    description: "Hemos recibido el set. ¡Gracias!",
+    description: "Hemos recibido el set en nuestro almacén. ¡Gracias!",
     icon: CheckCircle2,
   },
 ];
@@ -86,10 +94,10 @@ function getOutboundStepState(
   stepKey: ShipmentStatus,
   currentStatus: ShipmentStatus
 ): StepState {
-  const order: ShipmentStatus[] = ["pending", "prepared", "in_transit", "delivered"];
+  const order: ShipmentStatus[] = ["pending", "prepared", "in_transit_pudo", "delivered_pudo", "delivered_user"];
   const returnOrder: ShipmentStatus[] = [
-    "return_requested",
-    "return_in_transit",
+    "in_return_pudo",
+    "in_return",
     "returned",
   ];
 
@@ -109,8 +117,8 @@ function getReturnStepState(
   currentStatus: ShipmentStatus
 ): StepState {
   const order: ShipmentStatus[] = [
-    "return_requested",
-    "return_in_transit",
+    "in_return_pudo",
+    "in_return",
     "returned",
   ];
   const stepIdx = order.indexOf(stepKey);
@@ -233,8 +241,8 @@ export function ShipmentTimeline({
   className,
 }: ShipmentTimelineProps) {
   const isReturnPhase = [
-    "return_requested",
-    "return_in_transit",
+    "in_return_pudo",
+    "in_return",
     "returned",
   ].includes(status);
 
@@ -270,7 +278,7 @@ export function ShipmentTimeline({
       </div>
 
       {/* Tracking code */}
-      {trackingCode && ["in_transit", "delivered"].includes(status) && (
+      {trackingCode && ["in_transit_pudo", "delivered_pudo", "delivered_user"].includes(status) && (
         <div className="mx-0 mb-4 p-3 bg-blue-50 border border-blue-100 rounded-xl">
           <p className="text-[11px] font-semibold text-blue-500 uppercase tracking-wider mb-1">
             Código de seguimiento Correos

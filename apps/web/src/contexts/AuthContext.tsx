@@ -35,6 +35,10 @@ interface AuthContextType {
   updateUserPassword: (password: string) => Promise<{ error: Error | null }>;
   deleteUserAccount: () => Promise<{ error: Error | null }>;
   updateProfile: (data: Partial<Profile>) => Promise<{ error: Error | null }>;
+  openAuthModal: (mode?: "login" | "signup" | "forgot-password") => void;
+  closeAuthModal: () => void;
+  isAuthModalOpen: boolean;
+  authModalMode: "login" | "signup" | "forgot-password";
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -46,6 +50,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isOperador, setIsOperador] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState<"login" | "signup" | "forgot-password">("login");
 
   const fetchProfile = async (userId: string) => {
     const { data, error } = await supabase
@@ -162,7 +168,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const resetPassword = async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth?type=recovery`,
+      redirectTo: `${window.location.origin}/?type=recovery`,
     });
     return { error: error as Error | null };
   };
@@ -176,18 +182,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!user) return { error: new Error("No user logged in") };
 
     try {
-      // Call the edge function that properly deletes all user data and auth record
+      // Call the edge function that deactivates the account (soft-delete)
       const { data, error } = await supabase.functions.invoke('delete-user');
 
       if (error) {
-        return { error: new Error(error.message || 'Failed to delete account') };
+        return { error: new Error(error.message || 'Failed to deactivate account') };
       }
 
       if (data?.error) {
         return { error: new Error(data.error) };
       }
 
-      // Clear local state after successful deletion
+      // Sign out and clear local state after successful deactivation
+      await supabase.auth.signOut();
       setUser(null);
       setSession(null);
       setProfile(null);
@@ -221,6 +228,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { error: error as Error | null };
   };
 
+  const openAuthModal = (mode: "login" | "signup" | "forgot-password" = "login") => {
+    setAuthModalMode(mode);
+    setIsAuthModalOpen(true);
+  };
+
+  const closeAuthModal = () => {
+    setIsAuthModalOpen(false);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -239,6 +255,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         updateUserPassword,
         deleteUserAccount,
         updateProfile,
+        openAuthModal,
+        closeAuthModal,
+        isAuthModalOpen,
+        authModalMode,
       }}
     >
       {children}

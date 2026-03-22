@@ -6,6 +6,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ProductCard from "@/components/ProductCard";
 import ProductRow from "@/components/ProductRow";
+import DeleteAccountDialog from "@/components/DeleteAccountDialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -67,6 +68,7 @@ const Dashboard = () => {
 
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [selectedEnvioId, setSelectedEnvioId] = useState<string | null>(null);
+  const [deleteAccountDialogOpen, setDeleteAccountDialogOpen] = useState(false);
 
   const handleReturnClick = (envioId: string) => {
     setSelectedEnvioId(envioId);
@@ -90,7 +92,7 @@ const Dashboard = () => {
   useEffect(() => {
     if (!authLoading) {
       if (!user) {
-        navigate("/auth");
+        navigate("/");
       } else if (isAdmin) {
         navigate("/admin");
       } else if (isOperador) {
@@ -294,11 +296,12 @@ const Dashboard = () => {
                           const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
                             pending: { label: "Pendiente", variant: "outline" },
                             preparation: { label: "En Preparación", variant: "outline" },
-                            assigned: { label: "Asignado", variant: "outline" },
-                            in_transit: { label: "En Ruta (Envío)", variant: "default" },
-                            delivered: { label: "Entregado", variant: "default" },
+                            in_transit_pudo: { label: "En Ruta al PUDO", variant: "default" },
+                            delivered_pudo: { label: "En PUDO", variant: "default" },
+                            delivered_user: { label: "Entregado", variant: "default" },
+                            in_return_pudo: { label: "Devolución en PUDO", variant: "secondary" },
+                            in_return: { label: "En Retorno", variant: "secondary" },
                             returned: { label: "Devuelto", variant: "secondary" },
-                            return_in_transit: { label: "En Ruta (Devolución)", variant: "secondary" },
                             cancelled: { label: "Cancelado", variant: "destructive" },
                           };
                           const config = statusConfig[status] || { label: status, variant: "outline" };
@@ -316,7 +319,7 @@ const Dashboard = () => {
                         };
 
                         // Only the most recent order (index 0) can be returned, and only if it's delivered
-                        const canReturn = index === 0 && order.shipment_status === 'delivered';
+                        const canReturn = index === 0 && order.shipment_status === 'delivered_user';
 
                         return (
                           <tr key={order.id} className="hover:bg-muted/50 transition-colors">
@@ -522,25 +525,19 @@ const Dashboard = () => {
                   <AlertTriangle className="h-6 w-6" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-foreground mb-1">Zona de Peligro</h3>
+                  <h3 className="font-semibold text-foreground mb-1">Dar de baja mi cuenta</h3>
                   <p className="text-sm text-muted-foreground max-w-md">
-                    Al eliminar tu cuenta, todos tus datos personales, wishlist e historial de suscripción se borrarán de forma permanente. Esta acción no se puede deshacer.
+                    Al dar de baja tu cuenta, tu suscripción será cancelada y no podrás acceder a tu perfil. Tus datos se conservarán durante 30 días por si deseas reactivar la cuenta.
                   </p>
                 </div>
               </div>
               <Button
                 variant="destructive"
-                onClick={async () => {
-                  if (confirm("¿Estás seguro de que deseas eliminar tu cuenta? Esta acción es irreversible.")) {
-                    const { error } = await deleteUserAccount();
-                    if (error) {
-                      alert("Error al eliminar la cuenta: " + error.message);
-                    }
-                  }
-                }}
+                onClick={() => setDeleteAccountDialogOpen(true)}
                 className="shrink-0"
               >
-                Eliminar Cuenta Permanente
+                <Trash2 className="h-4 w-4 mr-2" />
+                Dar de baja
               </Button>
             </div>
           </motion.div>
@@ -558,6 +555,22 @@ const Dashboard = () => {
         onSelect={handlePudoSelect}
         initialZipCode={profile?.zip_code || undefined}
         initialAddress={profile?.address || undefined}
+      />
+
+      <DeleteAccountDialog
+        open={deleteAccountDialogOpen}
+        onOpenChange={setDeleteAccountDialogOpen}
+        subscriptionType={profile?.subscription_type}
+        onConfirm={async () => {
+          const { error } = await deleteUserAccount();
+          if (error) {
+            toast.error("Error al dar de baja la cuenta: " + error.message);
+          } else {
+            toast.success("Tu cuenta ha sido dada de baja correctamente. Recibirás un email de confirmación.");
+            setDeleteAccountDialogOpen(false);
+            navigate("/");
+          }
+        }}
       />
 
       <AlertDialog open={returnDialogOpen} onOpenChange={setReturnDialogOpen}>

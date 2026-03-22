@@ -43,13 +43,13 @@ const ProductCard = ({
   onWishlistToggle,
 }: SetCardProps) => {
   const [isToggling, setIsToggling] = useState(false);
-  const { user } = useAuth();
+  const { user, openAuthModal } = useAuth();
   const navigate = useNavigate();
 
   const handleWishlistClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!user) {
-      navigate("/auth");
+      openAuthModal("login");
       return;
     }
 

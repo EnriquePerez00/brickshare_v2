@@ -63,8 +63,8 @@ function buildEmail(payload: EmailPayload): { subject: string; html: string } {
           <h1>Novedad en tu envío 📦</h1>
           <p>El set <strong>${d.set_name ?? ""}</strong> ha cambiado de estado:</p>
           <p style="font-size:18px;font-weight:bold;color:#e63946;">${d.status_label ?? ""}</p>
-          ${d.status === "delivered" ? `<p>¡Ya puedes recoger tu set en <strong>${d.pudo_name ?? "tu punto de entrega"}</strong>!</p>` : ""}
-          ${d.status === "return_in_transit" ? `<p>Por favor, lleva el set a <strong>${d.pudo_name ?? "tu punto PUDO"}</strong> para completar la devolución.</p>` : ""}
+          ${d.status === "delivered_pudo" ? `<p>¡Ya puedes recoger tu set en <strong>${d.pudo_name ?? "tu punto de entrega"}</strong>!</p>` : ""}
+          ${d.status === "in_return_pudo" ? `<p>Por favor, lleva el set a <strong>${d.pudo_name ?? "tu punto PUDO"}</strong> para completar la devolución.</p>` : ""}
           <a href="https://brickshare.es/dashboard?tab=envios" style="display:inline-block;padding:12px 24px;background:#e63946;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;">
             Ver mis envíos
           </a>

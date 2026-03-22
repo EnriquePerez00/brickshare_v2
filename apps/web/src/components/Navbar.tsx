@@ -14,7 +14,7 @@ import {
 
 const Navbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { user, profile, signOut, isAdmin, isOperador } = useAuth();
+  const { user, profile, signOut, isAdmin, isOperador, openAuthModal } = useAuth();
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
@@ -123,14 +123,23 @@ const Navbar = () => {
               </DropdownMenu>
             ) : (
               <>
-                <Button variant="ghost" size="sm" asChild>
-                  <Link to="/auth" data-testid="login-link">Iniciar sesión</Link>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => openAuthModal("login")}
+                  data-testid="login-link"
+                >
+                  Iniciar sesión
                 </Button>
-                <Button size="sm" className="gradient-hero" asChild>
-                  <Link to="/auth" data-testid="register-link" aria-label="Registrarse">
-                    <User className="h-4 w-4 mr-2" />
-                    Suscribirse
-                  </Link>
+                <Button 
+                  size="sm" 
+                  className="gradient-hero" 
+                  onClick={() => openAuthModal("signup")}
+                  data-testid="register-link" 
+                  aria-label="Registrarse"
+                >
+                  <User className="h-4 w-4 mr-2" />
+                  Suscribirse
                 </Button>
               </>
             )}
@@ -236,16 +245,29 @@ const Navbar = () => {
                 </>
               ) : (
                 <>
-                  <Button variant="outline" size="sm" asChild>
-                    <Link to="/auth" data-testid="login-link-mobile" onClick={() => setMobileMenuOpen(false)}>
-                      Iniciar sesión
-                    </Link>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      openAuthModal("login");
+                    }}
+                    data-testid="login-link-mobile"
+                  >
+                    Iniciar sesión
                   </Button>
-                  <Button size="sm" className="gradient-hero" asChild>
-                    <Link to="/auth" data-testid="register-link-mobile" onClick={() => setMobileMenuOpen(false)} aria-label="Registrarse">
-                      <User className="h-4 w-4 mr-2" />
-                      Suscribirse
-                    </Link>
+                  <Button 
+                    size="sm" 
+                    className="gradient-hero" 
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      openAuthModal("signup");
+                    }}
+                    data-testid="register-link-mobile" 
+                    aria-label="Registrarse"
+                  >
+                    <User className="h-4 w-4 mr-2" />
+                    Suscribirse
                   </Button>
                 </>
               )}

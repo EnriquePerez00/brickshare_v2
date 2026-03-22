@@ -54,7 +54,7 @@ export const useReturnSet = () => {
         mutationFn: async (envioId: string) => {
             const { error: dbError } = await supabase
                 .from("shipments" as any)
-                .update({ shipment_status: "return_in_transit" } as any)
+                .update({ shipment_status: "in_return_pudo" } as any)
                 .eq("id", envioId);
 
             if (dbError) throw dbError;
