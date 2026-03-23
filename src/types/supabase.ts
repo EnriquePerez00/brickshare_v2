@@ -114,222 +114,66 @@ export type Database = {
       }
       donations: {
         Row: {
-          co2_evitado: number
+          address: string | null
+          children_benefited: number
+          co2_avoided: number
           created_at: string
-          direccion: string | null
+          delivery_method: string
           email: string
+          estimated_weight: number
           id: string
-          metodo_entrega: string
-          ninos_beneficiados: number
-          nombre: string
-          peso_estimado: number
-          recompensa: string
+          name: string
+          phone: string | null
+          reward: string
           status: string
-          telefono: string | null
           tracking_code: string | null
           updated_at: string
           user_id: string | null
         }
         Insert: {
-          co2_evitado: number
+          address?: string | null
+          children_benefited: number
+          co2_avoided: number
           created_at?: string
-          direccion?: string | null
+          delivery_method: string
           email: string
+          estimated_weight: number
           id?: string
-          metodo_entrega: string
-          ninos_beneficiados: number
-          nombre: string
-          peso_estimado: number
-          recompensa: string
+          name: string
+          phone?: string | null
+          reward: string
           status?: string
-          telefono?: string | null
           tracking_code?: string | null
           updated_at?: string
           user_id?: string | null
         }
         Update: {
-          co2_evitado?: number
+          address?: string | null
+          children_benefited?: number
+          co2_avoided?: number
           created_at?: string
-          direccion?: string | null
+          delivery_method?: string
           email?: string
+          estimated_weight?: number
           id?: string
-          metodo_entrega?: string
-          ninos_beneficiados?: number
-          nombre?: string
-          peso_estimado?: number
-          recompensa?: string
+          name?: string
+          phone?: string | null
+          reward?: string
           status?: string
-          telefono?: string | null
           tracking_code?: string | null
           updated_at?: string
           user_id?: string | null
         }
         Relationships: []
       }
-      shipments: {
-        Row: {
-          brickshare_metadata: Json | null
-          brickshare_package_id: string | null
-          brickshare_pudo_id: string | null
-          shipping_city: string
-          shipping_postal_code: string
-          correos_shipment_id: string | null
-          created_at: string
-          delivery_qr_code: string | null
-          delivery_qr_expires_at: string | null
-          delivery_validated_at: string | null
-          shipping_address: string
-          pickup_provider_address: string | null
-          shipment_status: string
-          handling_status: boolean | null
-          assigned_date: string | null
-          estimated_return_date: string | null
-          delivery_date: string | null
-          actual_delivery_date: string | null
-          user_delivery_date: string | null
-          warehouse_reception_date: string | null
-          warehouse_pickup_date: string | null
-          return_request_date: string | null
-          id: string
-          label_url: string | null
-          last_tracking_update: string | null
-          additional_notes: string | null
-          tracking_number: string | null
-          shipping_country: string
-          pickup_id: string | null
-          pickup_type: string | null
-          shipping_provider: string | null
-          pickup_provider: string | null
-          return_qr_code: string | null
-          return_qr_expires_at: string | null
-          return_validated_at: string | null
-          set_id: string | null
-          set_ref: string | null
-          swikly_deposit_amount: number | null
-          swikly_status: string | null
-          swikly_wish_id: string | null
-          swikly_wish_url: string | null
-          carrier: string | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          brickshare_metadata?: Json | null
-          brickshare_package_id?: string | null
-          brickshare_pudo_id?: string | null
-          shipping_city: string
-          shipping_postal_code: string
-          correos_shipment_id?: string | null
-          created_at?: string
-          delivery_qr_code?: string | null
-          delivery_qr_expires_at?: string | null
-          delivery_validated_at?: string | null
-          shipping_address: string
-          pickup_provider_address?: string | null
-          shipment_status?: string
-          handling_status?: boolean | null
-          assigned_date?: string | null
-          estimated_return_date?: string | null
-          delivery_date?: string | null
-          actual_delivery_date?: string | null
-          user_delivery_date?: string | null
-          warehouse_reception_date?: string | null
-          warehouse_pickup_date?: string | null
-          return_request_date?: string | null
-          id?: string
-          label_url?: string | null
-          last_tracking_update?: string | null
-          additional_notes?: string | null
-          tracking_number?: string | null
-          shipping_country?: string
-          pickup_id?: string | null
-          pickup_type?: string | null
-          shipping_provider?: string | null
-          pickup_provider?: string | null
-          return_qr_code?: string | null
-          return_qr_expires_at?: string | null
-          return_validated_at?: string | null
-          set_id?: string | null
-          set_ref?: string | null
-          swikly_deposit_amount?: number | null
-          swikly_status?: string | null
-          swikly_wish_id?: string | null
-          swikly_wish_url?: string | null
-          carrier?: string | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          brickshare_metadata?: Json | null
-          brickshare_package_id?: string | null
-          brickshare_pudo_id?: string | null
-          shipping_city?: string
-          shipping_postal_code?: string
-          correos_shipment_id?: string | null
-          created_at?: string
-          delivery_qr_code?: string | null
-          delivery_qr_expires_at?: string | null
-          delivery_validated_at?: string | null
-          shipping_address?: string
-          pickup_provider_address?: string | null
-          shipment_status?: string
-          handling_status?: boolean | null
-          assigned_date?: string | null
-          estimated_return_date?: string | null
-          delivery_date?: string | null
-          actual_delivery_date?: string | null
-          user_delivery_date?: string | null
-          warehouse_reception_date?: string | null
-          warehouse_pickup_date?: string | null
-          return_request_date?: string | null
-          id?: string
-          label_url?: string | null
-          last_tracking_update?: string | null
-          additional_notes?: string | null
-          tracking_number?: string | null
-          shipping_country?: string
-          pickup_id?: string | null
-          pickup_type?: string | null
-          shipping_provider?: string | null
-          pickup_provider?: string | null
-          return_qr_code?: string | null
-          return_qr_expires_at?: string | null
-          return_validated_at?: string | null
-          set_id?: string | null
-          set_ref?: string | null
-          swikly_deposit_amount?: number | null
-          swikly_status?: string | null
-          swikly_wish_id?: string | null
-          swikly_wish_url?: string | null
-          carrier?: string | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "shipments_set_id_fkey"
-            columns: ["set_id"]
-            isOneToOne: false
-            referencedRelation: "sets"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "shipments_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["user_id"]
-          },
-        ]
-      }
       inventory_sets: {
         Row: {
           created_at: string
+          id: string
+          in_repair: number
           in_return: number
           in_shipping: number
-          in_repair: number
           in_use: number
-          id: string
           inventory_set_total_qty: number
           set_id: string
           set_ref: string | null
@@ -338,11 +182,11 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          id?: string
+          in_repair?: number
           in_return?: number
           in_shipping?: number
-          in_repair?: number
           in_use?: number
-          id?: string
           inventory_set_total_qty?: number
           set_id: string
           set_ref?: string | null
@@ -351,11 +195,11 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          id?: string
+          in_repair?: number
           in_return?: number
           in_shipping?: number
-          in_repair?: number
           in_use?: number
-          id?: string
           inventory_set_total_qty?: number
           set_id?: string
           set_ref?: string | null
@@ -364,110 +208,13 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "inventario_sets_set_id_fkey"
+            foreignKeyName: "inventory_sets_set_id_fkey"
             columns: ["set_id"]
             isOneToOne: true
             referencedRelation: "sets"
             referencedColumns: ["id"]
           },
         ]
-      }
-      reception_operations: {
-        Row: {
-          created_at: string
-          event_id: string | null
-          id: string
-          missing_parts: string | null
-          set_id: string
-          reception_status: boolean
-          updated_at: string
-          user_id: string
-          weight_measured: number | null
-        }
-        Insert: {
-          created_at?: string
-          event_id?: string | null
-          id?: string
-          missing_parts?: string | null
-          set_id: string
-          reception_status?: boolean
-          updated_at?: string
-          user_id: string
-          weight_measured?: number | null
-        }
-        Update: {
-          created_at?: string
-          event_id?: string | null
-          id?: string
-          missing_parts?: string | null
-          set_id?: string
-          reception_status?: boolean
-          updated_at?: string
-          user_id?: string
-          weight_measured?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "reception_operations_event_id_fkey"
-            columns: ["event_id"]
-            isOneToOne: false
-            referencedRelation: "brickshare_pudo_shipments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "reception_operations_event_id_fkey"
-            columns: ["event_id"]
-            isOneToOne: false
-            referencedRelation: "shipments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "reception_operations_set_id_fkey"
-            columns: ["set_id"]
-            isOneToOne: false
-            referencedRelation: "sets"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      profiles: {
-        Row: {
-          avatar_url: string | null
-          created_at: string
-          full_name: string | null
-          id: string
-          impact_points: number | null
-          referral_code: string | null
-          referral_credits: number
-          referred_by: string | null
-          sub_status: string | null
-          updated_at: string
-        }
-        Insert: {
-          avatar_url?: string | null
-          created_at?: string
-          full_name?: string | null
-          id: string
-          impact_points?: number | null
-          referral_code?: string | null
-          referral_credits?: number
-          referred_by?: string | null
-          sub_status?: string | null
-          updated_at?: string
-        }
-        Update: {
-          avatar_url?: string | null
-          created_at?: string
-          full_name?: string | null
-          id?: string
-          impact_points?: number | null
-          referral_code?: string | null
-          referral_credits?: number
-          referred_by?: string | null
-          sub_status?: string | null
-          updated_at?: string
-        }
-        Relationships: []
       }
       qr_validation_logs: {
         Row: {
@@ -520,6 +267,64 @@ export type Database = {
           },
         ]
       }
+      reception_operations: {
+        Row: {
+          created_at: string
+          event_id: string | null
+          id: string
+          missing_parts: string | null
+          reception_completed: boolean
+          set_id: string
+          updated_at: string
+          user_id: string
+          weight_measured: number | null
+        }
+        Insert: {
+          created_at?: string
+          event_id?: string | null
+          id?: string
+          missing_parts?: string | null
+          reception_completed?: boolean
+          set_id: string
+          updated_at?: string
+          user_id: string
+          weight_measured?: number | null
+        }
+        Update: {
+          created_at?: string
+          event_id?: string | null
+          id?: string
+          missing_parts?: string | null
+          reception_completed?: boolean
+          set_id?: string
+          updated_at?: string
+          user_id?: string
+          weight_measured?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operaciones_recepcion_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "brickshare_pudo_shipments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operaciones_recepcion_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operaciones_recepcion_set_id_fkey"
+            columns: ["set_id"]
+            isOneToOne: false
+            referencedRelation: "sets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       referrals: {
         Row: {
           created_at: string
@@ -562,7 +367,7 @@ export type Database = {
           comment: string | null
           created_at: string
           difficulty: number | null
-          shipment_id: string | null
+          envio_id: string | null
           id: string
           is_published: boolean
           rating: number
@@ -576,7 +381,7 @@ export type Database = {
           comment?: string | null
           created_at?: string
           difficulty?: number | null
-          shipment_id?: string | null
+          envio_id?: string | null
           id?: string
           is_published?: boolean
           rating: number
@@ -590,7 +395,7 @@ export type Database = {
           comment?: string | null
           created_at?: string
           difficulty?: number | null
-          shipment_id?: string | null
+          envio_id?: string | null
           id?: string
           is_published?: boolean
           rating?: number
@@ -601,15 +406,15 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "reviews_shipment_id_fkey"
-            columns: ["shipment_id"]
+            foreignKeyName: "reviews_envio_id_fkey"
+            columns: ["envio_id"]
             isOneToOne: false
             referencedRelation: "brickshare_pudo_shipments"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "reviews_shipment_id_fkey"
-            columns: ["shipment_id"]
+            foreignKeyName: "reviews_envio_id_fkey"
+            columns: ["envio_id"]
             isOneToOne: false
             referencedRelation: "shipments"
             referencedColumns: ["id"]
@@ -778,6 +583,162 @@ export type Database = {
         }
         Relationships: []
       }
+      shipments: {
+        Row: {
+          actual_delivery_date: string | null
+          additional_notes: string | null
+          assigned_date: string | null
+          brickshare_metadata: Json | null
+          brickshare_package_id: string | null
+          brickshare_pudo_id: string | null
+          carrier: string | null
+          correos_shipment_id: string | null
+          created_at: string
+          delivery_qr_code: string | null
+          delivery_qr_expires_at: string | null
+          delivery_validated_at: string | null
+          estimated_delivery_date: string | null
+          estimated_return_date: string | null
+          handling_processed: boolean | null
+          id: string
+          label_url: string | null
+          last_tracking_update: string | null
+          pickup_id: string | null
+          pickup_provider: string | null
+          pickup_provider_address: string | null
+          pickup_type: string | null
+          return_qr_code: string | null
+          return_qr_expires_at: string | null
+          return_request_date: string | null
+          return_validated_at: string | null
+          set_id: string | null
+          set_ref: string | null
+          shipment_status: string
+          shipping_address: string
+          shipping_city: string
+          shipping_country: string
+          shipping_provider: string | null
+          shipping_zip_code: string
+          swikly_deposit_amount: number | null
+          swikly_status: string | null
+          swikly_wish_id: string | null
+          swikly_wish_url: string | null
+          tracking_number: string | null
+          updated_at: string
+          user_delivery_date: string | null
+          user_id: string
+          warehouse_pickup_date: string | null
+          warehouse_reception_date: string | null
+        }
+        Insert: {
+          actual_delivery_date?: string | null
+          additional_notes?: string | null
+          assigned_date?: string | null
+          brickshare_metadata?: Json | null
+          brickshare_package_id?: string | null
+          brickshare_pudo_id?: string | null
+          carrier?: string | null
+          correos_shipment_id?: string | null
+          created_at?: string
+          delivery_qr_code?: string | null
+          delivery_qr_expires_at?: string | null
+          delivery_validated_at?: string | null
+          estimated_delivery_date?: string | null
+          estimated_return_date?: string | null
+          handling_processed?: boolean | null
+          id?: string
+          label_url?: string | null
+          last_tracking_update?: string | null
+          pickup_id?: string | null
+          pickup_provider?: string | null
+          pickup_provider_address?: string | null
+          pickup_type?: string | null
+          return_qr_code?: string | null
+          return_qr_expires_at?: string | null
+          return_request_date?: string | null
+          return_validated_at?: string | null
+          set_id?: string | null
+          set_ref?: string | null
+          shipment_status?: string
+          shipping_address: string
+          shipping_city: string
+          shipping_country?: string
+          shipping_provider?: string | null
+          shipping_zip_code: string
+          swikly_deposit_amount?: number | null
+          swikly_status?: string | null
+          swikly_wish_id?: string | null
+          swikly_wish_url?: string | null
+          tracking_number?: string | null
+          updated_at?: string
+          user_delivery_date?: string | null
+          user_id: string
+          warehouse_pickup_date?: string | null
+          warehouse_reception_date?: string | null
+        }
+        Update: {
+          actual_delivery_date?: string | null
+          additional_notes?: string | null
+          assigned_date?: string | null
+          brickshare_metadata?: Json | null
+          brickshare_package_id?: string | null
+          brickshare_pudo_id?: string | null
+          carrier?: string | null
+          correos_shipment_id?: string | null
+          created_at?: string
+          delivery_qr_code?: string | null
+          delivery_qr_expires_at?: string | null
+          delivery_validated_at?: string | null
+          estimated_delivery_date?: string | null
+          estimated_return_date?: string | null
+          handling_processed?: boolean | null
+          id?: string
+          label_url?: string | null
+          last_tracking_update?: string | null
+          pickup_id?: string | null
+          pickup_provider?: string | null
+          pickup_provider_address?: string | null
+          pickup_type?: string | null
+          return_qr_code?: string | null
+          return_qr_expires_at?: string | null
+          return_request_date?: string | null
+          return_validated_at?: string | null
+          set_id?: string | null
+          set_ref?: string | null
+          shipment_status?: string
+          shipping_address?: string
+          shipping_city?: string
+          shipping_country?: string
+          shipping_provider?: string | null
+          shipping_zip_code?: string
+          swikly_deposit_amount?: number | null
+          swikly_status?: string | null
+          swikly_wish_id?: string | null
+          swikly_wish_url?: string | null
+          tracking_number?: string | null
+          updated_at?: string
+          user_delivery_date?: string | null
+          user_id?: string
+          warehouse_pickup_date?: string | null
+          warehouse_reception_date?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "envios_set_id_fkey"
+            columns: ["set_id"]
+            isOneToOne: false
+            referencedRelation: "sets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "envios_user_id_fkey_public_users"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       shipping_orders: {
         Row: {
           created_at: string | null
@@ -858,6 +819,9 @@ export type Database = {
           phone: string | null
           profile_completed: boolean | null
           province: string | null
+          referral_code: string | null
+          referral_credits: number
+          referred_by: string | null
           stripe_customer_id: string | null
           subscription_status: string | null
           subscription_type: string | null
@@ -879,6 +843,9 @@ export type Database = {
           phone?: string | null
           profile_completed?: boolean | null
           province?: string | null
+          referral_code?: string | null
+          referral_credits?: number
+          referred_by?: string | null
           stripe_customer_id?: string | null
           subscription_status?: string | null
           subscription_type?: string | null
@@ -900,6 +867,9 @@ export type Database = {
           phone?: string | null
           profile_completed?: boolean | null
           province?: string | null
+          referral_code?: string | null
+          referral_credits?: number
+          referred_by?: string | null
           stripe_customer_id?: string | null
           subscription_status?: string | null
           subscription_type?: string | null
@@ -913,84 +883,84 @@ export type Database = {
       users_correos_dropping: {
         Row: {
           correos_accessibility: boolean | null
-          correos_locker_capacity: number | null
-          correos_city: string
-          correos_internal_code: string | null
-          correos_zip_code: string
-          correos_street: string
-          correos_full_address: string
-          correos_street_number: string | null
+          correos_additional_services: string[] | null
           correos_available: boolean
+          correos_city: string
+          correos_country: string
           correos_email: string | null
-          correos_selection_date: string
-          correos_opening_hours: string | null
-          correos_structured_hours: Json | null
+          correos_full_address: string
           correos_id_pudo: string
+          correos_internal_code: string | null
           correos_latitude: number
+          correos_locker_capacity: number | null
           correos_longitude: number
           correos_name: string
-          correos_country: string
+          correos_opening_hours: string | null
           correos_parking: boolean | null
-          correos_province: string
-          correos_additional_services: string[] | null
           correos_phone: string | null
           correos_point_type: string
+          correos_province: string
+          correos_selection_date: string
+          correos_street: string
+          correos_street_number: string | null
+          correos_structured_hours: Json | null
+          correos_zip_code: string
           created_at: string
           updated_at: string
           user_id: string
         }
         Insert: {
           correos_accessibility?: boolean | null
-          correos_locker_capacity?: number | null
-          correos_city: string
-          correos_internal_code?: string | null
-          correos_zip_code: string
-          correos_street: string
-          correos_full_address: string
-          correos_street_number?: string | null
+          correos_additional_services?: string[] | null
           correos_available?: boolean
+          correos_city: string
+          correos_country?: string
           correos_email?: string | null
-          correos_selection_date?: string
-          correos_opening_hours?: string | null
-          correos_structured_hours?: Json | null
+          correos_full_address: string
           correos_id_pudo: string
+          correos_internal_code?: string | null
           correos_latitude: number
+          correos_locker_capacity?: number | null
           correos_longitude: number
           correos_name: string
-          correos_country?: string
+          correos_opening_hours?: string | null
           correos_parking?: boolean | null
-          correos_province: string
-          correos_additional_services?: string[] | null
           correos_phone?: string | null
           correos_point_type: string
+          correos_province: string
+          correos_selection_date?: string
+          correos_street: string
+          correos_street_number?: string | null
+          correos_structured_hours?: Json | null
+          correos_zip_code: string
           created_at?: string
           updated_at?: string
           user_id: string
         }
         Update: {
           correos_accessibility?: boolean | null
-          correos_locker_capacity?: number | null
-          correos_city?: string
-          correos_internal_code?: string | null
-          correos_zip_code?: string
-          correos_street?: string
-          correos_full_address?: string
-          correos_street_number?: string | null
+          correos_additional_services?: string[] | null
           correos_available?: boolean
+          correos_city?: string
+          correos_country?: string
           correos_email?: string | null
-          correos_selection_date?: string
-          correos_opening_hours?: string | null
-          correos_structured_hours?: Json | null
+          correos_full_address?: string
           correos_id_pudo?: string
+          correos_internal_code?: string | null
           correos_latitude?: number
+          correos_locker_capacity?: number | null
           correos_longitude?: number
           correos_name?: string
-          correos_country?: string
+          correos_opening_hours?: string | null
           correos_parking?: boolean | null
-          correos_province?: string
-          correos_additional_services?: string[] | null
           correos_phone?: string | null
           correos_point_type?: string
+          correos_province?: string
+          correos_selection_date?: string
+          correos_street?: string
+          correos_street_number?: string | null
+          correos_structured_hours?: Json | null
+          correos_zip_code?: string
           created_at?: string
           updated_at?: string
           user_id?: string
@@ -1082,7 +1052,7 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "shipments_user_id_fkey"
+            foreignKeyName: "envios_user_id_fkey_public_users"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
@@ -1131,24 +1101,11 @@ export type Database = {
       }
     }
     Functions: {
-      assign_sets_to_users: {
-        Args: never
-        Returns: {
-          created_at: string
-          shipment_id: string
-          order_id: string
-          set_id: string
-          set_name: string
-          set_ref: string
-          user_id: string
-          user_name: string
-        }[]
-      }
       confirm_assign_sets_to_users: {
         Args: { p_user_ids: string[] }
         Returns: {
           created_at: string
-          shipment_id: string
+          envio_id: string
           order_id: string
           pudo_address: string
           pudo_city: string
@@ -1387,3 +1344,4 @@ export const Constants = {
     },
   },
 } as const
+

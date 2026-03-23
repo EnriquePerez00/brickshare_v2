@@ -1,0 +1,37 @@
+project_id = "brickshare_main"
+
+# MAIN ENVIRONMENT PORTS
+[api]
+port = 54321
+schemas = ["public", "graphql_public"]
+max_rows = 1000
+
+[db]
+port = 5432
+# shadow_port is used for automatic migrations
+shadow_port = 54320
+
+[studio]
+port = 54323
+
+[inbucket]
+port = 54324
+
+# Edge Functions configuration
+[functions.delete-user]
+verify_jwt = true
+
+[functions.submit-donation]
+verify_jwt = false
+
+[functions.change-subscription]
+verify_jwt = true
+
+[functions.add-lego-set]
+verify_jwt = false
+
+[functions.correos-pudo]
+verify_jwt = false
+
+[functions.brickman-chat]
+verify_jwt = false

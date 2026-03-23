@@ -17,7 +17,13 @@
     "lint:web": "npm run lint -w @brickshare/web",
     "test": "npm run test -w @brickshare/web",
     "test:watch": "npm run test:watch -w @brickshare/web",
-    "dump-schema": "bash scripts/update-schema-docs.sh"
+    "dump-schema": "bash scripts/update-schema-docs.sh",
+    "supabase:start": "bash scripts/supabase-environments.sh start",
+    "supabase:stop": "bash scripts/supabase-environments.sh stop",
+    "supabase:status": "bash scripts/supabase-environments.sh status",
+    "supabase:reset": "bash scripts/supabase-environments.sh reset",
+    "supabase:dump": "bash scripts/supabase-environments.sh dump",
+    "supabase:help": "bash scripts/supabase-environments.sh help"
   },
   "engines": {
     "node": ">=18"

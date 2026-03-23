@@ -1,5 +1,23 @@
 project_id = "tevoogkifiszfontzkgd"
 
+# DEVELOP ENVIRONMENT PORTS
+[api]
+port = 54331
+schemas = ["public", "graphql_public"]
+max_rows = 1000
+
+[db]
+port = 5433
+# shadow_port is used for automatic migrations
+shadow_port = 54330
+
+[studio]
+port = 54333
+
+[inbucket]
+port = 54334
+
+# Edge Functions configuration
 [functions.delete-user]
 verify_jwt = true
 

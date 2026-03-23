@@ -441,6 +441,12 @@ Output format is unaligned.
 **Retorna**: `TABLE(qr_code text, expires_at timestamp with time zone)`
 
 
+### `handle_new_auth_user`
+
+**Parámetros**: Ninguno
+**Retorna**: `trigger`
+
+
 ### `handle_new_set_inventory`
 
 **Parámetros**: Ninguno
@@ -611,43 +617,43 @@ Output format is unaligned.
 
 ### sets
 
-- **update_sets_updated_at**
-  - Evento: UPDATE
-  - Timing: BEFORE
-  - Función: `EXECUTE FUNCTION update_updated_at_column()`
-
 - **on_set_created**
   - Evento: INSERT
   - Timing: AFTER
   - Función: `EXECUTE FUNCTION handle_new_set_inventory()`
 
+- **update_sets_updated_at**
+  - Evento: UPDATE
+  - Timing: BEFORE
+  - Función: `EXECUTE FUNCTION update_updated_at_column()`
+
 
 ### shipments
 
-- **on_shipment_delivered**
-  - Evento: UPDATE
-  - Timing: AFTER
-  - Función: `EXECUTE FUNCTION handle_shipment_delivered()`
-
-- **on_shipment_warehouse_received**
+- **update_shipments_updated_at**
   - Evento: UPDATE
   - Timing: BEFORE
-  - Función: `EXECUTE FUNCTION handle_shipment_warehouse_received()`
-
-- **on_shipment_return_user_status**
-  - Evento: UPDATE
-  - Timing: AFTER
-  - Función: `EXECUTE FUNCTION handle_return_user_status()`
+  - Función: `EXECUTE FUNCTION update_updated_at_column()`
 
 - **on_shipment_return_transit_inv**
   - Evento: UPDATE
   - Timing: AFTER
   - Función: `EXECUTE FUNCTION handle_shipment_return_transit_inventory()`
 
-- **update_shipments_updated_at**
+- **on_shipment_return_user_status**
+  - Evento: UPDATE
+  - Timing: AFTER
+  - Función: `EXECUTE FUNCTION handle_return_user_status()`
+
+- **on_shipment_warehouse_received**
   - Evento: UPDATE
   - Timing: BEFORE
-  - Función: `EXECUTE FUNCTION update_updated_at_column()`
+  - Función: `EXECUTE FUNCTION handle_shipment_warehouse_received()`
+
+- **on_shipment_delivered**
+  - Evento: UPDATE
+  - Timing: AFTER
+  - Función: `EXECUTE FUNCTION handle_shipment_delivered()`
 
 
 ### shipping_orders
@@ -710,12 +716,6 @@ Output format is unaligned.
 
 ### Tabla: `donations`
 
-- **Admins can manage all donations**
-  - Comando: `ALL`
-  - Roles: public
-  - Usando: `has_role(auth.uid(), 'admin'::app_role)`
-
-
 - **Authenticated users can insert their own donations**
   - Comando: `INSERT`
   - Roles: public
@@ -728,6 +728,12 @@ Output format is unaligned.
   - Usando: `((auth.uid() = user_id) OR (email = (( SELECT users.email
    FROM auth.users
   WHERE (users.id = auth.uid())))::text))`
+
+
+- **Admins can manage all donations**
+  - Comando: `ALL`
+  - Roles: public
+  - Usando: `has_role(auth.uid(), 'admin'::app_role)`
 
 
 
@@ -759,12 +765,6 @@ Output format is unaligned.
 
 ### Tabla: `reception_operations`
 
-- **Admins and operators can insert**
-  - Comando: `INSERT`
-  - Roles: authenticated
-  - Usando: `true`
-  - With check: `(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'operador'::app_role))`
-
 - **Authenticated users can read**
   - Comando: `SELECT`
   - Roles: authenticated
@@ -777,6 +777,12 @@ Output format is unaligned.
   - Usando: `(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'operador'::app_role))`
   - With check: `(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'operador'::app_role))`
 
+- **Admins and operators can insert**
+  - Comando: `INSERT`
+  - Roles: authenticated
+  - Usando: `true`
+  - With check: `(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'operador'::app_role))`
+
 
 ### Tabla: `referrals`
 
@@ -784,12 +790,6 @@ Output format is unaligned.
   - Comando: `SELECT`
   - Roles: authenticated
   - Usando: `(referee_id = auth.uid())`
-
-
-- **referrals_select_own**
-  - Comando: `SELECT`
-  - Roles: authenticated
-  - Usando: `(referrer_id = auth.uid())`
 
 
 - **referrals_admin_all**
@@ -800,8 +800,32 @@ Output format is unaligned.
   WHERE ((user_roles.user_id = auth.uid()) AND (user_roles.role = ANY (ARRAY['admin'::app_role, 'operador'::app_role])))))`
 
 
+- **referrals_select_own**
+  - Comando: `SELECT`
+  - Roles: authenticated
+  - Usando: `(referrer_id = auth.uid())`
+
+
 
 ### Tabla: `reviews`
+
+- **reviews_delete_own**
+  - Comando: `DELETE`
+  - Roles: authenticated
+  - Usando: `(auth.uid() = user_id)`
+
+
+- **reviews_insert_own**
+  - Comando: `INSERT`
+  - Roles: authenticated
+  - Usando: `true`
+  - With check: `(auth.uid() = user_id)`
+
+- **reviews_select_own**
+  - Comando: `SELECT`
+  - Roles: authenticated
+  - Usando: `(auth.uid() = user_id)`
+
 
 - **reviews_select_published**
   - Comando: `SELECT`
@@ -817,29 +841,11 @@ Output format is unaligned.
   WHERE ((user_roles.user_id = auth.uid()) AND (user_roles.role = ANY (ARRAY['admin'::app_role, 'operador'::app_role])))))`
 
 
-- **reviews_delete_own**
-  - Comando: `DELETE`
-  - Roles: authenticated
-  - Usando: `(auth.uid() = user_id)`
-
-
 - **reviews_update_own**
   - Comando: `UPDATE`
   - Roles: authenticated
   - Usando: `(auth.uid() = user_id)`
   - With check: `(auth.uid() = user_id)`
-
-- **reviews_insert_own**
-  - Comando: `INSERT`
-  - Roles: authenticated
-  - Usando: `true`
-  - With check: `(auth.uid() = user_id)`
-
-- **reviews_select_own**
-  - Comando: `SELECT`
-  - Roles: authenticated
-  - Usando: `(auth.uid() = user_id)`
-
 
 
 ### Tabla: `set_piece_list`
@@ -859,16 +865,16 @@ Output format is unaligned.
 
 ### Tabla: `sets`
 
+- **Admins can insert sets**
+  - Comando: `INSERT`
+  - Roles: public
+  - Usando: `true`
+  - With check: `has_role(auth.uid(), 'admin'::app_role)`
+
 - **Sets are viewable by everyone**
   - Comando: `SELECT`
   - Roles: public
   - Usando: `true`
-
-
-- **Admins can delete sets**
-  - Comando: `DELETE`
-  - Roles: public
-  - Usando: `has_role(auth.uid(), 'admin'::app_role)`
 
 
 - **Admins can update sets**
@@ -877,23 +883,23 @@ Output format is unaligned.
   - Usando: `has_role(auth.uid(), 'admin'::app_role)`
 
 
-- **Admins can insert sets**
-  - Comando: `INSERT`
+- **Admins can delete sets**
+  - Comando: `DELETE`
   - Roles: public
-  - Usando: `true`
-  - With check: `has_role(auth.uid(), 'admin'::app_role)`
+  - Usando: `has_role(auth.uid(), 'admin'::app_role)`
+
 
 
 ### Tabla: `shipments`
 
-- **Users can update own shipment status**
-  - Comando: `UPDATE`
-  - Roles: authenticated
+- **Users can view own shipments**
+  - Comando: `SELECT`
+  - Roles: public
   - Usando: `(auth.uid() = user_id)`
-  - With check: `((auth.uid() = user_id) AND (shipment_status = 'in_return_pudo'::text))`
 
-- **Admins and operators full access**
-  - Comando: `ALL`
+
+- **Operators can update shipments**
+  - Comando: `UPDATE`
   - Roles: public
   - Usando: `(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'operador'::app_role))`
 
@@ -904,17 +910,17 @@ Output format is unaligned.
   - Usando: `true`
   - With check: `(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'operador'::app_role))`
 
-- **Operators can update shipments**
-  - Comando: `UPDATE`
+- **Admins and operators full access**
+  - Comando: `ALL`
   - Roles: public
   - Usando: `(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'operador'::app_role))`
 
 
-- **Users can view own shipments**
-  - Comando: `SELECT`
-  - Roles: public
+- **Users can update own shipment status**
+  - Comando: `UPDATE`
+  - Roles: authenticated
   - Usando: `(auth.uid() = user_id)`
-
+  - With check: `((auth.uid() = user_id) AND (shipment_status = 'in_return_pudo'::text))`
 
 
 ### Tabla: `shipping_orders`
@@ -928,29 +934,53 @@ Output format is unaligned.
 
 ### Tabla: `user_roles`
 
-- **Users can view their own roles**
-  - Comando: `SELECT`
-  - Roles: authenticated
-  - Usando: `(auth.uid() = user_id)`
-
-
 - **Admins can manage all roles**
   - Comando: `ALL`
   - Roles: authenticated
   - Usando: `has_role(auth.uid(), 'admin'::app_role)`
 
 
-
-### Tabla: `users`
-
-- **Users can update their own profile**
-  - Comando: `UPDATE`
+- **Users can view their own roles**
+  - Comando: `SELECT`
   - Roles: authenticated
   - Usando: `(auth.uid() = user_id)`
 
 
+
+### Tabla: `users`
+
+- **Admins can update any user**
+  - Comando: `UPDATE`
+  - Roles: public
+  - Usando: `has_role(auth.uid(), 'admin'::app_role)`
+
+
+- **users_update_own**
+  - Comando: `UPDATE`
+  - Roles: authenticated
+  - Usando: `(user_id = auth.uid())`
+
+
+- **users_insert_own**
+  - Comando: `INSERT`
+  - Roles: authenticated
+  - Usando: `true`
+  - With check: `(user_id = auth.uid())`
+
+- **users_select_own**
+  - Comando: `SELECT`
+  - Roles: authenticated
+  - Usando: `(user_id = auth.uid())`
+
+
 - **Users can delete their own profile**
   - Comando: `DELETE`
+  - Roles: authenticated
+  - Usando: `(auth.uid() = user_id)`
+
+
+- **Users can view their own profile**
+  - Comando: `SELECT`
   - Roles: authenticated
   - Usando: `(auth.uid() = user_id)`
 
@@ -967,6 +997,24 @@ Output format is unaligned.
   - Usando: `(user_id = auth.uid())`
 
 
+- **Users can update their own profile**
+  - Comando: `UPDATE`
+  - Roles: authenticated
+  - Usando: `(auth.uid() = user_id)`
+
+
+- **Users can insert their own profile**
+  - Comando: `INSERT`
+  - Roles: authenticated
+  - Usando: `true`
+  - With check: `(auth.uid() = user_id)`
+
+- **Admins and Operadores can view all users**
+  - Comando: `SELECT`
+  - Roles: public
+  - Usando: `(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'operador'::app_role))`
+
+
 - **Users can view own profile**
   - Comando: `SELECT`
   - Roles: public
@@ -979,38 +1027,14 @@ Output format is unaligned.
   - Usando: `(auth.uid() = user_id)`
 
 
-- **Admins can update any user**
-  - Comando: `UPDATE`
-  - Roles: public
-  - Usando: `has_role(auth.uid(), 'admin'::app_role)`
-
-
-- **Users can view their own profile**
-  - Comando: `SELECT`
-  - Roles: authenticated
-  - Usando: `(auth.uid() = user_id)`
-
-
-- **Admins and Operadores can view all users**
-  - Comando: `SELECT`
-  - Roles: public
-  - Usando: `(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'operador'::app_role))`
-
-
-- **Users can insert their own profile**
-  - Comando: `INSERT`
-  - Roles: authenticated
-  - Usando: `true`
-  - With check: `(auth.uid() = user_id)`
-
 
 ### Tabla: `users_correos_dropping`
 
-- **Users can insert their own Correos PUDO selection**
-  - Comando: `INSERT`
+- **Users can view their own Correos PUDO selection**
+  - Comando: `SELECT`
   - Roles: public
-  - Usando: `true`
-  - With check: `(auth.uid() = user_id)`
+  - Usando: `(auth.uid() = user_id)`
+
 
 - **Users can delete their own Correos PUDO selection**
   - Comando: `DELETE`
@@ -1024,26 +1048,14 @@ Output format is unaligned.
   - Usando: `(auth.uid() = user_id)`
   - With check: `(auth.uid() = user_id)`
 
-- **Users can view their own Correos PUDO selection**
-  - Comando: `SELECT`
+- **Users can insert their own Correos PUDO selection**
+  - Comando: `INSERT`
   - Roles: public
-  - Usando: `(auth.uid() = user_id)`
-
+  - Usando: `true`
+  - With check: `(auth.uid() = user_id)`
 
 
 ### Tabla: `wishlist`
-
-- **Users can remove from their own wishlist**
-  - Comando: `DELETE`
-  - Roles: public
-  - Usando: `(auth.uid() = user_id)`
-
-
-- **Users can update their own wishlist**
-  - Comando: `UPDATE`
-  - Roles: authenticated
-  - Usando: `(auth.uid() = user_id)`
-  - With check: `(auth.uid() = user_id)`
 
 - **Admins can view all wishlists**
   - Comando: `SELECT`
@@ -1057,11 +1069,23 @@ Output format is unaligned.
   - Usando: `(auth.uid() = user_id)`
 
 
+- **Users can update their own wishlist**
+  - Comando: `UPDATE`
+  - Roles: authenticated
+  - Usando: `(auth.uid() = user_id)`
+  - With check: `(auth.uid() = user_id)`
+
 - **Users can add to their own wishlist**
   - Comando: `INSERT`
   - Roles: public
   - Usando: `true`
   - With check: `(auth.uid() = user_id)`
+
+- **Users can remove from their own wishlist**
+  - Comando: `DELETE`
+  - Roles: public
+  - Usando: `(auth.uid() = user_id)`
+
 
 
 

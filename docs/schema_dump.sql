@@ -282,6 +282,26 @@ $$;
 ALTER FUNCTION "public"."generate_return_qr"("p_shipment_id" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."handle_new_auth_user"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+BEGIN
+    INSERT INTO public.users (user_id, full_name, avatar_url)
+    VALUES (
+        NEW.id,
+        NEW.raw_user_meta_data ->> 'full_name',
+        NEW.raw_user_meta_data ->> 'avatar_url'
+    )
+    ON CONFLICT (user_id) DO NOTHING;
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."handle_new_auth_user"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."handle_new_set_inventory"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
@@ -1347,16 +1367,6 @@ ALTER TABLE ONLY "public"."sets"
 
 
 
-ALTER TABLE ONLY "public"."users"
-    ADD CONSTRAINT "profiles_pkey" PRIMARY KEY ("id");
-
-
-
-ALTER TABLE ONLY "public"."users"
-    ADD CONSTRAINT "profiles_user_id_key" UNIQUE ("user_id");
-
-
-
 ALTER TABLE ONLY "public"."qr_validation_logs"
     ADD CONSTRAINT "qr_validation_logs_pkey" PRIMARY KEY ("id");
 
@@ -1403,7 +1413,17 @@ ALTER TABLE ONLY "public"."users_correos_dropping"
 
 
 ALTER TABLE ONLY "public"."users"
+    ADD CONSTRAINT "users_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."users"
     ADD CONSTRAINT "users_stripe_customer_id_key" UNIQUE ("stripe_customer_id");
+
+
+
+ALTER TABLE ONLY "public"."users"
+    ADD CONSTRAINT "users_user_id_key" UNIQUE ("user_id");
 
 
 
@@ -1694,11 +1714,6 @@ ALTER TABLE ONLY "public"."reception_operations"
 
 
 
-ALTER TABLE ONLY "public"."users"
-    ADD CONSTRAINT "profiles_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
-
-
-
 ALTER TABLE ONLY "public"."qr_validation_logs"
     ADD CONSTRAINT "qr_validation_logs_shipment_id_fkey" FOREIGN KEY ("shipment_id") REFERENCES "public"."shipments"("id") ON DELETE CASCADE;
 
@@ -1756,6 +1771,11 @@ ALTER TABLE ONLY "public"."users_correos_dropping"
 
 ALTER TABLE ONLY "public"."users"
     ADD CONSTRAINT "users_referred_by_fkey" FOREIGN KEY ("referred_by") REFERENCES "auth"."users"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."users"
+    ADD CONSTRAINT "users_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
 
 
 
@@ -2029,7 +2049,19 @@ ALTER TABLE "public"."users" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."users_correos_dropping" ENABLE ROW LEVEL SECURITY;
 
 
+CREATE POLICY "users_insert_own" ON "public"."users" FOR INSERT TO "authenticated" WITH CHECK (("user_id" = "auth"."uid"()));
+
+
+
+CREATE POLICY "users_select_own" ON "public"."users" FOR SELECT TO "authenticated" USING (("user_id" = "auth"."uid"()));
+
+
+
 CREATE POLICY "users_select_own_referral" ON "public"."users" FOR SELECT TO "authenticated" USING (("user_id" = "auth"."uid"()));
+
+
+
+CREATE POLICY "users_update_own" ON "public"."users" FOR UPDATE TO "authenticated" USING (("user_id" = "auth"."uid"()));
 
 
 
@@ -2082,6 +2114,12 @@ GRANT ALL ON FUNCTION "public"."generate_referral_code_users"() TO "service_role
 GRANT ALL ON FUNCTION "public"."generate_return_qr"("p_shipment_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."generate_return_qr"("p_shipment_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."generate_return_qr"("p_shipment_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."handle_new_auth_user"() TO "anon";
+GRANT ALL ON FUNCTION "public"."handle_new_auth_user"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."handle_new_auth_user"() TO "service_role";
 
 
 
