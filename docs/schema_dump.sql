@@ -45,80 +45,99 @@ CREATE TYPE "public"."operation_type" AS ENUM (
 ALTER TYPE "public"."operation_type" OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."confirm_assign_sets_to_users"("p_user_ids" "uuid"[]) RETURNS TABLE("envio_id" "uuid", "user_id" "uuid", "set_id" "uuid", "order_id" "uuid", "user_name" "text", "user_email" "text", "user_phone" "text", "set_name" "text", "set_ref" "text", "set_weight" numeric, "set_dim" "text", "pudo_id" "text", "pudo_name" "text", "pudo_address" "text", "pudo_cp" "text", "pudo_city" "text", "pudo_province" "text", "created_at" timestamp with time zone)
+CREATE OR REPLACE FUNCTION "public"."confirm_assign_sets_to_users"("user_ids" "uuid"[]) RETURNS TABLE("success" boolean, "message" "text", "user_id" "uuid", "set_id" "uuid")
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public'
     AS $$
 DECLARE
-    r RECORD;
-    target_set_id UUID; new_order_id UUID; new_envio_id UUID;
-    v_set_name TEXT; v_set_ref TEXT; v_set_weight NUMERIC; v_set_dim TEXT;
-    v_user_email TEXT; v_user_phone TEXT;
-    v_pudo_id TEXT; v_pudo_name TEXT; v_pudo_address TEXT; v_pudo_cp TEXT; v_pudo_city TEXT; v_pudo_province TEXT;
-    v_created_at TIMESTAMPTZ;
+    v_user_id UUID;
+    v_set_id UUID;
+    v_has_pudo BOOLEAN;
 BEGIN
-    FOR r IN (
-        SELECT u.user_id, u.full_name, u.email, u.phone,
-               p.correos_id_pudo, p.correos_name, p.correos_full_address,
-               p.correos_zip_code, p.correos_city, p.correos_province
-        FROM public.users u
-        LEFT JOIN public.users_correos_dropping p ON u.user_id = p.user_id
-        WHERE u.user_id = ANY(p_user_ids)
-          AND u.user_status IN ('no_set', 'set_returning')
-          AND EXISTS (SELECT 1 FROM public.wishlist w WHERE w.user_id = u.user_id AND w.status = true)
-    ) LOOP
-        SELECT w.set_id, s.set_name, s.set_ref, s.set_weight, s.set_dim
-        INTO target_set_id, v_set_name, v_set_ref, v_set_weight, v_set_dim
-        FROM public.wishlist w
-        JOIN public.inventory_sets i ON w.set_id = i.set_id
-        JOIN public.sets s ON w.set_id = s.id
-        WHERE w.user_id = r.user_id AND w.status = true AND i.inventory_set_total_qty > 0
-        ORDER BY w.created_at ASC LIMIT 1;
-
-        IF target_set_id IS NOT NULL THEN
-            UPDATE public.inventory_sets SET inventory_set_total_qty = inventory_set_total_qty - 1, in_shipping = in_shipping + 1
-            WHERE inventory_sets.set_id = target_set_id;
-
-            INSERT INTO public.orders (user_id, set_id, status) VALUES (r.user_id, target_set_id, 'pending') RETURNING id INTO new_order_id;
-
-            INSERT INTO public.shipments (order_id, user_id, shipment_status, shipping_address, shipping_city, shipping_zip_code, shipping_country)
-            VALUES (new_order_id, r.user_id, 'pending',
-                    COALESCE(r.correos_full_address, 'Pending assignment'),
-                    COALESCE(r.correos_city, 'Pending'),
-                    COALESCE(r.correos_zip_code, '00000'), 'España')
-            RETURNING shipments.id, shipments.created_at INTO new_envio_id, v_created_at;
-
-            UPDATE public.users SET user_status = 'set_shipping' WHERE users.user_id = r.user_id;
-
-            UPDATE public.wishlist SET status = false, status_changed_at = now()
-            WHERE wishlist.user_id = r.user_id AND wishlist.set_id = target_set_id;
-
-            confirm_assign_sets_to_users.envio_id := new_envio_id;
-            confirm_assign_sets_to_users.user_id := r.user_id;
-            confirm_assign_sets_to_users.set_id := target_set_id;
-            confirm_assign_sets_to_users.order_id := new_order_id;
-            confirm_assign_sets_to_users.user_name := r.full_name;
-            confirm_assign_sets_to_users.user_email := r.email;
-            confirm_assign_sets_to_users.user_phone := r.phone;
-            confirm_assign_sets_to_users.set_name := v_set_name;
-            confirm_assign_sets_to_users.set_ref := v_set_ref;
-            confirm_assign_sets_to_users.set_weight := v_set_weight;
-            confirm_assign_sets_to_users.set_dim := v_set_dim;
-            confirm_assign_sets_to_users.pudo_id := r.correos_id_pudo;
-            confirm_assign_sets_to_users.pudo_name := r.correos_name;
-            confirm_assign_sets_to_users.pudo_address := r.correos_full_address;
-            confirm_assign_sets_to_users.pudo_cp := r.correos_zip_code;
-            confirm_assign_sets_to_users.pudo_city := r.correos_city;
-            confirm_assign_sets_to_users.pudo_province := r.correos_province;
-            confirm_assign_sets_to_users.created_at := v_created_at;
-            RETURN NEXT;
+    -- Validate all users have PUDO configured
+    FOR v_user_id IN SELECT unnest(user_ids) LOOP
+        -- Check if user has PUDO configured
+        SELECT EXISTS(
+            SELECT 1 FROM public.users 
+            WHERE users.user_id = v_user_id 
+            AND pudo_type IS NOT NULL 
+            AND pudo_id IS NOT NULL
+        ) INTO v_has_pudo;
+        
+        IF NOT v_has_pudo THEN
+            RETURN QUERY SELECT 
+                FALSE,
+                'User does not have a PUDO point configured',
+                v_user_id,
+                NULL::UUID;
+            CONTINUE;
         END IF;
+        
+        -- Get the proposed set for this user
+        SELECT proposed_set_id INTO v_set_id
+        FROM public.users
+        WHERE users.user_id = v_user_id;
+        
+        IF v_set_id IS NULL THEN
+            RETURN QUERY SELECT 
+                FALSE,
+                'No set proposed for this user',
+                v_user_id,
+                NULL::UUID;
+            CONTINUE;
+        END IF;
+        
+        -- Create shipment
+        INSERT INTO public.shipments (
+            user_id,
+            set_id,
+            set_ref,
+            shipment_status,
+            shipment_type,
+            created_at,
+            updated_at
+        )
+        SELECT 
+            v_user_id,
+            v_set_id,
+            s.set_ref,
+            'pending',
+            'outbound',
+            NOW(),
+            NOW()
+        FROM public.sets s
+        WHERE s.id = v_set_id
+        RETURNING shipments.id INTO v_set_id; -- Reusing variable for shipment_id
+        
+        -- Update inventory
+        UPDATE public.inventory_sets
+        SET 
+            available_stock = available_stock - 1,
+            in_transit = in_transit + 1,
+            updated_at = NOW()
+        WHERE set_id = (SELECT proposed_set_id FROM public.users WHERE users.user_id = v_user_id);
+        
+        -- Clear proposed_set_id
+        UPDATE public.users
+        SET 
+            proposed_set_id = NULL,
+            updated_at = NOW()
+        WHERE users.user_id = v_user_id;
+        
+        RETURN QUERY SELECT 
+            TRUE,
+            'Assignment confirmed successfully',
+            v_user_id,
+            v_set_id;
     END LOOP;
 END;
 $$;
 
 
-ALTER FUNCTION "public"."confirm_assign_sets_to_users"("p_user_ids" "uuid"[]) OWNER TO "postgres";
+ALTER FUNCTION "public"."confirm_assign_sets_to_users"("user_ids" "uuid"[]) OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."confirm_assign_sets_to_users"("user_ids" "uuid"[]) IS 'Confirms set assignments for users. Validates that each user has a PUDO point configured before proceeding.';
+
 
 
 CREATE OR REPLACE FUNCTION "public"."confirm_qr_validation"("p_qr_code" "text", "p_validated_by" "text" DEFAULT NULL::"text") RETURNS TABLE("success" boolean, "message" "text", "shipment_id" "uuid")
@@ -280,6 +299,50 @@ $$;
 
 
 ALTER FUNCTION "public"."generate_return_qr"("p_shipment_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."get_user_active_pudo"("p_user_id" "uuid") RETURNS TABLE("pudo_type" "text", "pudo_id" "text", "pudo_name" "text", "pudo_address" "text", "pudo_city" "text", "pudo_postal_code" "text")
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+BEGIN
+    -- Check users table for PUDO type
+    RETURN QUERY
+    SELECT 
+        u.pudo_type,
+        u.pudo_id,
+        CASE 
+            WHEN u.pudo_type = 'correos' THEN c.correos_name
+            WHEN u.pudo_type = 'brickshare' THEN b.location_name
+            ELSE NULL
+        END as pudo_name,
+        CASE 
+            WHEN u.pudo_type = 'correos' THEN c.correos_full_address
+            WHEN u.pudo_type = 'brickshare' THEN b.address
+            ELSE NULL
+        END as pudo_address,
+        CASE 
+            WHEN u.pudo_type = 'correos' THEN c.correos_city
+            WHEN u.pudo_type = 'brickshare' THEN b.city
+            ELSE NULL
+        END as pudo_city,
+        CASE 
+            WHEN u.pudo_type = 'correos' THEN c.correos_zip_code
+            WHEN u.pudo_type = 'brickshare' THEN b.postal_code
+            ELSE NULL
+        END as pudo_postal_code
+    FROM public.users u
+    LEFT JOIN public.users_correos_dropping c ON u.user_id = c.user_id AND u.pudo_type = 'correos'
+    LEFT JOIN public.users_brickshare_dropping b ON u.user_id = b.user_id AND u.pudo_type = 'brickshare'
+    WHERE u.user_id = p_user_id;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."get_user_active_pudo"("p_user_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."get_user_active_pudo"("p_user_id" "uuid") IS 'Returns the active PUDO point information for a user regardless of type';
+
 
 
 CREATE OR REPLACE FUNCTION "public"."handle_new_auth_user"() RETURNS "trigger"
@@ -508,8 +571,13 @@ BEGIN
     FOR r IN (
         SELECT u.user_id, u.full_name
         FROM public.users u
-        WHERE u.user_status IN ('sin set', 'set en devolucion')
-          AND u.user_type = 'user'  -- Only regular users, not admin or operations
+        WHERE u.user_status IN ('no_set', 'set_returning')  -- FIXED: Changed from Spanish to English
+          -- Only include users who don't have admin or operador roles
+          AND NOT EXISTS (
+              SELECT 1 FROM public.user_roles ur
+              WHERE ur.user_id = u.user_id
+              AND ur.role IN ('admin', 'operador')
+          )
     ) LOOP
         v_set_id := NULL;
         v_matches_wishlist := FALSE;
@@ -526,7 +594,7 @@ BEGIN
           AND i.inventory_set_total_qty > 0
           -- Check if user has NOT had this set before
           AND NOT EXISTS (
-              SELECT 1 FROM public.envios e
+              SELECT 1 FROM public.shipments e
               WHERE e.user_id = r.user_id 
                 AND e.set_id = w.set_id
           )
@@ -568,10 +636,6 @@ $$;
 
 
 ALTER FUNCTION "public"."preview_assign_sets_to_users"() OWNER TO "postgres";
-
-
-COMMENT ON FUNCTION "public"."preview_assign_sets_to_users"() IS 'Shows proposed set assignments checking history to avoid duplicates, with random fallback if no wishlist match - includes matches_wishlist flag';
-
 
 
 CREATE OR REPLACE FUNCTION "public"."process_referral_credit"("p_referee_user_id" "uuid") RETURNS "void"
@@ -663,6 +727,19 @@ $$;
 
 
 ALTER FUNCTION "public"."update_updated_at_column"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."update_users_brickshare_dropping_updated_at"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."update_users_brickshare_dropping_updated_at"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."update_users_correos_dropping_updated_at"() RETURNS "trigger"
@@ -1221,7 +1298,11 @@ CREATE TABLE IF NOT EXISTS "public"."users" (
     "city" "text",
     "province" "text",
     "phone" "text",
+    "stripe_payment_method_id" "text",
+    "pudo_id" "text",
+    "pudo_type" "text",
     CONSTRAINT "check_user_status" CHECK (("user_status" = ANY (ARRAY['no_set'::"text", 'set_shipping'::"text", 'received'::"text", 'has_set'::"text", 'set_returning'::"text", 'suspended'::"text", 'cancelled'::"text"]))),
+    CONSTRAINT "users_pudo_type_check" CHECK (("pudo_type" = ANY (ARRAY['correos'::"text", 'brickshare'::"text"]))),
     CONSTRAINT "users_subscription_status_check" CHECK (("subscription_status" = ANY (ARRAY['active'::"text", 'inactive'::"text", 'trialing'::"text", 'past_due'::"text", 'canceled'::"text"])))
 );
 
@@ -1258,6 +1339,48 @@ COMMENT ON COLUMN "public"."users"."referred_by" IS 'auth.users.id of the user w
 
 
 COMMENT ON COLUMN "public"."users"."referral_credits" IS 'Accumulated credits from successful referrals';
+
+
+
+COMMENT ON COLUMN "public"."users"."stripe_payment_method_id" IS 'Stripe Payment Method ID (e.g., pm_card_visa for test mode)';
+
+
+
+COMMENT ON COLUMN "public"."users"."pudo_id" IS 'Reference to the active PUDO point ID (either correos_id_pudo or brickshare_pudo_id)';
+
+
+
+COMMENT ON COLUMN "public"."users"."pudo_type" IS 'Type of PUDO point currently selected by the user (correos or brickshare)';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."users_brickshare_dropping" (
+    "user_id" "uuid" NOT NULL,
+    "brickshare_pudo_id" "text" NOT NULL,
+    "location_name" "text" NOT NULL,
+    "address" "text" NOT NULL,
+    "city" "text" NOT NULL,
+    "postal_code" "text" NOT NULL,
+    "province" "text" NOT NULL,
+    "latitude" numeric(10,8),
+    "longitude" numeric(11,8),
+    "contact_email" "text",
+    "contact_phone" "text",
+    "opening_hours" "jsonb",
+    "selection_date" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."users_brickshare_dropping" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."users_brickshare_dropping" IS 'Stores user-selected Brickshare deposit locations for pickup/dropoff';
+
+
+
+COMMENT ON COLUMN "public"."users_brickshare_dropping"."brickshare_pudo_id" IS 'Reference to Brickshare PUDO location ID. No FK constraint to allow dynamic locations from external APIs.';
 
 
 
@@ -1407,6 +1530,11 @@ ALTER TABLE ONLY "public"."user_roles"
 
 
 
+ALTER TABLE ONLY "public"."users_brickshare_dropping"
+    ADD CONSTRAINT "users_brickshare_dropping_pkey" PRIMARY KEY ("user_id");
+
+
+
 ALTER TABLE ONLY "public"."users_correos_dropping"
     ADD CONSTRAINT "users_correos_dropping_pkey" PRIMARY KEY ("user_id");
 
@@ -1545,6 +1673,14 @@ CREATE INDEX "idx_set_piece_list_set_id" ON "public"."set_piece_list" USING "btr
 
 
 
+CREATE INDEX "idx_users_brickshare_dropping_location" ON "public"."users_brickshare_dropping" USING "btree" ("brickshare_pudo_id");
+
+
+
+CREATE INDEX "idx_users_brickshare_dropping_user_id" ON "public"."users_brickshare_dropping" USING "btree" ("user_id");
+
+
+
 CREATE INDEX "idx_users_correos_dropping_cp" ON "public"."users_correos_dropping" USING "btree" ("correos_zip_code");
 
 
@@ -1554,6 +1690,14 @@ CREATE INDEX "idx_users_correos_dropping_tipo" ON "public"."users_correos_droppi
 
 
 CREATE INDEX "idx_users_correos_dropping_user_id" ON "public"."users_correos_dropping" USING "btree" ("user_id");
+
+
+
+CREATE INDEX "idx_users_pudo_id" ON "public"."users" USING "btree" ("pudo_id") WHERE ("pudo_id" IS NOT NULL);
+
+
+
+CREATE INDEX "idx_users_pudo_type" ON "public"."users" USING "btree" ("pudo_type") WHERE ("pudo_type" IS NOT NULL);
 
 
 
@@ -1630,6 +1774,10 @@ CREATE OR REPLACE TRIGGER "referrals_updated_at" BEFORE UPDATE ON "public"."refe
 
 
 CREATE OR REPLACE TRIGGER "reviews_updated_at" BEFORE UPDATE ON "public"."reviews" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
+
+
+
+CREATE OR REPLACE TRIGGER "trigger_update_users_brickshare_dropping_updated_at" BEFORE UPDATE ON "public"."users_brickshare_dropping" FOR EACH ROW EXECUTE FUNCTION "public"."update_users_brickshare_dropping_updated_at"();
 
 
 
@@ -1764,6 +1912,11 @@ ALTER TABLE ONLY "public"."user_roles"
 
 
 
+ALTER TABLE ONLY "public"."users_brickshare_dropping"
+    ADD CONSTRAINT "users_brickshare_dropping_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."users_correos_dropping"
     ADD CONSTRAINT "users_correos_dropping_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("user_id") ON DELETE CASCADE;
 
@@ -1884,11 +2037,19 @@ CREATE POLICY "Users can add to their own wishlist" ON "public"."wishlist" FOR I
 
 
 
+CREATE POLICY "Users can delete their own Brickshare PUDO selection" ON "public"."users_brickshare_dropping" FOR DELETE TO "authenticated" USING (("auth"."uid"() = "user_id"));
+
+
+
 CREATE POLICY "Users can delete their own Correos PUDO selection" ON "public"."users_correos_dropping" FOR DELETE USING (("auth"."uid"() = "user_id"));
 
 
 
 CREATE POLICY "Users can delete their own profile" ON "public"."users" FOR DELETE TO "authenticated" USING (("auth"."uid"() = "user_id"));
+
+
+
+CREATE POLICY "Users can insert their own Brickshare PUDO selection" ON "public"."users_brickshare_dropping" FOR INSERT TO "authenticated" WITH CHECK (("auth"."uid"() = "user_id"));
 
 
 
@@ -1912,6 +2073,10 @@ CREATE POLICY "Users can update own shipment status" ON "public"."shipments" FOR
 
 
 
+CREATE POLICY "Users can update their own Brickshare PUDO selection" ON "public"."users_brickshare_dropping" FOR UPDATE TO "authenticated" USING (("auth"."uid"() = "user_id")) WITH CHECK (("auth"."uid"() = "user_id"));
+
+
+
 CREATE POLICY "Users can update their own Correos PUDO selection" ON "public"."users_correos_dropping" FOR UPDATE USING (("auth"."uid"() = "user_id")) WITH CHECK (("auth"."uid"() = "user_id"));
 
 
@@ -1929,6 +2094,10 @@ CREATE POLICY "Users can view own profile" ON "public"."users" FOR SELECT USING 
 
 
 CREATE POLICY "Users can view own shipments" ON "public"."shipments" FOR SELECT USING (("auth"."uid"() = "user_id"));
+
+
+
+CREATE POLICY "Users can view their own Brickshare PUDO selection" ON "public"."users_brickshare_dropping" FOR SELECT TO "authenticated" USING (("auth"."uid"() = "user_id"));
 
 
 
@@ -2046,6 +2215,9 @@ ALTER TABLE "public"."user_roles" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."users" ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE "public"."users_brickshare_dropping" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."users_correos_dropping" ENABLE ROW LEVEL SECURITY;
 
 
@@ -2075,9 +2247,9 @@ GRANT USAGE ON SCHEMA "public" TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."confirm_assign_sets_to_users"("p_user_ids" "uuid"[]) TO "anon";
-GRANT ALL ON FUNCTION "public"."confirm_assign_sets_to_users"("p_user_ids" "uuid"[]) TO "authenticated";
-GRANT ALL ON FUNCTION "public"."confirm_assign_sets_to_users"("p_user_ids" "uuid"[]) TO "service_role";
+GRANT ALL ON FUNCTION "public"."confirm_assign_sets_to_users"("user_ids" "uuid"[]) TO "anon";
+GRANT ALL ON FUNCTION "public"."confirm_assign_sets_to_users"("user_ids" "uuid"[]) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."confirm_assign_sets_to_users"("user_ids" "uuid"[]) TO "service_role";
 
 
 
@@ -2114,6 +2286,12 @@ GRANT ALL ON FUNCTION "public"."generate_referral_code_users"() TO "service_role
 GRANT ALL ON FUNCTION "public"."generate_return_qr"("p_shipment_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."generate_return_qr"("p_shipment_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."generate_return_qr"("p_shipment_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."get_user_active_pudo"("p_user_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."get_user_active_pudo"("p_user_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_user_active_pudo"("p_user_id" "uuid") TO "service_role";
 
 
 
@@ -2210,6 +2388,12 @@ GRANT ALL ON FUNCTION "public"."update_set_status_from_return"("p_set_id" "uuid"
 GRANT ALL ON FUNCTION "public"."update_updated_at_column"() TO "anon";
 GRANT ALL ON FUNCTION "public"."update_updated_at_column"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."update_updated_at_column"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."update_users_brickshare_dropping_updated_at"() TO "anon";
+GRANT ALL ON FUNCTION "public"."update_users_brickshare_dropping_updated_at"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."update_users_brickshare_dropping_updated_at"() TO "service_role";
 
 
 
@@ -2330,6 +2514,12 @@ GRANT ALL ON TABLE "public"."user_roles" TO "service_role";
 GRANT ALL ON TABLE "public"."users" TO "anon";
 GRANT ALL ON TABLE "public"."users" TO "authenticated";
 GRANT ALL ON TABLE "public"."users" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."users_brickshare_dropping" TO "anon";
+GRANT ALL ON TABLE "public"."users_brickshare_dropping" TO "authenticated";
+GRANT ALL ON TABLE "public"."users_brickshare_dropping" TO "service_role";
 
 
 

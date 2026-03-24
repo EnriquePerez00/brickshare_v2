@@ -21,9 +21,15 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Eye, CheckCircle, XCircle, Trash2, Package2, RefreshCw } from "lucide-react";
+import { Eye, CheckCircle, XCircle, Trash2, Package2, RefreshCw, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface PreviewAssignment {
     user_id: string;
@@ -33,6 +39,7 @@ interface PreviewAssignment {
     set_ref: string;
     set_price: number;
     current_stock: number;
+    pudo_type?: string;
 }
 
 interface ConfirmedShipment {
@@ -72,6 +79,7 @@ const SetAssignment = () => {
         errorMessage: "",
         errorCode: ""
     });
+    const [confirmingUserId, setConfirmingUserId] = useState<string | null>(null);
 
     // Preview mutation - shows proposal without making changes
     const previewMutation = useMutation({
@@ -93,6 +101,40 @@ const SetAssignment = () => {
             toast.error("Error al generar propuesta: " + error.message);
         },
     });
+
+    // Helper function to execute Correos preregistration
+    const executeCorreosPreregistration = async (shipment: ConfirmedShipment, pudoType?: string) => {
+        // Only execute if user has Correos PUDO selected
+        if (pudoType !== 'correos') {
+            console.log(`Skipping Correos preregistration for ${shipment.user_name} - pudo_type: ${pudoType || 'not set'}`);
+            return;
+        }
+
+        try {
+            const { data: preregResult, error: preregError } = await supabase.functions.invoke('correos-logistics', {
+                body: { action: 'preregister', p_shipment_id: shipment.shipment_id }
+            });
+
+            if (preregError) throw preregError;
+
+            // Fetch label automatically
+            await supabase.functions.invoke('correos-logistics', {
+                body: { action: 'get_label', p_shipment_id: shipment.shipment_id }
+            });
+
+            // Update local state with tracking info
+            setConfirmedShipments(current => current.map(e =>
+                e.shipment_id === shipment.shipment_id
+                    ? { ...e, correos_shipment_id: preregResult.correos_shipment_id }
+                    : e
+            ));
+
+            toast.success(`Preregistro Correos completado para ${shipment.user_name}`);
+        } catch (err) {
+            console.error(`Error en preregistro Correos para ${shipment.user_name}:`, err);
+            toast.error(`Error en preregistro de ${shipment.user_name}`);
+        }
+    };
 
     // Confirm mutation - executes payments FIRST, then assignments
     const confirmMutation = useMutation({
@@ -167,33 +209,15 @@ const SetAssignment = () => {
             setPreviewAssignments([]);
             toast.success(`¡Éxito! Se procesaron ${data.length} pagos y asignaciones`);
 
-            // Phase 3: Automatic Correos Preregistration
-            toast.info("Iniciando preregistros en Correos...");
-
-            for (const shipment of data) {
-                try {
-                    const { data: preregResult, error: preregError } = await supabase.functions.invoke('correos-logistics', {
-                        body: { action: 'preregister', p_shipment_id: shipment.shipment_id }
-                    });
-
-                    if (preregError) throw preregError;
-
-                    // Fetch label automatically
-                    await supabase.functions.invoke('correos-logistics', {
-                        body: { action: 'get_label', p_shipment_id: shipment.shipment_id }
-                    });
-
-                    // Update local state with tracking info
-                    setConfirmedShipments(current => current.map(e =>
-                        e.shipment_id === shipment.shipment_id
-                            ? { ...e, correos_shipment_id: preregResult.correos_shipment_id }
-                            : e
-                    ));
-
-                    toast.success(`Preregistro completado para ${shipment.user_name}`);
-                } catch (err) {
-                    console.error(`Error en preregistro para ${shipment.user_name}:`, err);
-                    toast.error(`Error en preregistro de ${shipment.user_name}`);
+            // Phase 3: Automatic Correos Preregistration (only for Correos PUDO users)
+            const correosUsers = data.filter((_, idx) => previewAssignments[idx]?.pudo_type === 'correos');
+            if (correosUsers.length > 0) {
+                toast.info(`Iniciando preregistros en Correos para ${correosUsers.length} usuario(s)...`);
+                
+                for (let i = 0; i < data.length; i++) {
+                    const shipment = data[i];
+                    const assignment = previewAssignments[i];
+                    await executeCorreosPreregistration(shipment, assignment?.pudo_type);
                 }
             }
 
@@ -217,6 +241,89 @@ const SetAssignment = () => {
     });
 
     // Delete mutation - removes confirmed assignment with rollback
+    // Confirm single user mutation
+    const confirmSingleMutation = useMutation({
+        mutationFn: async (assignment: PreviewAssignment) => {
+            // Phase 1: Process payment for this user
+            const { data: paymentResponse, error: paymentError } = await supabase.functions.invoke(
+                'process-assignment-payment',
+                {
+                    body: {
+                        userId: assignment.user_id,
+                        setRef: assignment.set_ref,
+                        setPrice: assignment.set_price || 100.00
+                    }
+                }
+            );
+
+            if (paymentError || !paymentResponse?.success) {
+                // Get user email for error dialog
+                const { data: userData } = await supabase
+                    .from('users')
+                    .select('email')
+                    .eq('user_id', assignment.user_id)
+                    .single();
+
+                throw {
+                    userName: assignment.user_name,
+                    userEmail: paymentResponse?.userEmail || userData?.email || 'Email no disponible',
+                    errorMessage: paymentResponse?.error || paymentError?.message || 'Error desconocido',
+                    errorCode: paymentResponse?.errorCode || 'unknown'
+                };
+            }
+
+            // Phase 2: Confirm assignment in database
+            const { data, error } = await supabase.rpc("confirm_assign_sets_to_users", {
+                p_user_ids: [assignment.user_id],
+            });
+
+            if (error) {
+                console.error('Database operation failed after payment. Manual cleanup may be needed:');
+                console.error('Payment IntentIDs:', {
+                    depositId: paymentResponse.depositPaymentIntentId,
+                    transportId: paymentResponse.transportPaymentIntentId
+                });
+
+                throw new Error(`Error en base de datos: ${error.message}. El pago fue procesado pero la asignación no se guardó. Revisa Stripe Dashboard.`);
+            }
+
+            return { shipment: data[0] as ConfirmedShipment, pudoType: assignment.pudo_type };
+        },
+        onSuccess: async ({ shipment, pudoType }) => {
+            // Add to confirmed shipments
+            setConfirmedShipments(prev => [...prev, shipment]);
+            
+            // Remove from preview assignments
+            setPreviewAssignments(prev => prev.filter(a => a.user_id !== shipment.user_id));
+            
+            toast.success(`¡Asignación confirmada para ${shipment.user_name}!`);
+
+            // Phase 3: Automatic Correos Preregistration (only if Correos PUDO)
+            await executeCorreosPreregistration(shipment, pudoType);
+
+            queryClient.invalidateQueries({ queryKey: ["admin-set-assignment-inventory"] });
+            queryClient.invalidateQueries({ queryKey: ["admin-shipments"] });
+            
+            setConfirmingUserId(null);
+        },
+        onError: (error: any) => {
+            setConfirmingUserId(null);
+            
+            // If error has payment info, show dialog
+            if (error.userName && error.errorMessage) {
+                setPaymentErrorDialog({
+                    open: true,
+                    userName: error.userName,
+                    userEmail: error.userEmail,
+                    errorMessage: error.errorMessage,
+                    errorCode: error.errorCode
+                });
+            } else {
+                toast.error("Error al confirmar asignación: " + (error.message || error));
+            }
+        },
+    });
+
     const deleteMutation = useMutation({
         mutationFn: async (envioId: string) => {
             const { error } = await supabase.rpc("delete_assignment_and_rollback", {
@@ -242,8 +349,13 @@ const SetAssignment = () => {
         previewMutation.mutate();
     };
 
-    const handleConfirmAssignments = () => {
+    const handleConfirmAllAssignments = () => {
         confirmMutation.mutate(previewAssignments);
+    };
+
+    const handleConfirmSingleAssignment = (assignment: PreviewAssignment) => {
+        setConfirmingUserId(assignment.user_id);
+        confirmSingleMutation.mutate(assignment);
     };
 
     const handleCancelPreview = () => {
@@ -305,8 +417,8 @@ const SetAssignment = () => {
                                     Cancelar
                                 </Button>
                                 <Button
-                                    onClick={handleConfirmAssignments}
-                                    disabled={confirmMutation.isPending}
+                                    onClick={handleConfirmAllAssignments}
+                                    disabled={confirmMutation.isPending || confirmSingleMutation.isPending}
                                     className="bg-green-600 hover:bg-green-700"
                                     data-testid="assignment-confirm-button"
                                 >
@@ -315,7 +427,7 @@ const SetAssignment = () => {
                                     ) : (
                                         <CheckCircle className="h-4 w-4 mr-2" />
                                     )}
-                                    Confirmar asignaciones
+                                    Confirmar asignaciones (todas)
                                 </Button>
                             </>
                         )}
@@ -356,6 +468,7 @@ const SetAssignment = () => {
                                             <TableHead>Usuario</TableHead>
                                             <TableHead>Set Propuesto (Ref)</TableHead>
                                             <TableHead className="text-center">Stock Actual</TableHead>
+                                            <TableHead className="text-center">Acciones</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -369,6 +482,31 @@ const SetAssignment = () => {
                                                 </TableCell>
                                                 <TableCell className="text-center">
                                                     <Badge variant="outline">{assignment.current_stock} disponible</Badge>
+                                                </TableCell>
+                                                <TableCell className="text-center">
+                                                    <TooltipProvider>
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    onClick={() => handleConfirmSingleAssignment(assignment)}
+                                                                    disabled={confirmMutation.isPending || confirmSingleMutation.isPending || confirmingUserId === assignment.user_id}
+                                                                    className="text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950"
+                                                                    data-testid={`confirm-single-${assignment.user_id}`}
+                                                                >
+                                                                    {confirmingUserId === assignment.user_id ? (
+                                                                        <RefreshCw className="h-5 w-5 animate-spin" />
+                                                                    ) : (
+                                                                        <UserCheck className="h-5 w-5" />
+                                                                    )}
+                                                                </Button>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent>
+                                                                <p>Asignar solo a este usuario</p>
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    </TooltipProvider>
                                                 </TableCell>
                                             </TableRow>
                                         ))}

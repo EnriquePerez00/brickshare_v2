@@ -819,6 +819,8 @@ export type Database = {
           phone: string | null
           profile_completed: boolean | null
           province: string | null
+          pudo_id: string | null
+          pudo_type: string | null
           referral_code: string | null
           referral_credits: number
           referred_by: string | null
@@ -844,6 +846,8 @@ export type Database = {
           phone?: string | null
           profile_completed?: boolean | null
           province?: string | null
+          pudo_id?: string | null
+          pudo_type?: string | null
           referral_code?: string | null
           referral_credits?: number
           referred_by?: string | null
@@ -869,6 +873,8 @@ export type Database = {
           phone?: string | null
           profile_completed?: boolean | null
           province?: string | null
+          pudo_id?: string | null
+          pudo_type?: string | null
           referral_code?: string | null
           referral_credits?: number
           referred_by?: string | null
@@ -880,6 +886,60 @@ export type Database = {
           user_id?: string
           user_status?: string | null
           zip_code?: string | null
+        }
+        Relationships: []
+      }
+      users_brickshare_dropping: {
+        Row: {
+          address: string
+          brickshare_pudo_id: string
+          city: string
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string
+          latitude: number | null
+          location_name: string
+          longitude: number | null
+          opening_hours: Json | null
+          postal_code: string
+          province: string
+          selection_date: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address: string
+          brickshare_pudo_id: string
+          city: string
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          latitude?: number | null
+          location_name: string
+          longitude?: number | null
+          opening_hours?: Json | null
+          postal_code: string
+          province: string
+          selection_date?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: string
+          brickshare_pudo_id?: string
+          city?: string
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          latitude?: number | null
+          location_name?: string
+          longitude?: number | null
+          opening_hours?: Json | null
+          postal_code?: string
+          province?: string
+          selection_date?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -1105,26 +1165,12 @@ export type Database = {
     }
     Functions: {
       confirm_assign_sets_to_users: {
-        Args: { p_user_ids: string[] }
+        Args: { user_ids: string[] }
         Returns: {
-          created_at: string
-          envio_id: string
-          order_id: string
-          pudo_address: string
-          pudo_city: string
-          pudo_cp: string
-          pudo_id: string
-          pudo_name: string
-          pudo_province: string
-          set_dim: string
+          message: string
           set_id: string
-          set_name: string
-          set_ref: string
-          set_weight: number
-          user_email: string
+          success: boolean
           user_id: string
-          user_name: string
-          user_phone: string
         }[]
       }
       confirm_qr_validation: {
@@ -1154,6 +1200,17 @@ export type Database = {
           qr_code: string
         }[]
       }
+      get_user_active_pudo: {
+        Args: { p_user_id: string }
+        Returns: {
+          pudo_address: string
+          pudo_city: string
+          pudo_id: string
+          pudo_name: string
+          pudo_postal_code: string
+          pudo_type: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1170,6 +1227,7 @@ export type Database = {
         Returns: {
           current_stock: number
           matches_wishlist: boolean
+          pudo_type: string
           set_id: string
           set_name: string
           set_price: number

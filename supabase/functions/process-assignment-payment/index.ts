@@ -79,9 +79,30 @@ serve(async (req) => {
         );
 
         const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
-        if (userError || !user || user.id !== userId) {
-            return new Response(JSON.stringify({ error: "Unauthorized - ID mismatch or invalid token" }), {
+        if (userError || !user) {
+            return new Response(JSON.stringify({ error: "Unauthorized - Invalid token" }), {
                 status: 401,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+        }
+
+        // Check if user is admin or processing their own payment
+        const supabaseAdmin = createClient(
+            Deno.env.get("SUPABASE_URL") ?? "",
+            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+        );
+
+        const { data: roles } = await supabaseAdmin
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", user.id);
+
+        const isAdmin = roles?.some(r => r.role === "admin");
+        const isOwnPayment = user.id === userId;
+
+        if (!isAdmin && !isOwnPayment) {
+            return new Response(JSON.stringify({ error: "Unauthorized - Only admins can process payments for other users" }), {
+                status: 403,
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
         }
