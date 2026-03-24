@@ -29,6 +29,7 @@
     "node": ">=18"
   },
   "devDependencies": {
+    "@supabase/supabase-js": "^2.100.0",
     "dotenv": "^17.3.1",
     "tsx": "^4.21.0"
   }

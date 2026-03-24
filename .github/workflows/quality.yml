@@ -1,0 +1,83 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  code-quality:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Check ESLint
+        run: npm run lint --workspace=@brickshare/web 2>&1 | tee eslint-report.txt || true
+      
+      - name: Check TypeScript
+        run: npm run type-check --workspace=@brickshare/web 2>&1 | tee typecheck-report.txt || true
+      
+      - name: Check for console.logs
+        run: |
+          if grep -r "console\.\(log\|debug\|error\)(" apps/web/src --include="*.ts" --include="*.tsx" | grep -v ".test." | grep -v "node_modules"; then
+            echo "❌ console.* statements found in production code"
+            exit 1
+          else
+            echo "✅ No console.* statements found"
+          fi
+      
+      - name: Check for TODO/FIXME
+        run: |
+          TODO_COUNT=$(grep -r "TODO\|FIXME" apps/web/src --include="*.ts" --include="*.tsx" | grep -v ".test." | wc -l)
+          echo "📝 Found $TODO_COUNT TODO/FIXME comments"
+      
+      - name: Check bundle size
+        run: |
+          echo "📦 Checking bundle size..."
+          npm run build --workspace=@brickshare/web 2>&1 || true
+      
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-reports
+          path: |
+            eslint-report.txt
+            typecheck-report.txt
+          retention-days: 7
+
+  dependency-check:
+    name: Dependency Security Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Audit dependencies
+        run: npm audit --audit-level=moderate 2>&1 || true
+      
+      - name: Check for outdated packages
+        run: npm outdated 2>&1 || true

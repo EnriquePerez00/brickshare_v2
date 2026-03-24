@@ -26,43 +26,60 @@ import { useOrders, useReturnSet } from "@/hooks/useOrders";
 import ProfileCompletionModal from "@/components/ProfileCompletionModal";
 import PudoSelector from "@/components/PudoSelector";
 import { toast } from "sonner";
-import { useUserPudoPoint, useSavePudoPoint } from "@/hooks/usePudo";
+import { useUserActivePudo, useSaveCorreosPudo, useSaveBricksharePudo } from "@/hooks/usePudo";
+import { transformPUDOPointToCorreosPudo, transformPUDOPointToBricksharePudo, normalizePudoPointType, type PUDOPoint } from "@/lib/pudoService";
 
 const Dashboard = () => {
   const { user, profile, isLoading: authLoading, deleteUserAccount, updateProfile, isAdmin, isOperador } = useAuth();
   const { wishlistIds, toggleWishlist, isLoading: wishlistLoading } = useWishlist();
   const { data: sets = [], isLoading: setsLoading } = useSets(100);
   const { data: orders = [], isLoading: ordersLoading } = useOrders();
-  const { data: pudoPoint } = useUserPudoPoint();
-  const savePudoMutation = useSavePudoPoint();
+  const { data: activePudo } = useUserActivePudo();
+  const saveCorreosPudoMutation = useSaveCorreosPudo();
+  const saveBricksharePudoMutation = useSaveBricksharePudo();
   const returnMutation = useReturnSet();
   const navigate = useNavigate();
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [isPudoSelectorOpen, setIsPudoSelectorOpen] = useState(false);
 
-  const handlePudoSelect = async (point: any) => {
+  const handlePudoSelect = async (point: PUDOPoint) => {
     try {
-      await savePudoMutation.mutateAsync({
-        correos_id_pudo: point.id_correos_pudo || `unknown-${Date.now()}`,
-        correos_name: point.nombre || "Oficina de Correos",
-        correos_point_type: point.tipo_punto || "Oficina",
-        correos_street: point.direccion || "Dirección no disponible",
-        correos_zip_code: point.cp || "00000",
-        correos_city: point.ciudad || "Localidad no disponible",
-        correos_province: point.ciudad || "Provincia no disponible",
-        correos_country: "España",
-        correos_full_address: `${point.direccion || "Dirección no disponible"}, ${point.cp || "00000"} ${point.ciudad || "Localidad no disponible"}`,
-        correos_latitude: point.lat || 0,
-        correos_longitude: point.lng || 0,
-        correos_opening_hours: point.horario || "Consultar en ubicación",
-        correos_available: true,
-      });
-
+      console.log('📍 [handlePudoSelect] Selected point:', point);
+      console.log('📍 [handlePudoSelect] Point tipo_punto value:', point.tipo_punto);
+      
+      // Normalize the tipo_punto to match database constraints
+      const normalizedType = normalizePudoPointType(point.tipo_punto);
+      console.log('📍 [handlePudoSelect] Normalized type:', normalizedType);
+      
+      if (normalizedType === 'Deposito') {
+        // This is a Brickshare PUDO
+        console.log('🏢 [handlePudoSelect] Processing as Brickshare deposit');
+        const pudoData = transformPUDOPointToBricksharePudo(point);
+        console.log('✅ [handlePudoSelect] Brickshare PUDO data:', pudoData);
+        await saveBricksharePudoMutation.mutateAsync(pudoData);
+        console.log('✅ [handlePudoSelect] Brickshare PUDO saved successfully');
+      } else {
+        // This is a Correos PUDO
+        console.log('📮 [handlePudoSelect] Processing as Correos point');
+        const pudoData = transformPUDOPointToCorreosPudo(point);
+        console.log('✅ [handlePudoSelect] Correos PUDO data:', pudoData);
+        await saveCorreosPudoMutation.mutateAsync(pudoData);
+        console.log('✅ [handlePudoSelect] Correos PUDO saved successfully');
+      }
+      
       toast.success("Punto de entrega actualizado correctamente");
       setIsPudoSelectorOpen(false);
     } catch (error) {
-      console.error("Error updating PUDO:", error);
-      toast.error("Error al actualizar el punto de entrega");
+      console.error("❌ [handlePudoSelect] Error updating PUDO:", error);
+      console.error("❌ [handlePudoSelect] Full error details:", JSON.stringify(error, null, 2));
+      
+      // More descriptive error message
+      let errorMessage = "Error al actualizar el punto de entrega";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage);
     }
   };
 
@@ -222,7 +239,7 @@ const Dashboard = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.3 }}
           >
-            <h2 className="text-2xl font-display font-bold text-foreground mb-6">
+            <h2 className="text-2xl font-display font-bold text-foreground mb-6" data-testid="dashboard-wishlist-title">
               Mi Wishlist
             </h2>
 
@@ -231,7 +248,7 @@ const Dashboard = () => {
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
             ) : wishlistSets.length > 0 ? (
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-3" data-testid="dashboard-wishlist-items">
                 {wishlistSets.map((set) => (
                   <ProductRow
                     key={set.id}
@@ -250,12 +267,12 @@ const Dashboard = () => {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-12 bg-card rounded-2xl">
+              <div className="text-center py-12 bg-card rounded-2xl" data-testid="dashboard-wishlist-empty">
                 <Heart className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <p className="text-lg text-muted-foreground mb-4">
                   Tu wishlist está vacía
                 </p>
-                <Button asChild>
+                <Button asChild data-testid="dashboard-explore-catalog-button">
                   <a href="/catalogo">Explorar catálogo</a>
                 </Button>
               </div>
@@ -269,7 +286,7 @@ const Dashboard = () => {
             transition={{ duration: 0.5, delay: 0.4 }}
             className="mt-16"
           >
-            <h2 className="text-2xl font-display font-bold text-foreground mb-6">
+            <h2 className="text-2xl font-display font-bold text-foreground mb-6" data-testid="dashboard-history-title">
               Mi Histórico
             </h2>
 
@@ -278,7 +295,7 @@ const Dashboard = () => {
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
             ) : orders.length > 0 ? (
-              <div className="overflow-hidden bg-card rounded-2xl shadow-card">
+              <div className="overflow-hidden bg-card rounded-2xl shadow-card" data-testid="dashboard-orders-table">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
                     <thead>
@@ -322,7 +339,7 @@ const Dashboard = () => {
                         const canReturn = index === 0 && order.shipment_status === 'delivered_user';
 
                         return (
-                          <tr key={order.id} className="hover:bg-muted/50 transition-colors">
+                          <tr key={order.id} className="hover:bg-muted/50 transition-colors" data-testid={`dashboard-order-row-${order.id}`}>
                             <td className="p-4 font-mono text-xs">{order.set_ref || "-"}</td>
                             <td className="p-4 font-medium">
                               <div className="flex items-center gap-3">
@@ -346,6 +363,7 @@ const Dashboard = () => {
                                   className="h-8 gap-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50 border-orange-200"
                                   onClick={() => handleReturnClick(order.id)}
                                   disabled={returnMutation.isPending}
+                                  data-testid={`dashboard-return-button-${order.id}`}
                                 >
                                   <ArrowLeftRight className="h-3.5 w-3.5" />
                                   Solicitar devolución
@@ -360,7 +378,7 @@ const Dashboard = () => {
                 </div>
               </div>
             ) : (
-              <div className="text-center py-12 bg-card rounded-2xl">
+              <div className="text-center py-12 bg-card rounded-2xl" data-testid="dashboard-orders-empty">
                 <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <p className="text-lg text-muted-foreground mb-4">
                   No tienes envíos registrados
@@ -393,55 +411,60 @@ const Dashboard = () => {
                 size="sm"
                 onClick={() => setIsPudoSelectorOpen(true)}
                 className="gap-2 border-yellow-200 hover:bg-yellow-50 text-yellow-700"
+                data-testid="dashboard-select-pudo-button"
               >
                 <MapPin className="h-4 w-4" />
-                {pudoPoint?.correos_id_pudo ? "Cambiar punto" : "Seleccionar punto"}
+                {activePudo?.pudo_id ? "Cambiar punto" : "Seleccionar punto"}
               </Button>
             </div>
 
-            <div className="bg-card rounded-2xl p-6 shadow-card border border-border/50">
-              {pudoPoint?.correos_id_pudo ? (
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="bg-card rounded-2xl p-6 shadow-card border border-border/50" data-testid="dashboard-pudo-display">
+              {activePudo?.pudo_id ? (
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4" data-testid="dashboard-pudo-selected">
                   <div className="flex items-start gap-4">
-                    <div className={`mt-1 p-2 rounded-full ${pudoPoint.correos_point_type === 'Oficina' ? 'bg-blue-100' : 'bg-yellow-100'}`}>
-                      {pudoPoint.correos_point_type === 'Oficina' ? (
-                        <Building2 className="h-6 w-6 text-blue-600" />
+                    <div className={`mt-1 p-2 rounded-full ${
+                      activePudo.pudo_type === 'brickshare' 
+                        ? 'bg-green-100' 
+                        : 'bg-blue-100'
+                    }`}>
+                      {activePudo.pudo_type === 'brickshare' ? (
+                        <Building2 className="h-6 w-6 text-green-600" />
                       ) : (
-                        <Package className="h-6 w-6 text-yellow-600" />
+                        <Package className="h-6 w-6 text-blue-600" />
                       )}
                     </div>
                     <div>
                       <h3 className="font-bold text-foreground flex items-center gap-2">
-                        {pudoPoint.correos_name}
+                        {activePudo.pudo_name}
                         <Badge
-                          className={`font-normal text-[0.65rem] uppercase py-0 px-1.5 h-4 ${pudoPoint.correos_point_type === 'Oficina'
-                              ? 'bg-blue-100 text-blue-700 border-blue-200'
-                              : 'bg-yellow-100 text-yellow-700 border-yellow-200'
-                            }`}
+                          className={`font-normal text-[0.65rem] uppercase py-0 px-1.5 h-4 ${
+                            activePudo.pudo_type === 'brickshare'
+                              ? 'bg-green-100 text-green-700 border-green-200'
+                              : 'bg-blue-100 text-blue-700 border-blue-200'
+                          }`}
                         >
-                          {pudoPoint.correos_point_type === 'Oficina' ? 'Oficina Correos' : 'Punto Citypaq'}
+                          {activePudo.pudo_type === 'brickshare' ? 'Depósito Brickshare' : 'Punto Correos'}
                         </Badge>
                       </h3>
-                      <p className="text-sm text-muted-foreground">{pudoPoint.correos_full_address}</p>
-                      {pudoPoint.correos_selection_date && (
-                        <p className="text-[10px] text-muted-foreground mt-2 uppercase tracking-tight">
-                          Seleccionado el {new Date(pudoPoint.correos_selection_date).toLocaleDateString()}
-                        </p>
-                      )}
+                      <p className="text-sm text-muted-foreground">{activePudo.pudo_address}</p>
                     </div>
                   </div>
-                  <div className="text-xs p-3 bg-blue-50 text-blue-700 rounded-xl border border-blue-100 flex items-center gap-2 max-w-xs">
+                  <div className={`text-xs p-3 rounded-xl border flex items-center gap-2 max-w-xs ${
+                    activePudo.pudo_type === 'brickshare'
+                      ? 'bg-green-50 text-green-700 border-green-100'
+                      : 'bg-blue-50 text-blue-700 border-blue-100'
+                  }`}>
                     <Info className="h-4 w-4 shrink-0" />
                     <p>Todos tus próximos envíos y devoluciones se gestionarán por defecto a través de este punto.</p>
                   </div>
                 </div>
               ) : (
-                <div className="text-center py-6 flex flex-col items-center">
+                <div className="text-center py-6 flex flex-col items-center" data-testid="dashboard-pudo-empty">
                   <MapPin className="h-10 w-10 text-muted-foreground/30 mb-2" />
                   <p className="text-sm text-muted-foreground mb-4">
                     No has seleccionado ningún punto de recogida de Correos.
                   </p>
-                  <Button onClick={() => setIsPudoSelectorOpen(true)}>
+                  <Button onClick={() => setIsPudoSelectorOpen(true)} data-testid="dashboard-pudo-configure-button">
                     Configurar ahora
                   </Button>
                 </div>
@@ -519,7 +542,7 @@ const Dashboard = () => {
             </div>
 
             {/* Danger Zone */}
-            <div className="bg-destructive/5 rounded-2xl p-6 border border-destructive/20 flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="bg-destructive/5 rounded-2xl p-6 border border-destructive/20 flex flex-col md:flex-row items-center justify-between gap-6" data-testid="dashboard-delete-account-section">
               <div className="flex gap-4">
                 <div className="p-3 rounded-xl bg-destructive/10 text-destructive h-fit">
                   <AlertTriangle className="h-6 w-6" />
@@ -535,6 +558,7 @@ const Dashboard = () => {
                 variant="destructive"
                 onClick={() => setDeleteAccountDialogOpen(true)}
                 className="shrink-0"
+                data-testid="dashboard-delete-account-button"
               >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Dar de baja

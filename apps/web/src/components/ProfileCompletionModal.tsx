@@ -77,6 +77,7 @@ const ProfileCompletionModal = ({ open, onClose }: ProfileCompletionModalProps) 
               <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 id="full_name"
+                data-testid="profile-full-name-input"
                 placeholder="Tu nombre y apellidos"
                 value={formData.full_name}
                 onChange={(e) => handleChange("full_name", e.target.value)}
@@ -92,6 +93,7 @@ const ProfileCompletionModal = ({ open, onClose }: ProfileCompletionModalProps) 
               <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 id="address"
+                data-testid="profile-address-input"
                 placeholder="Calle, número, piso..."
                 value={formData.address}
                 onChange={(e) => handleChange("address", e.target.value)}
@@ -106,6 +108,7 @@ const ProfileCompletionModal = ({ open, onClose }: ProfileCompletionModalProps) 
               <Label htmlFor="zip_code">Código postal</Label>
               <Input
                 id="zip_code"
+                data-testid="profile-zip-code-input"
                 placeholder="28001"
                 value={formData.zip_code}
                 onChange={(e) => handleChange("zip_code", e.target.value)}
@@ -116,6 +119,7 @@ const ProfileCompletionModal = ({ open, onClose }: ProfileCompletionModalProps) 
               <Label htmlFor="city">Ciudad</Label>
               <Input
                 id="city"
+                data-testid="profile-city-input"
                 placeholder="Madrid"
                 value={formData.city}
                 onChange={(e) => handleChange("city", e.target.value)}
@@ -130,6 +134,7 @@ const ProfileCompletionModal = ({ open, onClose }: ProfileCompletionModalProps) 
               <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 id="phone"
+                data-testid="profile-phone-input"
                 type="tel"
                 placeholder="+34 600 000 000"
                 value={formData.phone}
@@ -146,6 +151,7 @@ const ProfileCompletionModal = ({ open, onClose }: ProfileCompletionModalProps) 
               variant="outline"
               onClick={onClose}
               className="flex-1"
+              data-testid="profile-cancel-button"
             >
               Más tarde
             </Button>
@@ -153,6 +159,7 @@ const ProfileCompletionModal = ({ open, onClose }: ProfileCompletionModalProps) 
               type="submit"
               disabled={isSubmitting}
               className="flex-1 gradient-hero"
+              data-testid="profile-save-button"
             >
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Guardar

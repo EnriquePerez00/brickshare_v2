@@ -1,4 +1,10 @@
 /**
+ * Type for PUDO point selection.
+ * 'brickshare' is an alias for 'brickshare_deposit' for backwards compatibility.
+ */
+export type PudoType = 'correos' | 'brickshare' | 'brickshare_deposit';
+
+/**
  * Correos PUDO Point (table: users_correos_dropping).
  * Shared between web and iOS.
  */

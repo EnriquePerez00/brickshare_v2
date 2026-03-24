@@ -20,29 +20,7 @@ serve(async (req) => {
   try {
     const { lat, lng, radius = 5000 } = await req.json()
 
-    // JWT Verification
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Unauthorized - Missing header" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    console.log(`📍 Fetching PUDO points for coordinates: ${lat}, ${lng} (radius: ${radius}m)`)
 
     const config: CorreosConfig = {
       clientId: Deno.env.get('CORREOS_CLIENT_ID') ?? '',

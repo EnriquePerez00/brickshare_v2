@@ -147,6 +147,11 @@ const PudoSelector = ({ isOpen, onClose, onSelect, initialZipCode, initialAddres
 
     const fetchPudoPoints = async (lat: number, lng: number, mapInstance = map) => {
         try {
+            console.log(`🌍 Fetching PUDO points for location: ${lat}, ${lng}`);
+            let allPoints: PUDOPoint[] = [];
+            
+            // Fetch Correos points
+            console.log('📡 Calling correos-pudo Edge Function...');
             const { data, error } = await supabase.functions.invoke("correos-pudo", {
                 body: { lat, lng, radius: 5000 }
             });
@@ -164,54 +169,63 @@ const PudoSelector = ({ isOpen, onClose, onSelect, initialZipCode, initialAddres
                 } catch (e) {
                     errorMessage = error.message || errorMessage;
                 }
-                throw new Error(errorMessage);
+                console.error("❌ Correos fetch failed:", errorMessage);
+                toast.error(errorMessage);
+            } else {
+                allPoints = data || [];
+                console.log(`✅ Correos points received: ${allPoints.length}`);
             }
-
-            let allPoints: PUDOPoint[] = data || [];
 
             // Add local API points via Vite proxy
             try {
-                const depRes = await fetch("/api/locations-local");
-                if (depRes.ok) {
-                    const deposits = await depRes.json();
-                    if (Array.isArray(deposits)) {
-                        const activeDeposits = deposits.filter((d: any) => d.is_active);
-                        if (activeDeposits.length > 0) {
-                            const geocoder = new window.google.maps.Geocoder();
-                            const depositPoints = await Promise.all(activeDeposits.map(async (dep: any) => {
-                                return new Promise<PUDOPoint | null>((resolve) => {
-                                    // Use structured components for better accuracy
+                console.log('🔍 Fetching local deposits from /api/locations-local...');
+                const depRes = await fetch("/api/locations-local", {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!depRes.ok) {
+                    console.error(`❌ API Error: ${depRes.status} ${depRes.statusText}`);
+                    throw new Error(`HTTP ${depRes.status}`);
+                }
+                
+                const deposits = await depRes.json();
+                console.log('✅ Deposits received:', deposits);
+                
+                if (Array.isArray(deposits) && deposits.length > 0) {
+                    const activeDeposits = deposits.filter((d: any) => d.is_active);
+                    console.log(`📍 Found ${activeDeposits.length} active deposits`);
+                    
+                    if (activeDeposits.length > 0 && window.google) {
+                        const geocoder = new window.google.maps.Geocoder();
+                        
+                        // Add timeout to geocoding promises
+                        const geocodeWithTimeout = (dep: any): Promise<PUDOPoint | null> => {
+                            return new Promise((resolve) => {
+                                const timeout = setTimeout(() => {
+                                    console.warn(`⏱️ Geocoding timeout for ${dep.location_name || dep.name}`);
+                                    resolve(null);
+                                }, 5000);
+
+                                try {
                                     const geocodeRequest: any = {
-                                        address: dep.address,
+                                        address: `${dep.address}, ${dep.postal_code} ${dep.city}, España`,
                                         componentRestrictions: {
-                                            country: 'ES',
-                                            postalCode: dep.postal_code,
-                                            locality: dep.city
+                                            country: 'ES'
                                         },
                                         region: 'es'
                                     };
 
                                     geocoder.geocode(geocodeRequest, (results, status) => {
+                                        clearTimeout(timeout);
+                                        
                                         if (status === "OK" && results?.[0]) {
                                             const location = results[0].geometry.location;
                                             const locationType = results[0].geometry.location_type;
                                             
-                                            // Log precision for debugging
-                                            console.log(`Geocoded ${dep.location_name || dep.name}:`, {
-                                                address: dep.address,
-                                                postal_code: dep.postal_code,
-                                                city: dep.city,
-                                                location_type: locationType,
-                                                lat: location.lat(),
-                                                lng: location.lng()
-                                            });
-
-                                            // Warn if precision is low
-                                            if (locationType !== 'ROOFTOP' && locationType !== 'RANGE_INTERPOLATED') {
-                                                console.warn(`⚠️ Baja precisión para ${dep.location_name || dep.name}: ${locationType}`);
-                                            }
-
-                                            resolve({
+                                            const point: PUDOPoint = {
                                                 id_correos_pudo: dep.id,
                                                 nombre: dep.location_name || dep.name,
                                                 direccion: dep.address,
@@ -221,65 +235,112 @@ const PudoSelector = ({ isOpen, onClose, onSelect, initialZipCode, initialAddres
                                                 lng: location.lng(),
                                                 horario: "Horario comercial del establecimiento",
                                                 tipo_punto: "Deposito"
+                                            };
+                                            
+                                            console.log(`✅ Geocoded ${point.nombre}:`, {
+                                                lat: point.lat,
+                                                lng: point.lng,
+                                                locationType: locationType
                                             });
+
+                                            if (locationType !== 'ROOFTOP' && locationType !== 'RANGE_INTERPOLATED') {
+                                                console.warn(`⚠️ Low precision for ${point.nombre}: ${locationType}`);
+                                            }
+
+                                            resolve(point);
                                         } else {
-                                            console.error(`❌ Geocodificación fallida para ${dep.location_name || dep.name}:`, {
+                                            console.error(`❌ Geocoding failed for ${dep.location_name || dep.name}:`, {
+                                                status: status,
                                                 address: dep.address,
                                                 postal_code: dep.postal_code,
-                                                city: dep.city,
-                                                status: status
+                                                city: dep.city
                                             });
                                             resolve(null);
                                         }
                                     });
-                                });
-                            }));
-                            const validPoints = depositPoints.filter(Boolean) as PUDOPoint[];
+                                } catch (error) {
+                                    clearTimeout(timeout);
+                                    console.error(`❌ Geocoding exception for ${dep.location_name || dep.name}:`, error);
+                                    resolve(null);
+                                }
+                            });
+                        };
+
+                        // Geocode all deposits with concurrency control
+                        const depositPoints = await Promise.all(
+                            activeDeposits.map(geocodeWithTimeout)
+                        );
+                        
+                        const validPoints = depositPoints.filter(Boolean) as PUDOPoint[];
+                        console.log(`✅ Valid points after geocoding: ${validPoints.length}/${activeDeposits.length}`);
+                        
+                        if (validPoints.length > 0) {
                             allPoints = [...allPoints, ...validPoints];
+                        } else {
+                            console.warn('⚠️ No valid points after geocoding deposits');
                         }
-                    } 
+                    } else if (!window.google) {
+                        console.error('❌ Google Maps not loaded yet');
+                    }
+                } else {
+                    console.log('ℹ️ No active deposits found');
                 }
             } catch (e: any) {
-                console.error("Error fetching local deposits through proxy:", e);
-                // No toast here to avoid confusing the user if the proxy is temporarily down
+                console.error("❌ Error fetching local deposits:", e);
+                const errorMsg = e?.message || String(e);
+                if (errorMsg.includes('HTTP')) {
+                    toast.error("No se pudo conectar con el servicio de depósitos locales");
+                }
             }
 
+            console.log(`📊 Total points collected: ${allPoints.length}`);
             setPoints(allPoints);
             updateMarkers(allPoints, mapInstance);
         } catch (error: any) {
-            console.error("Error fetching PUDO points:", error);
+            console.error("❌ Error fetching PUDO points:", error);
             const message = error.message || "Error al conectar con Correos";
             toast.error(message);
         }
     };
 
     const updateMarkers = (pudoPoints: PUDOPoint[], mapInstance = map) => {
-        if (!mapInstance || !window.google) return;
+        if (!mapInstance || !window.google) {
+            console.warn('⚠️ Cannot update markers: map or google not ready', { hasMap: !!mapInstance, hasGoogle: !!window.google });
+            return;
+        }
 
         // Clear old markers
+        console.log(`🗑️ Clearing ${markersRef.current.length} old markers`);
         markersRef.current.forEach(marker => marker.setMap(null));
         markersRef.current = [];
 
-        pudoPoints.forEach(point => {
+        console.log(`📍 Adding ${pudoPoints.length} markers to map`);
+        pudoPoints.forEach((point, index) => {
             let iconUrl = "https://maps.google.com/mapfiles/ms/icons/blue-dot.png";
             if (point.tipo_punto === "Citypaq") iconUrl = "https://maps.google.com/mapfiles/ms/icons/yellow-dot.png";
             if (point.tipo_punto === "Deposito") iconUrl = "https://maps.google.com/mapfiles/ms/icons/green-dot.png";
 
-            const marker = new window.google.maps.Marker({
-                position: { lat: point.lat, lng: point.lng },
-                map: mapInstance,
-                title: point.nombre,
-                icon: {
-                    url: iconUrl,
-                    scaledSize: new window.google.maps.Size(32, 32)
-                }
-            });
+            try {
+                const marker = new window.google.maps.Marker({
+                    position: { lat: point.lat, lng: point.lng },
+                    map: mapInstance,
+                    title: point.nombre,
+                    icon: {
+                        url: iconUrl,
+                        scaledSize: new window.google.maps.Size(32, 32)
+                    }
+                });
 
-            marker.addListener("click", () => {
-                setSelectedPoint(point);
-            });
+                marker.addListener("click", () => {
+                    console.log(`📌 Selected marker: ${point.nombre}`);
+                    setSelectedPoint(point);
+                });
 
-            markersRef.current.push(marker);
+                markersRef.current.push(marker);
+                console.log(`✅ Marker ${index + 1} added: ${point.nombre} (${point.lat}, ${point.lng})`);
+            } catch (error) {
+                console.error(`❌ Error creating marker for ${point.nombre}:`, error);
+            }
         });
     };
 

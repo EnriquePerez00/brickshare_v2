@@ -46,7 +46,7 @@ INSERT INTO public.sets (
   2011,
   true,
   '30016',
-  'activo',
+  'active',
   85.00,
   50,
   0
@@ -77,7 +77,7 @@ INSERT INTO public.sets (
   2013,
   true,
   '30224',
-  'activo',
+  'active',
   90.00,
   60,
   1
@@ -108,7 +108,7 @@ INSERT INTO public.sets (
   2015,
   true,
   '30314',
-  'activo',
+  'active',
   95.00,
   65,
   1
@@ -139,7 +139,7 @@ INSERT INTO public.sets (
   2015,
   true,
   '30315',
-  'activo',
+  'active',
   88.00,
   55,
   1
@@ -170,7 +170,7 @@ INSERT INTO public.sets (
   2016,
   true,
   '30350',
-  'activo',
+  'active',
   100.00,
   75,
   1
@@ -204,7 +204,7 @@ INSERT INTO public.sets (
   2008,
   true,
   '20006',
-  'activo',
+  'active',
   110.00,
   90,
   0
@@ -235,7 +235,7 @@ INSERT INTO public.sets (
   2009,
   true,
   '20007',
-  'activo',
+  'active',
   125.00,
   110,
   0
@@ -266,7 +266,7 @@ INSERT INTO public.sets (
   2009,
   true,
   '20009',
-  'activo',
+  'active',
   130.00,
   125,
   0
@@ -297,7 +297,7 @@ INSERT INTO public.sets (
   2009,
   true,
   '20010',
-  'activo',
+  'active',
   130.00,
   125,
   0
@@ -328,7 +328,7 @@ INSERT INTO public.sets (
   2010,
   true,
   '20016',
-  'activo',
+  'active',
   115.00,
   95,
   0
@@ -362,7 +362,7 @@ INSERT INTO public.sets (
   2008,
   true,
   '19710',
-  'activo',
+  'active',
   110.00,
   95,
   0
@@ -393,7 +393,7 @@ INSERT INTO public.sets (
   2008,
   true,
   '19720',
-  'activo',
+  'active',
   110.00,
   95,
   0
@@ -424,7 +424,7 @@ INSERT INTO public.sets (
   2008,
   true,
   '21000',
-  'activo',
+  'active',
   110.00,
   95,
   0
@@ -455,7 +455,7 @@ INSERT INTO public.sets (
   2011,
   true,
   '21000-2',
-  'activo',
+  'active',
   110.00,
   95,
   0
@@ -486,7 +486,7 @@ INSERT INTO public.sets (
   2008,
   true,
   '21001',
-  'activo',
+  'active',
   115.00,
   100,
   0

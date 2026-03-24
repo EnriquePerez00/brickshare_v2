@@ -47,6 +47,8 @@ push_*.log
 # Database backups
 backups/
 *.sql.backup
+supabase/backups/
+supabase/dump_reset.sql
 
 # Keep schema documentation (auto-generated but versioned)
 !docs/DATABASE_SCHEMA.md

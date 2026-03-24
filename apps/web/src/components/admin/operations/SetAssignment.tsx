@@ -270,8 +270,8 @@ const SetAssignment = () => {
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                     <div>
-                        <CardTitle>Asignación Automática de Sets</CardTitle>
-                        <p className="text-sm text-muted-foreground mt-1">
+                        <CardTitle data-testid="assignment-title">Asignación Automática de Sets</CardTitle>
+                        <p className="text-sm text-muted-foreground mt-1" data-testid="assignment-subtitle">
                             {viewMode === "initial" && "Genera una propuesta de asignaciones basada en wishlists y stock disponible"}
                             {viewMode === "preview" && "Revisa la propuesta y confírmala o cancélala"}
                             {viewMode === "confirmed" && "Asignaciones confirmadas - puedes eliminar aquí si es necesario"}
@@ -283,6 +283,7 @@ const SetAssignment = () => {
                                 onClick={handleGenerateProposal}
                                 disabled={previewMutation.isPending}
                                 className="bg-primary hover:bg-primary/90"
+                                data-testid="assignment-generate-preview-button"
                             >
                                 {previewMutation.isPending ? (
                                     <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
@@ -298,6 +299,7 @@ const SetAssignment = () => {
                                     onClick={handleCancelPreview}
                                     variant="outline"
                                     disabled={confirmMutation.isPending}
+                                    data-testid="assignment-cancel-preview-button"
                                 >
                                     <XCircle className="h-4 w-4 mr-2" />
                                     Cancelar
@@ -306,6 +308,7 @@ const SetAssignment = () => {
                                     onClick={handleConfirmAssignments}
                                     disabled={confirmMutation.isPending}
                                     className="bg-green-600 hover:bg-green-700"
+                                    data-testid="assignment-confirm-button"
                                 >
                                     {confirmMutation.isPending ? (
                                         <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
@@ -320,6 +323,7 @@ const SetAssignment = () => {
                             <Button
                                 onClick={() => setViewMode("initial")}
                                 variant="outline"
+                                data-testid="assignment-new-proposal-button"
                             >
                                 <RefreshCw className="h-4 w-4 mr-2" />
                                 Nueva propuesta
@@ -329,7 +333,7 @@ const SetAssignment = () => {
                 </CardHeader>
                 <CardContent>
                     {viewMode === "initial" && (
-                        <div className="text-center py-12">
+                        <div className="text-center py-12" data-testid="assignment-initial-state">
                             <Package2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                             <p className="text-muted-foreground">
                                 Haz clic en "Genera propuesta de asignación" para ver qué sets se asignarían.
@@ -338,7 +342,7 @@ const SetAssignment = () => {
                     )}
 
                     {viewMode === "preview" && (
-                        <div>
+                        <div data-testid="assignment-preview-content">
                             <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
                                 <p className="text-sm text-blue-900 dark:text-blue-100">
                                     <strong>Vista previa:</strong> Esta es una propuesta. No se han realizado cambios en la base de datos.
@@ -346,7 +350,7 @@ const SetAssignment = () => {
                                 </p>
                             </div>
                             <div className="rounded-md border">
-                                <Table>
+                                <Table data-testid="assignment-preview-table">
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>Usuario</TableHead>
@@ -356,7 +360,7 @@ const SetAssignment = () => {
                                     </TableHeader>
                                     <TableBody>
                                         {previewAssignments.map((assignment) => (
-                                            <TableRow key={assignment.user_id}>
+                                            <TableRow key={assignment.user_id} data-testid={`assignment-row-${assignment.user_id}`}>
                                                 <TableCell className="font-medium">
                                                     {assignment.user_name}
                                                 </TableCell>
@@ -375,7 +379,7 @@ const SetAssignment = () => {
                     )}
 
                     {viewMode === "confirmed" && (
-                        <div>
+                        <div data-testid="assignment-confirmed-content">
                             {confirmedShipments.length === 0 ? (
                                 <div className="text-center py-12">
                                     <Package2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -385,7 +389,7 @@ const SetAssignment = () => {
                                 </div>
                             ) : (
                                 <div className="rounded-md border">
-                                    <Table>
+                                    <Table data-testid="assignment-confirmed-table">
                                         <TableHeader>
                                             <TableRow>
                                                 <TableHead>Usuario</TableHead>
@@ -396,7 +400,7 @@ const SetAssignment = () => {
                                         </TableHeader>
                                         <TableBody>
                                             {confirmedShipments.map((shipment) => (
-                                                <TableRow key={shipment.shipment_id}>
+                                                <TableRow key={shipment.shipment_id} data-testid={`confirmed-shipment-row-${shipment.shipment_id}`}>
                                                     <TableCell className="font-medium">
                                                         {shipment.user_name}
                                                     </TableCell>
@@ -414,7 +418,7 @@ const SetAssignment = () => {
                                                         </div>
                                                     </TableCell>
                                                     <TableCell className="text-center">
-                                                        <div className="flex justify-center gap-1">
+                                                        <div className="flex justify-center gap-1" data-testid={`shipment-actions-${shipment.shipment_id}`}>
                                                             {shipment.correos_shipment_id ? (
                                                                 <Button
                                                                     variant="ghost"
@@ -427,6 +431,7 @@ const SetAssignment = () => {
                                                                         });
                                                                     }}
                                                                     className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                                                    data-testid={`shipment-label-button-${shipment.shipment_id}`}
                                                                 >
                                                                     <Package2 className="h-4 w-4 mr-1" />
                                                                     Etiqueta
@@ -441,6 +446,7 @@ const SetAssignment = () => {
                                                                             body: { action: 'preregister', p_shipment_id: shipment.shipment_id }
                                                                         }).then(() => toast.success("Preregistro solicitado"));
                                                                     }}
+                                                                    data-testid={`shipment-retry-button-${shipment.shipment_id}`}
                                                                 >
                                                                     <RefreshCw className="h-4 w-4" />
                                                                 </Button>
@@ -451,6 +457,7 @@ const SetAssignment = () => {
                                                                 onClick={() => handleDeleteClick(shipment.shipment_id)}
                                                                 disabled={deleteMutation.isPending}
                                                                 className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                                data-testid={`shipment-delete-button-${shipment.shipment_id}`}
                                                             >
                                                                 <Trash2 className="h-4 w-4" />
                                                             </Button>

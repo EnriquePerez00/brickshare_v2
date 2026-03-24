@@ -823,6 +823,7 @@ export type Database = {
           referral_credits: number
           referred_by: string | null
           stripe_customer_id: string | null
+          stripe_payment_method_id: string | null
           subscription_status: string | null
           subscription_type: string | null
           updated_at: string
@@ -847,6 +848,7 @@ export type Database = {
           referral_credits?: number
           referred_by?: string | null
           stripe_customer_id?: string | null
+          stripe_payment_method_id?: string | null
           subscription_status?: string | null
           subscription_type?: string | null
           updated_at?: string
@@ -871,6 +873,7 @@ export type Database = {
           referral_credits?: number
           referred_by?: string | null
           stripe_customer_id?: string | null
+          stripe_payment_method_id?: string | null
           subscription_status?: string | null
           subscription_type?: string | null
           updated_at?: string
