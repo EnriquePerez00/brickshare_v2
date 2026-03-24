@@ -1,4 +1,4 @@
-#!/bin/bash
+ el seed#!/bin/bash
 # Wrapper script for 'supabase db reset' that triggers pre-reset hook
 # Usage: ./scripts/db-reset.sh [supabase db reset options]
 
@@ -40,7 +40,10 @@ echo -e "${GREEN}╔════════════════════
 echo -e "${GREEN}║   ✅ Database reset completed successfully!       ║${NC}"
 echo -e "${GREEN}╚═══════════════════════════════════════════════════╝${NC}"
 echo ""
-echo -e "${BLUE}💡 Tip: Your backup is saved at:${NC}"
-echo -e "   📄 supabase/last_dump.sql (latest)"
+echo -e "${BLUE}💡 Database restored from:${NC}"
+echo -e "   📄 supabase/seed.sql (official seed data)"
+echo -e "   📁 supabase/migrations/*.sql (schema)"
+echo ""
+echo -e "${BLUE}💾 Backup saved at:${NC}"
 echo -e "   📁 supabase/backups/pre_reset_*.sql (timestamped)"
 echo ""

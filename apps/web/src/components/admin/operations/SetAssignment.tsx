@@ -149,7 +149,7 @@ const SetAssignment = () => {
                         body: {
                             userId: assignment.user_id,
                             setRef: assignment.set_ref,
-                            setPrice: assignment.set_price || 100.00
+                            pudoType: assignment.pudo_type
                         }
                     }
                 );
@@ -251,7 +251,7 @@ const SetAssignment = () => {
                     body: {
                         userId: assignment.user_id,
                         setRef: assignment.set_ref,
-                        setPrice: assignment.set_price || 100.00
+                        pudoType: assignment.pudo_type
                     }
                 }
             );
@@ -468,7 +468,7 @@ const SetAssignment = () => {
                                             <TableHead>Usuario</TableHead>
                                             <TableHead>Set Propuesto (Ref)</TableHead>
                                             <TableHead className="text-center">Stock Actual</TableHead>
-                                            <TableHead className="text-center">Acciones</TableHead>
+                                            <TableHead className="text-right">Confirmar Individual</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -483,30 +483,27 @@ const SetAssignment = () => {
                                                 <TableCell className="text-center">
                                                     <Badge variant="outline">{assignment.current_stock} disponible</Badge>
                                                 </TableCell>
-                                                <TableCell className="text-center">
-                                                    <TooltipProvider>
-                                                        <Tooltip>
-                                                            <TooltipTrigger asChild>
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    onClick={() => handleConfirmSingleAssignment(assignment)}
-                                                                    disabled={confirmMutation.isPending || confirmSingleMutation.isPending || confirmingUserId === assignment.user_id}
-                                                                    className="text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950"
-                                                                    data-testid={`confirm-single-${assignment.user_id}`}
-                                                                >
-                                                                    {confirmingUserId === assignment.user_id ? (
-                                                                        <RefreshCw className="h-5 w-5 animate-spin" />
-                                                                    ) : (
-                                                                        <UserCheck className="h-5 w-5" />
-                                                                    )}
-                                                                </Button>
-                                                            </TooltipTrigger>
-                                                            <TooltipContent>
-                                                                <p>Asignar solo a este usuario</p>
-                                                            </TooltipContent>
-                                                        </Tooltip>
-                                                    </TooltipProvider>
+                                                <TableCell className="text-right">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => handleConfirmSingleAssignment(assignment)}
+                                                        disabled={confirmMutation.isPending || confirmSingleMutation.isPending || confirmingUserId === assignment.user_id}
+                                                        className="text-green-600 border-green-600 hover:bg-green-600 hover:text-white"
+                                                        data-testid={`confirm-single-${assignment.user_id}`}
+                                                    >
+                                                        {confirmingUserId === assignment.user_id ? (
+                                                            <>
+                                                                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                                                                Procesando...
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <UserCheck className="h-4 w-4 mr-2" />
+                                                                Confirmar
+                                                            </>
+                                                        )}
+                                                    </Button>
                                                 </TableCell>
                                             </TableRow>
                                         ))}

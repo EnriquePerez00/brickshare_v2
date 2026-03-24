@@ -156,7 +156,11 @@ supabase start                 # Backend Docker local
 supabase status                # Ver credenciales
 
 # Base de datos
-supabase db reset              # Reset + aplicar todas las migraciones
+### ❌ NUNCA hagas:
+supabase db reset              # NO usar directamente
+
+### ✅ SIEMPRE usa:
+./scripts/db-reset.sh          # Reset con backup automático y seeds
 supabase gen types typescript --local > src/types/supabase.ts  # Regenerar tipos
 psql postgresql://postgres:postgres@127.0.0.1:54322/postgres   # Conectar a BD
 

@@ -329,8 +329,15 @@ export function transformPUDOPointToCorreosPudo(pudoPoint: PUDOPoint): Partial<C
 export function transformPUDOPointToBricksharePudo(pudoPoint: PUDOPoint): Partial<BricksharePudoPoint> {
     console.log('🔄 [transformPUDOPointToBricksharePudo] Transforming point:', pudoPoint);
     
+    // IMPORTANT: id_correos_pudo from PudoSelector is the universal ID field
+    // For Brickshare deposits, this contains the Brickshare location ID
+    if (!pudoPoint.id_correos_pudo) {
+        console.error('❌ [transformPUDOPointToBricksharePudo] Missing id_correos_pudo');
+        throw new Error('Cannot transform PUDO point: missing ID');
+    }
+    
     const transformed = {
-        brickshare_pudo_id: pudoPoint.id_correos_pudo,
+        brickshare_pudo_id: pudoPoint.id_correos_pudo, // This is the key mapping
         location_name: pudoPoint.nombre,
         address: pudoPoint.direccion,
         city: pudoPoint.ciudad,

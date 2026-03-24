@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase
 import * as dotenv from 'dotenv';
 import path from 'path';
 

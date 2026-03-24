@@ -61,7 +61,7 @@ serve(async (req) => {
     }
 
     try {
-        const { userId, setRef, setPrice } = await req.json();
+        const { userId, setRef, pudoType } = await req.json();
 
         // JWT Verification
         const authHeader = req.headers.get('Authorization')
@@ -118,9 +118,6 @@ serve(async (req) => {
             });
         }
 
-        // Use default price of 100 EUR if not provided or null
-        const finalSetPrice = setPrice || 100.00;
-
         const sbUrl = Deno.env.get("SUPABASE_URL");
         const sbKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
@@ -156,7 +153,20 @@ serve(async (req) => {
 
         const stripeCustomerId = userProfile.stripe_customer_id;
 
-        // 2. Get default payment method
+        // 2. Check if user has Correos PUDO - only charge if Correos
+        if (pudoType !== 'correos') {
+            console.log(`No charge needed for user ${userId} with pudo_type: ${pudoType || 'not set'}`);
+            return new Response(JSON.stringify({
+                success: true,
+                message: "No charge required for Brickshare PUDO",
+                transportAmount: 0
+            }), {
+                status: 200,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+        }
+
+        // 3. Get default payment method (only for Correos users)
         const paymentMethod = await getDefaultPaymentMethod(stripeCustomerId);
 
         if (!paymentMethod) {
@@ -172,78 +182,29 @@ serve(async (req) => {
             });
         }
 
-        // 3. FIRST: Create PaymentIntent for Deposit (Fianza) - Immediate capture (Custody)
-        const depositAmount = Math.round(finalSetPrice * 100); // Convert to cents
-        let depositPaymentIntent;
-
-        try {
-            depositPaymentIntent = await stripe.paymentIntents.create({
-                amount: depositAmount,
-                currency: "eur",
-                customer: stripeCustomerId,
-                payment_method: paymentMethod,
-                off_session: true,
-                confirm: true,
-                capture_method: "automatic", // Immediate charge, held in custody
-                description: `Fianza en custodia por set ${setRef}`,
-                metadata: {
-                    user_id: userId,
-                    set_ref: setRef,
-                    type: "deposit"
-                }
-            });
-
-            console.log(`Deposit charge created: ${depositPaymentIntent.id}, status: ${depositPaymentIntent.status}, amount: ${finalSetPrice} EUR`);
-
-            // Check if capture was successful
-            if (depositPaymentIntent.status !== "succeeded") {
-                throw new Error(`Deposit payment failed with status: ${depositPaymentIntent.status}`);
-            }
-
-        } catch (error: any) {
-            console.error("Deposit authorization failed:", error);
-
-            let errorCode = "stripe_error";
-            if (error.code === "insufficient_funds" || error.decline_code === "insufficient_funds") {
-                errorCode = "insufficient_funds";
-            } else if (error.code === "card_declined" || error.type === "card_error") {
-                errorCode = "card_declined";
-            }
-
-            return new Response(JSON.stringify({
-                success: false,
-                error: error.message || "Error al autorizar la fianza",
-                errorCode: errorCode,
-                failedOperation: "deposit",
-                userEmail: userProfile.email
-            }), {
-                status: 400,
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
-            });
-        }
-
-        // 4. SECOND: Create PaymentIntent for Transport - Immediate charge
+        // 4. Create PaymentIntent for Transport Fee (Correos only) - Immediate charge
         let transportPaymentIntent;
         const shippingCost = parseInt(Deno.env.get("COSTE_ENVIO_DEVOLUCION") ?? "10");
 
         try {
             transportPaymentIntent = await stripe.paymentIntents.create({
-                amount: shippingCost * 100, // Using environment variable
+                amount: shippingCost * 100,
                 currency: "eur",
                 customer: stripeCustomerId,
                 payment_method: paymentMethod,
                 off_session: true,
                 confirm: true,
-                capture_method: "automatic", // Immediate capture
-                description: `Gastos de transporte - Set ${setRef}`,
+                capture_method: "automatic",
+                description: `Gastos de transporte Correos - Set ${setRef}`,
                 metadata: {
                     user_id: userId,
                     set_ref: setRef,
-                    type: "transport"
+                    type: "transport",
+                    pudo_type: "correos"
                 }
             });
 
-            console.log(`Transport charge created: ${transportPaymentIntent.id}, status: ${transportPaymentIntent.status}, amount: ${shippingCost} EUR`);
+            console.log(`Transport fee charged: ${transportPaymentIntent.id}, status: ${transportPaymentIntent.status}, amount: ${shippingCost} EUR`);
 
             // Check if charge was successful
             if (transportPaymentIntent.status !== "succeeded") {
@@ -253,9 +214,6 @@ serve(async (req) => {
         } catch (error: any) {
             console.error("Transport charge failed:", error);
 
-            // ROLLBACK: Cancel the deposit authorization
-            await cancelPaymentIntent(depositPaymentIntent.id);
-
             let errorCode = "stripe_error";
             if (error.code === "insufficient_funds" || error.decline_code === "insufficient_funds") {
                 errorCode = "insufficient_funds";
@@ -265,7 +223,7 @@ serve(async (req) => {
 
             return new Response(JSON.stringify({
                 success: false,
-                error: `Cobro de transporte falló: ${error.message}. Se canceló la autorización de fianza.`,
+                error: error.message || "Error al procesar cobro de transporte",
                 errorCode: errorCode,
                 failedOperation: "transport",
                 userEmail: userProfile.email
@@ -275,12 +233,10 @@ serve(async (req) => {
             });
         }
 
-        // 5. Success: Both operations completed
+        // 5. Success: Transport fee charged
         return new Response(JSON.stringify({
             success: true,
-            depositPaymentIntentId: depositPaymentIntent.id,
             transportPaymentIntentId: transportPaymentIntent.id,
-            depositAmount: depositAmount / 100,
             transportAmount: shippingCost
         }), {
             status: 200,

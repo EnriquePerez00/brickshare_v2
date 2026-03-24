@@ -335,4 +335,3 @@ Después de aplicar `seed_full.sql`, deberías tener:
 
 **Última actualización**: 24 de marzo de 2026  
 **Versión del dump**: Compatible con PostgreSQL 17  
-**Estado**: ✅ Archivo generado y verificado

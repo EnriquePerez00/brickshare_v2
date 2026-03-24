@@ -45,98 +45,154 @@ CREATE TYPE "public"."operation_type" AS ENUM (
 ALTER TYPE "public"."operation_type" OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."confirm_assign_sets_to_users"("user_ids" "uuid"[]) RETURNS TABLE("success" boolean, "message" "text", "user_id" "uuid", "set_id" "uuid")
+CREATE OR REPLACE FUNCTION "public"."confirm_assign_sets_to_users"("p_user_ids" "uuid"[]) RETURNS TABLE("envio_id" "uuid", "user_id" "uuid", "set_id" "uuid", "order_id" "uuid", "user_name" "text", "user_email" "text", "user_phone" "text", "set_name" "text", "set_ref" "text", "set_weight" numeric, "set_dim" "text", "pudo_id" "text", "pudo_name" "text", "pudo_address" "text", "pudo_cp" "text", "pudo_city" "text", "pudo_province" "text", "created_at" timestamp with time zone)
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
     AS $$
 DECLARE
-    v_user_id UUID;
-    v_set_id UUID;
-    v_has_pudo BOOLEAN;
+    r RECORD;
+    target_set_id UUID;
+    new_order_id UUID;
+    new_envio_id UUID;
+    v_set_name TEXT;
+    v_set_ref TEXT;
+    v_set_weight NUMERIC;
+    v_set_dim TEXT;
+    v_user_email TEXT;
+    v_user_phone TEXT;
+    v_pudo_id TEXT;
+    v_pudo_name TEXT;
+    v_pudo_address TEXT;
+    v_pudo_cp TEXT;
+    v_pudo_city TEXT;
+    v_pudo_province TEXT;
+    v_created_at TIMESTAMPTZ;
 BEGIN
-    -- Validate all users have PUDO configured
-    FOR v_user_id IN SELECT unnest(user_ids) LOOP
-        -- Check if user has PUDO configured
-        SELECT EXISTS(
-            SELECT 1 FROM public.users 
-            WHERE users.user_id = v_user_id 
-            AND pudo_type IS NOT NULL 
-            AND pudo_id IS NOT NULL
-        ) INTO v_has_pudo;
-        
-        IF NOT v_has_pudo THEN
-            RETURN QUERY SELECT 
-                FALSE,
-                'User does not have a PUDO point configured',
-                v_user_id,
-                NULL::UUID;
-            CONTINUE;
-        END IF;
-        
-        -- Get the proposed set for this user
-        SELECT proposed_set_id INTO v_set_id
-        FROM public.users
-        WHERE users.user_id = v_user_id;
-        
-        IF v_set_id IS NULL THEN
-            RETURN QUERY SELECT 
-                FALSE,
-                'No set proposed for this user',
-                v_user_id,
-                NULL::UUID;
-            CONTINUE;
-        END IF;
-        
-        -- Create shipment
-        INSERT INTO public.shipments (
-            user_id,
-            set_id,
-            set_ref,
-            shipment_status,
-            shipment_type,
-            created_at,
-            updated_at
-        )
+    -- Loop through each user to confirm their assignment
+    FOR r IN (
         SELECT 
-            v_user_id,
-            v_set_id,
+            u.user_id,
+            u.full_name,
+            u.email,
+            u.phone,
+            p.correos_id_pudo,
+            p.correos_name,
+            p.correos_full_address,
+            p.correos_zip_code,
+            p.correos_city,
+            p.correos_province
+        FROM public.users u
+        LEFT JOIN public.users_correos_dropping p ON u.user_id = p.user_id
+        WHERE u.user_id = ANY(p_user_ids)
+          AND u.user_status IN ('no_set', 'set_returning')
+          AND EXISTS (
+              SELECT 1 
+              FROM public.wishlist w 
+              WHERE w.user_id = u.user_id 
+                AND w.status = true
+          )
+    ) LOOP
+        -- Find the first available set from user's wishlist
+        SELECT 
+            w.set_id,
+            s.set_name,
             s.set_ref,
-            'pending',
-            'outbound',
-            NOW(),
-            NOW()
-        FROM public.sets s
-        WHERE s.id = v_set_id
-        RETURNING shipments.id INTO v_set_id; -- Reusing variable for shipment_id
-        
-        -- Update inventory
-        UPDATE public.inventory_sets
-        SET 
-            available_stock = available_stock - 1,
-            in_transit = in_transit + 1,
-            updated_at = NOW()
-        WHERE set_id = (SELECT proposed_set_id FROM public.users WHERE users.user_id = v_user_id);
-        
-        -- Clear proposed_set_id
-        UPDATE public.users
-        SET 
-            proposed_set_id = NULL,
-            updated_at = NOW()
-        WHERE users.user_id = v_user_id;
-        
-        RETURN QUERY SELECT 
-            TRUE,
-            'Assignment confirmed successfully',
-            v_user_id,
-            v_set_id;
+            s.set_weight,
+            s.set_dim
+        INTO 
+            target_set_id,
+            v_set_name,
+            v_set_ref,
+            v_set_weight,
+            v_set_dim
+        FROM public.wishlist w
+        JOIN public.inventory_sets i ON w.set_id = i.set_id
+        JOIN public.sets s ON w.set_id = s.id
+        WHERE w.user_id = r.user_id
+          AND w.status = true
+          AND i.inventory_set_total_qty > 0
+        ORDER BY w.created_at ASC
+        LIMIT 1;
+
+        IF target_set_id IS NOT NULL THEN
+            -- Update inventory
+            UPDATE public.inventory_sets
+            SET 
+                inventory_set_total_qty = inventory_set_total_qty - 1,
+                in_shipping = in_shipping + 1
+            WHERE inventory_sets.set_id = target_set_id;
+
+            -- Create order
+            INSERT INTO public.orders (user_id, set_id, status)
+            VALUES (r.user_id, target_set_id, 'pending')
+            RETURNING id INTO new_order_id;
+
+            -- Create shipment
+            INSERT INTO public.shipments (
+                order_id,
+                user_id,
+                shipment_status,
+                shipping_address,
+                shipping_city,
+                shipping_zip_code,
+                shipping_country
+            )
+            VALUES (
+                new_order_id,
+                r.user_id,
+                'pending',
+                COALESCE(r.correos_full_address, 'Pending assignment'),
+                COALESCE(r.correos_city, 'Pending'),
+                COALESCE(r.correos_zip_code, '00000'),
+                'España'
+            )
+            RETURNING shipments.id, shipments.created_at
+            INTO new_envio_id, v_created_at;
+
+            -- Update user status
+            UPDATE public.users
+            SET user_status = 'set_shipping'
+            WHERE users.user_id = r.user_id;
+
+            -- Mark wishlist item as assigned
+            UPDATE public.wishlist
+            SET 
+                status = false,
+                status_changed_at = now()
+            WHERE wishlist.user_id = r.user_id
+              AND wishlist.set_id = target_set_id;
+
+            -- Populate return record
+            confirm_assign_sets_to_users.envio_id := new_envio_id;
+            confirm_assign_sets_to_users.user_id := r.user_id;
+            confirm_assign_sets_to_users.set_id := target_set_id;
+            confirm_assign_sets_to_users.order_id := new_order_id;
+            confirm_assign_sets_to_users.user_name := r.full_name;
+            confirm_assign_sets_to_users.user_email := r.email;
+            confirm_assign_sets_to_users.user_phone := r.phone;
+            confirm_assign_sets_to_users.set_name := v_set_name;
+            confirm_assign_sets_to_users.set_ref := v_set_ref;
+            confirm_assign_sets_to_users.set_weight := v_set_weight;
+            confirm_assign_sets_to_users.set_dim := v_set_dim;
+            confirm_assign_sets_to_users.pudo_id := r.correos_id_pudo;
+            confirm_assign_sets_to_users.pudo_name := r.correos_name;
+            confirm_assign_sets_to_users.pudo_address := r.correos_full_address;
+            confirm_assign_sets_to_users.pudo_cp := r.correos_zip_code;
+            confirm_assign_sets_to_users.pudo_city := r.correos_city;
+            confirm_assign_sets_to_users.pudo_province := r.correos_province;
+            confirm_assign_sets_to_users.created_at := v_created_at;
+            
+            RETURN NEXT;
+        END IF;
     END LOOP;
 END;
 $$;
 
 
-ALTER FUNCTION "public"."confirm_assign_sets_to_users"("user_ids" "uuid"[]) OWNER TO "postgres";
+ALTER FUNCTION "public"."confirm_assign_sets_to_users"("p_user_ids" "uuid"[]) OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."confirm_assign_sets_to_users"("user_ids" "uuid"[]) IS 'Confirms set assignments for users. Validates that each user has a PUDO point configured before proceeding.';
+COMMENT ON FUNCTION "public"."confirm_assign_sets_to_users"("p_user_ids" "uuid"[]) IS 'Confirms set assignments for users. Creates orders, shipments, updates inventory and wishlist. Requires PUDO point configured (enforced by frontend validation).';
 
 
 
@@ -554,7 +610,7 @@ $$;
 ALTER FUNCTION "public"."increment_referral_credits"("p_user_id" "uuid", "p_amount" integer) OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."preview_assign_sets_to_users"() RETURNS TABLE("user_id" "uuid", "user_name" "text", "set_id" "uuid", "set_name" "text", "set_ref" "text", "set_price" numeric, "current_stock" integer, "matches_wishlist" boolean)
+CREATE OR REPLACE FUNCTION "public"."preview_assign_sets_to_users"() RETURNS TABLE("user_id" "uuid", "user_name" "text", "set_id" "uuid", "set_name" "text", "set_ref" "text", "set_price" numeric, "current_stock" integer, "matches_wishlist" boolean, "pudo_type" "text")
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
     AS $$
@@ -566,12 +622,13 @@ DECLARE
     v_set_price DECIMAL;
     v_current_stock INTEGER;
     v_matches_wishlist BOOLEAN;
+    v_pudo_type TEXT;
 BEGIN
     -- Loop through eligible users (those without a set and are regular users)
     FOR r IN (
-        SELECT u.user_id, u.full_name
+        SELECT u.user_id, u.full_name, u.pudo_type
         FROM public.users u
-        WHERE u.user_status IN ('no_set', 'set_returning')  -- FIXED: Changed from Spanish to English
+        WHERE u.user_status IN ('no_set', 'set_returning')
           -- Only include users who don't have admin or operador roles
           AND NOT EXISTS (
               SELECT 1 FROM public.user_roles ur
@@ -581,6 +638,7 @@ BEGIN
     ) LOOP
         v_set_id := NULL;
         v_matches_wishlist := FALSE;
+        v_pudo_type := r.pudo_type;
         
         -- Try to find set from user's wishlist that they haven't had before
         SELECT w.set_id, s.set_name, s.set_ref, 
@@ -628,6 +686,7 @@ BEGIN
             preview_assign_sets_to_users.set_price := v_set_price;
             preview_assign_sets_to_users.current_stock := v_current_stock;
             preview_assign_sets_to_users.matches_wishlist := v_matches_wishlist;
+            preview_assign_sets_to_users.pudo_type := v_pudo_type;
             RETURN NEXT;
         END IF;
     END LOOP;
@@ -636,6 +695,10 @@ $$;
 
 
 ALTER FUNCTION "public"."preview_assign_sets_to_users"() OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."preview_assign_sets_to_users"() IS 'Generates a preview of set assignments for eligible users. Includes pudo_type to determine if Correos preregistration should be executed.';
+
 
 
 CREATE OR REPLACE FUNCTION "public"."process_referral_credit"("p_referee_user_id" "uuid") RETURNS "void"
@@ -2247,9 +2310,9 @@ GRANT USAGE ON SCHEMA "public" TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."confirm_assign_sets_to_users"("user_ids" "uuid"[]) TO "anon";
-GRANT ALL ON FUNCTION "public"."confirm_assign_sets_to_users"("user_ids" "uuid"[]) TO "authenticated";
-GRANT ALL ON FUNCTION "public"."confirm_assign_sets_to_users"("user_ids" "uuid"[]) TO "service_role";
+GRANT ALL ON FUNCTION "public"."confirm_assign_sets_to_users"("p_user_ids" "uuid"[]) TO "anon";
+GRANT ALL ON FUNCTION "public"."confirm_assign_sets_to_users"("p_user_ids" "uuid"[]) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."confirm_assign_sets_to_users"("p_user_ids" "uuid"[]) TO "service_role";
 
 
 

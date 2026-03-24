@@ -12,6 +12,19 @@
 3. **No repitas código:** Si solo cambias una línea, no me devuelvas el archivo entero; usa bloques de diff o solo la parte afectada.
 4. **Pensamiento Interno:** Minimiza el razonamiento paso a paso si la solución es trivial.
 
+### ❌ __NUNCA hagas:__
+
+```bash
+supabase db reset
+```
+
+### ✅ __SIEMPRE usa:__
+
+```bash
+./scripts/db-reset.sh
+```
+
+
 ## 1. Esquema del Repositorio
 
 ```
