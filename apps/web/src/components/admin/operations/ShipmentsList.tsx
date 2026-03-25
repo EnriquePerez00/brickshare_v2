@@ -41,7 +41,7 @@ const ShipmentsList = () => {
     const filteredShipments = useMemo(() => {
         if (!shipments) return [];
 
-        let filtered = shipments.filter((shipment) => {
+        const filtered = shipments.filter((shipment) => {
             // Filter by user name
             if (filters.userName) {
                 const userName = shipment.users?.full_name?.toLowerCase() || "";
