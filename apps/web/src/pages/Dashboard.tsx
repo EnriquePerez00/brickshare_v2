@@ -44,35 +44,22 @@ const Dashboard = () => {
 
   const handlePudoSelect = async (point: PUDOPoint) => {
     try {
-      console.log('📍 [handlePudoSelect] Selected point:', point);
-      console.log('📍 [handlePudoSelect] Point tipo_punto value:', point.tipo_punto);
-      
       // Normalize the tipo_punto to match database constraints
       const normalizedType = normalizePudoPointType(point.tipo_punto);
-      console.log('📍 [handlePudoSelect] Normalized type:', normalizedType);
       
       if (normalizedType === 'Deposito') {
         // This is a Brickshare PUDO
-        console.log('🏢 [handlePudoSelect] Processing as Brickshare deposit');
         const pudoData = transformPUDOPointToBricksharePudo(point);
-        console.log('✅ [handlePudoSelect] Brickshare PUDO data:', pudoData);
         await saveBricksharePudoMutation.mutateAsync(pudoData);
-        console.log('✅ [handlePudoSelect] Brickshare PUDO saved successfully');
       } else {
         // This is a Correos PUDO
-        console.log('📮 [handlePudoSelect] Processing as Correos point');
         const pudoData = transformPUDOPointToCorreosPudo(point);
-        console.log('✅ [handlePudoSelect] Correos PUDO data:', pudoData);
         await saveCorreosPudoMutation.mutateAsync(pudoData);
-        console.log('✅ [handlePudoSelect] Correos PUDO saved successfully');
       }
       
       toast.success("Punto de entrega actualizado correctamente");
       setIsPudoSelectorOpen(false);
     } catch (error) {
-      console.error("❌ [handlePudoSelect] Error updating PUDO:", error);
-      console.error("❌ [handlePudoSelect] Full error details:", JSON.stringify(error, null, 2));
-      
       // More descriptive error message
       let errorMessage = "Error al actualizar el punto de entrega";
       if (error instanceof Error) {
