@@ -226,7 +226,7 @@ const PudoSelector = ({ isOpen, onClose, onSelect, initialZipCode, initialAddres
                                             const locationType = results[0].geometry.location_type;
                                             
                                             const point: PUDOPoint = {
-                                                id_correos_pudo: dep.id,
+                                                id_correos_pudo: dep.pudo_id,
                                                 nombre: dep.location_name || dep.name,
                                                 direccion: dep.address,
                                                 cp: dep.postal_code,

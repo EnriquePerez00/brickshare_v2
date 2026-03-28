@@ -117,7 +117,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    // Set up periodic session validation (every 5 minutes)
+    // This catches cases where auth.users.id exists but public.users.user_id doesn't (corrupted sessions)
+    const validationInterval = setInterval(async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        try {
+          const { data: userExists } = await supabase
+            .from('users')
+            .select('user_id')
+            .eq('user_id', session.user.id)
+            .maybeSingle();
+
+          if (!userExists) {
+            console.error(
+              '❌ [AuthContext] Session validation failed: user_id not found in public.users',
+              'User Auth ID:', session.user.id,
+              'This indicates a corrupted session. Forcing logout.'
+            );
+            
+            // Force logout to clear corrupted session
+            await supabase.auth.signOut();
+            setUser(null);
+            setSession(null);
+            setProfile(null);
+            setIsAdmin(false);
+            setIsOperador(false);
+          }
+        } catch (error) {
+          console.error('❌ [AuthContext] Error during session validation:', error);
+        }
+      }
+    }, 5 * 60 * 1000); // Run every 5 minutes
+
+    return () => {
+      subscription.unsubscribe();
+      clearInterval(validationInterval);
+    };
   }, []);
 
   const signUp = async (email: string, password: string, fullName?: string) => {

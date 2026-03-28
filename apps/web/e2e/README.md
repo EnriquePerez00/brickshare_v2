@@ -122,12 +122,39 @@ QR Scanner → Delivery → Return → Maintenance → Logs → Export
 - ✅ View operation logs
 - ✅ Export logs as CSV
 
+## Quick Start (Resolución del Error de "plawright")
+
+Si encontraste el error `npm error 404 Not Found - GET https://registry.npmjs.org/plawright`, es porque hay un **typo en el comando**:
+
+❌ **Incorrecto**: `npx plawright test`  
+✅ **Correcto**: `npx playwright test` (con **y**)
+
+### Setup Rápido
+
+```bash
+# 1. Configurar variables de entorno automáticamente
+./apps/web/e2e/setup-e2e-env.sh
+
+# 2. Iniciar servidor de desarrollo (en otra terminal)
+cd apps/web && npm run dev
+
+# 3. Ejecutar tests E2E
+cd apps/web && npx playwright test
+```
+
+El script `setup-e2e-env.sh` crea automáticamente el archivo `.env.e2e.local` con:
+- ✅ `VITE_SUPABASE_URL` - URL de Supabase local
+- ✅ `VITE_SUPABASE_ANON_KEY` - Clave anónima
+- ✅ `SUPABASE_SERVICE_ROLE_KEY` - **Clave de servicio (crítica para E2E)**
+- ✅ `BASE_URL` - URL base para Playwright
+
 ## Installation
 
 ### Prerequisites
 - Node.js 16+
 - npm or yarn
 - Running Brickshare dev server
+- **Supabase CLI** instalado y corriendo
 
 ### Setup
 

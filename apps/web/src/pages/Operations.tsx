@@ -2,8 +2,9 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Truck, ClipboardList, Boxes, Settings, UserPlus } from "lucide-react";
+import { Truck, ClipboardList, Boxes, Settings, UserPlus, Tag } from "lucide-react";
 import SetAssignment from "@/components/admin/operations/SetAssignment";
+import LabelGeneration from "@/components/admin/operations/LabelGeneration";
 import ShipmentsList from "@/components/admin/operations/ShipmentsList";
 import ReturnsList from "@/components/admin/operations/ReturnsList";
 import MaintenanceList from "@/components/admin/inventory/MaintenanceList";
@@ -44,10 +45,14 @@ const Operations = () => {
                 </div>
 
                 <Tabs defaultValue="assignment" className="space-y-6">
-                    <TabsList className="grid w-full grid-cols-4 lg:w-[600px]">
+                    <TabsList className="grid w-full grid-cols-5 lg:w-[750px]">
                         <TabsTrigger value="assignment" className="flex items-center gap-2">
                             <UserPlus className="h-4 w-4" />
                             Asignación sets
+                        </TabsTrigger>
+                        <TabsTrigger value="labels" className="flex items-center gap-2">
+                            <Tag className="h-4 w-4" />
+                            Etiquetas
                         </TabsTrigger>
                         <TabsTrigger value="shipments" className="flex items-center gap-2">
                             <Truck className="h-4 w-4" />
@@ -65,6 +70,10 @@ const Operations = () => {
 
                     <TabsContent value="assignment" className="space-y-4">
                         <SetAssignment />
+                    </TabsContent>
+
+                    <TabsContent value="labels" className="space-y-4">
+                        <LabelGeneration />
                     </TabsContent>
 
                     <TabsContent value="shipments">

@@ -49,17 +49,17 @@ const AuthForm = ({
   }, [searchParams]);
 
   const redirectBasedOnRole = () => {
+    // Always navigate after successful auth
+    const targetPath = isAdmin ? "/admin" : isOperador ? "/operaciones" : "/dashboard";
+    
+    // If modal, close it first then navigate
     if (onSuccess) {
       onSuccess();
-      return;
-    }
-
-    if (isAdmin) {
-      navigate("/admin");
-    } else if (isOperador) {
-      navigate("/operaciones");
+      // Small delay to allow modal to close before navigation
+      setTimeout(() => navigate(targetPath), 100);
     } else {
-      navigate("/dashboard");
+      // Direct navigation if not in modal
+      navigate(targetPath);
     }
   };
 

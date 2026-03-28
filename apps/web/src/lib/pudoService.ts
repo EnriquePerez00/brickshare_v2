@@ -167,6 +167,16 @@ export async function getUserBricksharePudo(userId: string): Promise<BrickshareP
  * Save or update the user's selected Correos PUDO point
  */
 export async function saveUserCorreosPudo(userId: string, pudoData: Partial<CorreosPudoPoint>): Promise<void> {
+    // Validate user exists before attempting to save
+    console.log('🔍 [saveUserCorreosPudo] Validating user session...');
+    try {
+        await validateUserExists(userId);
+        console.log('✅ [saveUserCorreosPudo] User session validated');
+    } catch (validationError) {
+        console.error('❌ [saveUserCorreosPudo] User validation failed:', validationError);
+        throw validationError;
+    }
+
     // Delete any existing Brickshare PUDO
     await supabase
         .from("users_brickshare_dropping")
@@ -197,11 +207,40 @@ export async function saveUserCorreosPudo(userId: string, pudoData: Partial<Corr
 }
 
 /**
+ * Validate that user exists in auth.users (defensive check)
+ */
+async function validateUserExists(userId: string): Promise<void> {
+    const { data, error } = await supabase
+        .from('users')
+        .select('user_id')
+        .eq('user_id', userId)
+        .single();
+
+    if (error || !data) {
+        console.error('❌ [validateUserExists] User ID does not exist in public.users:', userId);
+        throw new Error(
+            'Invalid user session. Your user ID is not found in the database. ' +
+            'Please log out completely (localStorage.clear()) and log in again.'
+        );
+    }
+}
+
+/**
  * Save or update the user's selected Brickshare PUDO point
  */
 export async function saveUserBricksharePudo(userId: string, pudoData: Partial<BricksharePudoPoint>): Promise<void> {
     console.log('🏢 [saveUserBricksharePudo] Starting save for user:', userId);
     console.log('🏢 [saveUserBricksharePudo] PUDO data:', pudoData);
+    
+    // Validate user exists before attempting to save
+    console.log('🔍 [saveUserBricksharePudo] Validating user session...');
+    try {
+        await validateUserExists(userId);
+        console.log('✅ [saveUserBricksharePudo] User session validated');
+    } catch (validationError) {
+        console.error('❌ [saveUserBricksharePudo] User validation failed:', validationError);
+        throw validationError;
+    }
     
     // Delete any existing Correos PUDO
     console.log('🗑️ [saveUserBricksharePudo] Deleting existing Correos PUDO...');

@@ -1,21 +1,19 @@
 import { test, expect } from '@playwright/test';
 import { testUsers } from '../fixtures/test-data';
+import { loginAsAdmin } from '../helpers/auth';
 
 /**
  * Admin Journey: Set Assignment Operations
- * Tests admin assignment preview, confirmation, and shipment management
+ * Tests admin operations for assigning sets to users
  */
 
 test.describe('Admin Set Assignment Operations', () => {
   test.beforeEach(async ({ page }) => {
-    // Login as admin
-    await page.goto('/auth/signin');
-    await page.fill('[name="email"]', testUsers.adminUser.email);
-    await page.fill('[name="password"]', testUsers.adminUser.password);
-    await page.click('button:has-text("Sign In")');
-
-    // Wait for admin dashboard
-    await expect(page).toHaveURL(/.*admin|backoffice/i);
+    // Login as admin using helper
+    await loginAsAdmin(page);
+    
+    // Wait for auth to be loaded
+    await page.waitForTimeout(1000);
   });
 
   test('should access admin dashboard', async ({ page }) => {

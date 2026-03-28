@@ -27,15 +27,11 @@ This script synchronizes users from a remote Supabase instance (production/stagi
 
 ## 🔧 Configuration
 
-Add these variables to your `.env.main` file:
+⚠️ **DEPRECATED**: This script is no longer maintained as the project now uses 100% local development.
 
-```bash
-# Remote Supabase Configuration (Production/Staging)
-REMOTE_SUPABASE_URL=https://your-project-id.supabase.co
-REMOTE_SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
+Remote Supabase synchronization is no longer supported. All development is performed locally using Docker.
 
-⚠️ **Important**: The Service Role Key is sensitive! Never commit it to version control.
+For testing purposes, create local test users directly using the provided scripts.
 
 ## 🚀 Usage
 
@@ -68,8 +64,14 @@ npm run sync-users
 
 The script provides detailed output during execution:
 
+
+📥 Fetching users from remote Supabase...
+   URL: https://your-project.supabase.co
 ```
-🚀 Starting Auth Users Sync to Local Database
+🚀 Starting Auth Users Sync to Local Database [DEPRECATED]
+
+📥 Fetching users from remote Supabase... [This script is no longer maintained]
+   URL: [local only]
 ============================================================
 
 📥 Fetching users from remote Supabase...
@@ -206,31 +208,12 @@ psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -c \
 
 ## 📝 Additional Options
 
-### Sync from Different Environment
+### Use Local Test Scripts Instead
 
-Create multiple environment files:
-
-```bash
-# .env.production
-REMOTE_SUPABASE_URL=https://prod.supabase.co
-REMOTE_SUPABASE_SERVICE_ROLE_KEY=prod_key_here
-
-# .env.staging  
-REMOTE_SUPABASE_URL=https://staging.supabase.co
-REMOTE_SUPABASE_SERVICE_ROLE_KEY=staging_key_here
-```
-
-Then specify which to use:
-
-```bash
-# Sync from production
-cp .env.production .env.main
-npx ts-node scripts/sync-auth-users-to-local.ts
-
-# Sync from staging
-cp .env.staging .env.main
-npx ts-node scripts/sync-auth-users-to-local.ts
-```
+Use these scripts to create local test users:
+- `scripts/create-user-brickshare.sql` - Create individual test user
+- `scripts/setup-test-user.sql` - Create complete test user with wishlist
+- `scripts/db-reset.sh` - Reset local database with seed data
 
 ## 🎯 Related Scripts
 

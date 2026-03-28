@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Preview: Email QR Code Fix - Brickshare</title>
+  <style>
+    body { 
+      font-family: Arial, sans-serif; 
+      line-height: 1.6; 
+      color: #333;
+      background: #f5f5f5;
+      padding: 20px;
+    }
+    .preview-label {
+      background: #fbbf24;
+      color: #92400e;
+      padding: 10px 20px;
+      border-radius: 8px;
+      text-align: center;
+      margin-bottom: 20px;
+      font-weight: bold;
+      font-size: 18px;
+    }
+    .container { 
+      max-width: 600px; 
+      margin: 0 auto; 
+      padding: 20px;
+      background: white;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      border-radius: 12px;
+    }
+    .header { 
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+      color: white; 
+      padding: 30px; 
+      text-align: center; 
+      border-radius: 10px 10px 0 0; 
+    }
+    .content { 
+      background: #f9f9f9; 
+      padding: 30px; 
+      border-radius: 0 0 10px 10px; 
+    }
+    .qr-box { 
+      background: white; 
+      padding: 30px; 
+      text-align: center; 
+      margin: 20px 0; 
+      border-radius: 8px; 
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+    }
+    .qr-box h2 {
+      color: #667eea;
+      margin-bottom: 20px;
+    }
+    .qr-image { 
+      max-width: 300px; 
+      height: auto; 
+      margin: 20px auto; 
+      display: block;
+      border: 3px solid #667eea;
+      border-radius: 8px;
+      padding: 10px;
+      background: white;
+    }
+    .qr-code-text { 
+      font-size: 20px; 
+      font-weight: bold; 
+      color: #667eea; 
+      letter-spacing: 2px; 
+      font-family: 'Courier New', monospace; 
+      margin-top: 15px;
+      padding: 10px;
+      background: #f0f4ff;
+      border-radius: 5px;
+    }
+    .info-box { 
+      background: white; 
+      padding: 20px; 
+      margin: 20px 0; 
+      border-left: 4px solid #667eea; 
+      border-radius: 5px; 
+    }
+    .footer { 
+      text-align: center; 
+      padding: 20px; 
+      color: #666; 
+      font-size: 14px; 
+    }
+    .fix-info {
+      background: #d1fae5;
+      border-left: 4px solid #10b981;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 5px;
+    }
+    .fix-info h3 {
+      color: #065f46;
+      margin-top: 0;
+    }
+    .fix-info ul {
+      color: #047857;
+      margin: 10px 0;
+    }
+    .before-after {
+      display: flex;
+      gap: 20px;
+      margin: 20px 0;
+    }
+    .before, .after {
+      flex: 1;
+      padding: 15px;
+      border-radius: 5px;
+    }
+    .before {
+      background: #fee2e2;
+      border-left: 4px solid #ef4444;
+    }
+    .after {
+      background: #d1fae5;
+      border-left: 4px solid #10b981;
+    }
+    .code-sample {
+      background: #1f2937;
+      color: #10b981;
+      padding: 10px;
+      border-radius: 5px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      overflow-x: auto;
+      margin: 10px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="preview-label">
+    🔧 PREVIEW DEL FIX - Email QR Code Brickshare
+  </div>
+
+  <div class="fix-info">
+    <h3>✅ Correcciones Aplicadas:</h3>
+    <ul>
+      <li><strong>Antes:</strong> Título mostraba "Set LEGO ()" - información hardcodeada</li>
+      <li><strong>Después:</strong> Muestra dinámicamente "Millennium Falcon (75192)" con datos reales</li>
+      <li><strong>Validación:</strong> Ahora verifica que el QR code no sea null antes de enviar</li>
+      <li><strong>Aplicado a:</strong> Emails de entrega Y devolución</li>
+    </ul>
+  </div>
+
+  <div class="before-after">
+    <div class="before">
+      <h4>❌ ANTES (Problema)</h4>
+      <p><code>&lt;h2&gt;Tu Código QR para Recoger: Set LEGO ()&lt;/h2&gt;</code></p>
+      <p style="font-size: 12px;">Información hardcodeada, sin nombre ni referencia del set</p>
+    </div>
+    <div class="after">
+      <h4>✅ DESPUÉS (Fix)</h4>
+      <p><code>&lt;h2&gt;Tu Código QR para Recoger: ${productName}${setNumber ? ` (${setNumber})` : ''}&lt;/h2&gt;</code></p>
+      <p style="font-size: 12px;">Información dinámica del set real</p>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="header">
+      <h1>¡Tu pedido está listo para recoger! 🎉</h1>
+      <p>Este es el aspecto correcto del email después del fix</p>
+    </div>
+    <div class="content">
+      <p>Hola Enrique,</p>
+      
+      <p>Tu set <strong>Millennium Falcon</strong> está listo para ser recogido en nuestro punto Brickshare.</p>
+      
+      <div class="qr-box">
+        <h2>Tu Código QR para Recoger: Millennium Falcon (75192)</h2>
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=BRICKSHARE-DEMO-12345" alt="QR Code" class="qr-image" />
+        <div class="qr-code-text">BRICKSHARE-DEMO-12345</div>
+        <p style="margin-top: 15px; color: #666; font-size: 14px;">Presenta este código en el punto de recogida</p>
+      </div>
+
+      <div class="info-box">
+        <h3>📍 Punto de Recogida</h3>
+        <p><strong>Brickshare Depot - Barcelona Centro</strong></p>
+        <p>Calle de Balmes, 123</p>
+        <p>08008 Barcelona</p>
+        <p>📞 +34 900 123 456</p>
+      </div>
+
+      <h3>¿Cómo funciona?</h3>
+      <ol>
+        <li>Dirígete al punto Brickshare en el horario de apertura</li>
+        <li>Muestra tu código QR al personal</li>
+        <li>Ellos escanearán el código para validar la entrega</li>
+        <li>¡Recoge tu set y disfruta! 🧱</li>
+      </ol>
+
+      <p>Si tienes alguna pregunta, no dudes en contactarnos.</p>
+      
+      <p>¡Que disfrutes construyendo!</p>
+      <p><strong>El equipo de Brickshare</strong></p>
+    </div>
+    <div class="footer">
+      <p>© 2026 Brickshare. Todos los derechos reservados.</p>
+    </div>
+  </div>
+
+  <div class="fix-info" style="margin-top: 30px;">
+    <h3>📝 Cambios en el Código:</h3>
+    <p><strong>Archivo modificado:</strong> <code>supabase/functions/send-brickshare-qr-email/index.ts</code></p>
+    
+    <h4>1. Título dinámico del QR:</h4>
+    <div class="code-sample">
+// Antes (línea ~170):<br>
+&lt;h2&gt;Tu Código QR para Recoger: Set LEGO ()&lt;/h2&gt;<br>
+<br>
+// Después:<br>
+&lt;h2&gt;Tu Código QR para Recoger: ${productName}${setNumber ? ` (${setNumber})` : ''}&lt;/h2&gt;
+    </div>
+
+    <h4>2. Validación del QR code:</h4>
+    <div class="code-sample">
+// Añadido antes de enviar el email:<br>
+if (!qrCode) {<br>
+&nbsp;&nbsp;return new Response(<br>
+&nbsp;&nbsp;&nbsp;&nbsp;JSON.stringify({ error: 'Delivery QR code not found' }),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;{ status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }}<br>
+&nbsp;&nbsp;);<br>
+}
+    </div>
+
+    <h4>3. Aplicado también al email de devolución (línea ~250):</h4>
+    <div class="code-sample">
+&lt;h2&gt;Tu Código QR para Devolver: ${productName}${setNumber ? ` (${setNumber})` : ''}&lt;/h2&gt;
+    </div>
+  </div>
+</body>
+</html>

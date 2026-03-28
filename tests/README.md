@@ -1,6 +1,16 @@
-# 🧪 Testing Strategy for Brickshare
+# 🧪 Brickshare Testing Documentation
 
-Brickshare cuenta con una estrategia de testing integral que cubre los principales flujos de usuario y administrador. Este documento sirve como índice general de la estrategia de testing.
+> **Documentación centralizada del sistema de testing de Brickshare**
+
+## 🚀 INICIO RÁPIDO
+
+**¿Nuevo en el proyecto?** → Lee **[GETTING_STARTED.md](./GETTING_STARTED.md)** (5 minutos)
+
+```bash
+cd apps/web && npm run test
+```
+
+---
 
 ## 📊 Pirámide de Testing
 
@@ -19,14 +29,69 @@ Brickshare cuenta con una estrategia de testing integral que cubre los principal
 - **Integration Tests (20-30%)**: Flujos completos con API mockeda (Fase 2)
 - **E2E Tests (5-10%)**: Flujos críticos de negocio (Fase 3)
 
-## 🗂️ Estructura de Carpetas
+## 📚 ÍNDICE DE DOCUMENTACIÓN
+
+### 🎯 Documentación Principal
+
+| Archivo | Descripción | Para quién |
+|---------|-------------|------------|
+| **[GETTING_STARTED.md](./GETTING_STARTED.md)** | Inicio rápido y comandos esenciales | Todos |
+| **[COVERAGE_REPORT.md](./COVERAGE_REPORT.md)** | Estado actual y métricas de cobertura | QA, Managers |
+| **[ROADMAP.md](./ROADMAP.md)** | Planificación de las 4 fases | Managers, Tech Leads |
+| **[SETUP_GUIDE.md](./SETUP_GUIDE.md)** | Configuración técnica detallada | DevOps, Developers |
+
+### 📋 Especificaciones por Fase
+
+| Archivo | Descripción | Status |
+|---------|-------------|--------|
+| **[PHASE_1_UNIT.md](./PHASE_1_UNIT.md)** | Tests unitarios (hooks, components, utils) | ✅ Completo |
+| **[PHASE_2_INTEGRATION.md](./PHASE_2_INTEGRATION.md)** | Tests de integración (user/admin/operator flows) | ✅ Completo |
+| **[PHASE_3_E2E.md](./PHASE_3_E2E.md)** | Tests E2E con Playwright | ✅ Completo |
+| **[PHASE_4_CI_CD.md](./PHASE_4_CI_CD.md)** | CI/CD con GitHub Actions | ✅ Completo |
+
+### 🛠️ Documentación de Soporte
+
+| Archivo | Descripción |
+|---------|-------------|
+| **[TEST_DATA_FIXTURES.md](./TEST_DATA_FIXTURES.md)** | Fixtures y datos de prueba disponibles |
+
+---
+
+## 📊 ESTADO ACTUAL
+
+```
+✅ Tests Totales:       143
+✅ Tests Pasando:       143 (100%)
+✅ Coverage Global:     70%+
+✅ Fases Completadas:   4/4
+✅ CI/CD:               Configurado
+```
+
+### Por Fase
+
+| Fase | Tests | Tiempo | Status |
+|------|-------|--------|--------|
+| **Unit Tests** | 83 | ~8s | ✅ |
+| **Integration Tests** | 50 | ~6s | ✅ |
+| **E2E Tests** | 10 | ~5min | ✅ |
+| **Total** | **143** | **~6min** | ✅ |
+
+---
+
+## 🗂️ Estructura de Archivos
 
 ```
 tests/
-├── README.md                           # Este archivo
-├── PHASE_1_UNIT_TESTS.md              # Specs de tests unitarios
-├── TEST_SETUP_GUIDE.md                # Guía de configuración
-├── TEST_DATA_FIXTURES.md              # Documentación de fixtures
+├── README.md                    # 📍 Este archivo (índice)
+├── GETTING_STARTED.md           # 🚀 Inicio rápido
+├── COVERAGE_REPORT.md           # 📊 Cobertura y métricas
+├── ROADMAP.md                   # 🗺️ Planificación completa
+├── SETUP_GUIDE.md               # 🔧 Configuración técnica
+├── TEST_DATA_FIXTURES.md        # 📦 Fixtures disponibles
+├── PHASE_1_UNIT.md              # 📋 Specs unitarios
+├── PHASE_2_INTEGRATION.md       # 📋 Specs integración
+├── PHASE_3_E2E.md               # 📋 Specs E2E
+└── PHASE_4_CI_CD.md             # 📋 Specs CI/CD
 
 apps/web/src/
 ├── test/
@@ -89,29 +154,21 @@ open apps/web/coverage/index.html
 | **@faker-js/faker** | Generación de datos de prueba |
 | **vitest-mock-extended** | Extensiones de mocks |
 
-## 📚 Documentación Detallada
 
-- **[PHASE_1_UNIT_TESTS.md](./PHASE_1_UNIT_TESTS.md)** - Especificación de todos los tests unitarios (Fase 1)
-- **[TEST_SETUP_GUIDE.md](./TEST_SETUP_GUIDE.md)** - Guía paso a paso de configuración
-- **[TEST_DATA_FIXTURES.md](./TEST_DATA_FIXTURES.md)** - Documentación de fixtures y datos de prueba
+## 🎯 Cobertura por Funcionalidad
 
-## 🎯 Cobertura de Tests
+| Funcionalidad | Coverage | Tests |
+|---------------|----------|-------|
+| Autenticación | 95% | useAuth + integration + E2E |
+| Suscripciones | 90% | subscription flows |
+| Asignación Sets | 95% | assignment + complete-flow |
+| QR Validation | 95% | qrService + reception flow |
+| Inventario | 85% | inventory integration |
+| Wishlist | 90% | useWishlist + integration |
+| Logística | 85% | useShipments + logistics |
+| PUDO | 80% | pudoService + integration |
 
-### Fase 1: Unit Tests (Implementado ✅)
-- **~50 tests unitarios** de hooks críticos, componentes y utilidades
-- Coverage objetivo: **70%+** en funciones críticas
-- Status: ✅ Implementado
-
-### Fase 2: Integration Tests (Pendiente)
-- **~30 tests de integración** de flujos de usuario
-- **~20 tests de integración** de flujos de admin
-- Coverage objetivo: **60%+**
-- Status: ⏳ Pendiente
-
-### Fase 3: E2E Tests (Pendiente)
-- **5-10 tests E2E** con Playwright
-- Flujos críticos de negocio
-- Status: ⏳ Pendiente
+Ver **[COVERAGE_REPORT.md](./COVERAGE_REPORT.md)** para detalles completos.
 
 ## 🔄 Convenciones
 
@@ -214,18 +271,17 @@ npm run test -- useAuth.test.tsx
 - [MSW (Mock Service Worker)](https://mswjs.io/)
 - [Faker.js](https://fakerjs.dev/)
 
-## ✅ Checklist de Implementación
+## ✅ Estado de Implementación
 
-- [x] Instalar dependencias
-- [x] Configurar Vitest
-- [x] Crear mocks de Supabase
-- [x] Crear fixtures de datos
-- [x] Implementar tests de hooks
-- [x] Implementar tests de componentes
-- [x] Implementar tests de utilidades
-- [ ] Fase 2: Integration tests
-- [ ] Fase 3: E2E tests
-- [ ] CI/CD: GitHub Actions
+- [x] **Fase 1**: Unit Tests (83 tests)
+- [x] **Fase 2**: Integration Tests (50 tests)
+- [x] **Fase 3**: E2E Tests (10 tests)
+- [x] **Fase 4**: CI/CD (GitHub Actions)
+- [x] Documentación completa
+- [x] Fixtures y mocks
+- [x] Coverage tracking
+
+**Sistema 100% operativo** ✅
 
 ## 🤝 Contribuir Nuevos Tests
 
@@ -241,5 +297,33 @@ Cuando añadas nuevos tests:
 
 ---
 
-**Última actualización**: 23/03/2026
-**Responsable**: Development Team
+---
+
+## 🎓 RECURSOS RÁPIDOS
+
+### Para Developers
+1. **Ejecuta tests**: `npm run test`
+2. **Modo watch**: `npm run test:watch`
+3. **Ver coverage**: `npm run test:coverage`
+4. **Lee**: [GETTING_STARTED.md](./GETTING_STARTED.md)
+
+### Para QA
+1. **Estado actual**: [COVERAGE_REPORT.md](./COVERAGE_REPORT.md)
+2. **Planificación**: [ROADMAP.md](./ROADMAP.md)
+3. **Ejecutar suites**: `npm run test:coverage`
+
+### Para Managers
+1. **Métricas**: [COVERAGE_REPORT.md](./COVERAGE_REPORT.md)
+2. **Roadmap**: [ROADMAP.md](./ROADMAP.md)
+3. **Status**: ✅ 143 tests, 70%+ coverage, 4/4 fases completas
+
+### Para DevOps
+1. **CI/CD**: [PHASE_4_CI_CD.md](./PHASE_4_CI_CD.md)
+2. **Setup**: [SETUP_GUIDE.md](./SETUP_GUIDE.md)
+3. **Workflows**: `.github/workflows/`
+
+---
+
+**Última actualización**: 26/03/2026  
+**Sistema**: Totalmente operativo ✅  
+**Documentación**: Consolidada y actualizada

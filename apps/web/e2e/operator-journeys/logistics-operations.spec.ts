@@ -1,21 +1,19 @@
 import { test, expect } from '@playwright/test';
-import { testUsers, generateQRCode, generateTrackingNumber } from '../fixtures/test-data';
+import { testUsers } from '../fixtures/test-data';
+import { loginAsOperator } from '../helpers/auth';
 
 /**
  * Operator Journey: Logistics Operations
- * Tests operator QR scanning, maintenance logging, and shipment tracking
+ * Tests logistics operator workflows
  */
 
 test.describe('Operator Logistics Operations', () => {
   test.beforeEach(async ({ page }) => {
-    // Login as operator
-    await page.goto('/auth/signin');
-    await page.fill('[name="email"]', testUsers.operatorUser.email);
-    await page.fill('[name="password"]', testUsers.operatorUser.password);
-    await page.click('button:has-text("Sign In")');
-
-    // Wait for operator dashboard
-    await expect(page).toHaveURL(/.*operator|operations/i);
+    // Login as operator using helper
+    await loginAsOperator(page);
+    
+    // Wait for auth to be loaded
+    await page.waitForTimeout(1000);
   });
 
   test('should access operator dashboard', async ({ page }) => {

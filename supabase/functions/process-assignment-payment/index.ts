@@ -131,7 +131,7 @@ serve(async (req) => {
         const { data: userProfile, error: profileError } = await supabase
             .from("users")
             .select("stripe_customer_id, email, full_name")
-            .eq("user_id", userId)
+            .eq("id", userId)
             .maybeSingle();
 
         if (profileError) {
@@ -153,12 +153,29 @@ serve(async (req) => {
 
         const stripeCustomerId = userProfile.stripe_customer_id;
 
-        // 2. Check if user has Correos PUDO - only charge if Correos
+        // 2. Validate user has PUDO configured
+        if (!pudoType) {
+            return new Response(JSON.stringify({
+                success: false,
+                error: "Usuario no tiene punto PUDO configurado. Debe seleccionar un punto de recogida antes de recibir asignaciones.",
+                errorCode: "no_pudo_configured",
+                failedOperation: "pudo_validation",
+                userEmail: userProfile.email
+            }), {
+                status: 400,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+        }
+
+        // 3. Check if user has Correos PUDO - only charge if Correos
         if (pudoType !== 'correos') {
             console.log(`No charge needed for user ${userId} with pudo_type: ${pudoType || 'not set'}`);
             return new Response(JSON.stringify({
                 success: true,
                 message: "No charge required for Brickshare PUDO",
+                depositPaymentIntentId: null,
+                transportPaymentIntentId: null,
+                depositAmount: 0,
                 transportAmount: 0
             }), {
                 status: 200,
@@ -166,7 +183,7 @@ serve(async (req) => {
             });
         }
 
-        // 3. Get default payment method (only for Correos users)
+        // 4. Get default payment method (only for Correos users)
         const paymentMethod = await getDefaultPaymentMethod(stripeCustomerId);
 
         if (!paymentMethod) {
@@ -182,7 +199,7 @@ serve(async (req) => {
             });
         }
 
-        // 4. Create PaymentIntent for Transport Fee (Correos only) - Immediate charge
+        // 5. Create PaymentIntent for Transport Fee (Correos only) - Immediate charge
         let transportPaymentIntent;
         const shippingCost = parseInt(Deno.env.get("COSTE_ENVIO_DEVOLUCION") ?? "10");
 
@@ -233,7 +250,7 @@ serve(async (req) => {
             });
         }
 
-        // 5. Success: Transport fee charged
+        // 6. Success: Transport fee charged
         return new Response(JSON.stringify({
             success: true,
             transportPaymentIntentId: transportPaymentIntent.id,

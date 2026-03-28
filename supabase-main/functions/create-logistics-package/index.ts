@@ -23,7 +23,8 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
 // Configuración de Brickshare_logistics
-const LOGISTICS_URL = Deno.env.get('BRICKSHARE_LOGISTICS_URL') || 'https://your-logistics-project.supabase.co'
+// Configuración de Brickshare_logistics (LOCAL ONLY)
+const LOGISTICS_URL = Deno.env.get('BRICKSHARE_LOGISTICS_URL') || 'http://127.0.0.1:54331'
 const LOGISTICS_SECRET = Deno.env.get('BRICKSHARE_LOGISTICS_SECRET') || 'change-me-in-production'
 
 const corsHeaders = {

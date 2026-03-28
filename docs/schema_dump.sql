@@ -45,19 +45,17 @@ CREATE TYPE "public"."operation_type" AS ENUM (
 ALTER TYPE "public"."operation_type" OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."confirm_assign_sets_to_users"("p_user_ids" "uuid"[]) RETURNS TABLE("envio_id" "uuid", "user_id" "uuid", "set_id" "uuid", "order_id" "uuid", "user_name" "text", "user_email" "text", "user_phone" "text", "set_name" "text", "set_ref" "text", "set_weight" numeric, "set_dim" "text", "pudo_id" "text", "pudo_name" "text", "pudo_address" "text", "pudo_cp" "text", "pudo_city" "text", "pudo_province" "text", "created_at" timestamp with time zone)
+CREATE OR REPLACE FUNCTION "public"."confirm_assign_sets_to_users"("p_user_ids" "uuid"[]) RETURNS TABLE("shipment_id" "uuid", "user_id" "uuid", "set_id" "uuid", "user_name" "text", "user_email" "text", "user_phone" "text", "set_name" "text", "set_ref" "text", "set_weight" numeric, "pudo_id" "text", "pudo_name" "text", "pudo_address" "text", "pudo_cp" "text", "pudo_city" "text", "pudo_province" "text", "created_at" timestamp with time zone)
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
     AS $$
 DECLARE
     r RECORD;
     target_set_id UUID;
-    new_order_id UUID;
-    new_envio_id UUID;
+    new_shipment_id UUID;
     v_set_name TEXT;
     v_set_ref TEXT;
     v_set_weight NUMERIC;
-    v_set_dim TEXT;
     v_user_email TEXT;
     v_user_phone TEXT;
     v_pudo_id TEXT;
@@ -67,44 +65,80 @@ DECLARE
     v_pudo_city TEXT;
     v_pudo_province TEXT;
     v_created_at TIMESTAMPTZ;
+    v_pudo_type TEXT;
+    v_brickshare_pudo_id UUID;
 BEGIN
     -- Loop through each user to confirm their assignment
     FOR r IN (
-        SELECT 
+        SELECT
             u.user_id,
             u.full_name,
             u.email,
             u.phone,
-            p.correos_id_pudo,
-            p.correos_name,
-            p.correos_full_address,
-            p.correos_zip_code,
-            p.correos_city,
-            p.correos_province
+            u.pudo_type,
+            u.pudo_id as user_pudo_id,
+            -- Correos PUDO data
+            ucd.correos_id_pudo,
+            ucd.correos_name,
+            ucd.correos_full_address,
+            ucd.correos_zip_code,
+            ucd.correos_city,
+            ucd.correos_province,
+            -- Brickshare PUDO data
+            bp.id as brickshare_pudo_id,
+            bp.name as brickshare_pudo_name,
+            bp.address as brickshare_address,
+            bp.postal_code as brickshare_postal_code,
+            bp.city as brickshare_city,
+            bp.province as brickshare_province
         FROM public.users u
-        LEFT JOIN public.users_correos_dropping p ON u.user_id = p.user_id
+        LEFT JOIN public.users_correos_dropping ucd ON u.user_id = ucd.user_id
+        LEFT JOIN public.brickshare_pudo_locations bp ON u.pudo_id = bp.id AND u.pudo_type = 'brickshare'
         WHERE u.user_id = ANY(p_user_ids)
           AND u.user_status IN ('no_set', 'set_returning')
           AND EXISTS (
-              SELECT 1 
-              FROM public.wishlist w 
-              WHERE w.user_id = u.user_id 
+              SELECT 1
+              FROM public.wishlist w
+              WHERE w.user_id = u.user_id
                 AND w.status = true
           )
     ) LOOP
+        -- Store pudo_type for later use
+        v_pudo_type := r.pudo_type;
+        
+        -- Determine PUDO data based on type
+        IF v_pudo_type = 'correos' THEN
+            v_pudo_id := r.correos_id_pudo;
+            v_pudo_name := r.correos_name;
+            v_pudo_address := r.correos_full_address;
+            v_pudo_cp := r.correos_zip_code;
+            v_pudo_city := r.correos_city;
+            v_pudo_province := r.correos_province;
+            v_brickshare_pudo_id := NULL;
+        ELSIF v_pudo_type = 'brickshare' THEN
+            v_pudo_id := r.user_pudo_id;
+            v_pudo_name := r.brickshare_pudo_name;
+            v_pudo_address := r.brickshare_address;
+            v_pudo_cp := r.brickshare_postal_code;
+            v_pudo_city := r.brickshare_city;
+            v_pudo_province := r.brickshare_province;
+            v_brickshare_pudo_id := r.brickshare_pudo_id;
+        ELSE
+            -- Skip user if no PUDO configured
+            CONTINUE;
+        END IF;
+        
         -- Find the first available set from user's wishlist
-        SELECT 
+        SELECT
             w.set_id,
             s.set_name,
             s.set_ref,
-            s.set_weight,
-            s.set_dim
-        INTO 
+            s.set_weight
+        INTO
             target_set_id,
             v_set_name,
             v_set_ref,
-            v_set_weight,
-            v_set_dim
+            v_set_weight
         FROM public.wishlist w
         JOIN public.inventory_sets i ON w.set_id = i.set_id
         JOIN public.sets s ON w.set_id = s.id
@@ -113,73 +147,76 @@ BEGIN
           AND i.inventory_set_total_qty > 0
         ORDER BY w.created_at ASC
         LIMIT 1;
-
+        
         IF target_set_id IS NOT NULL THEN
             -- Update inventory
             UPDATE public.inventory_sets
-            SET 
+            SET
                 inventory_set_total_qty = inventory_set_total_qty - 1,
                 in_shipping = in_shipping + 1
             WHERE inventory_sets.set_id = target_set_id;
-
-            -- Create order
-            INSERT INTO public.orders (user_id, set_id, status)
-            VALUES (r.user_id, target_set_id, 'pending')
-            RETURNING id INTO new_order_id;
-
-            -- Create shipment
+            
+            -- Create shipment with PUDO address data, pudo_type, brickshare_pudo_id, and shipping_province
             INSERT INTO public.shipments (
-                order_id,
                 user_id,
+                set_id,
+                set_ref,
                 shipment_status,
+                assigned_date,
+                pudo_type,
+                brickshare_pudo_id,
                 shipping_address,
                 shipping_city,
                 shipping_zip_code,
+                shipping_province,
                 shipping_country
             )
             VALUES (
-                new_order_id,
                 r.user_id,
-                'pending',
-                COALESCE(r.correos_full_address, 'Pending assignment'),
-                COALESCE(r.correos_city, 'Pending'),
-                COALESCE(r.correos_zip_code, '00000'),
+                target_set_id,
+                v_set_ref,
+                'assigned',
+                now(),
+                v_pudo_type,
+                v_brickshare_pudo_id,
+                COALESCE(v_pudo_address, 'Pending assignment'),
+                COALESCE(v_pudo_city, 'Pending'),
+                COALESCE(v_pudo_cp, '00000'),
+                COALESCE(v_pudo_province, 'Pending'),
                 'España'
             )
             RETURNING shipments.id, shipments.created_at
-            INTO new_envio_id, v_created_at;
-
-            -- Update user status
+            INTO new_shipment_id, v_created_at;
+            
+            -- Update user status to 'set_shipping'
             UPDATE public.users
             SET user_status = 'set_shipping'
             WHERE users.user_id = r.user_id;
-
+            
             -- Mark wishlist item as assigned
             UPDATE public.wishlist
-            SET 
+            SET
                 status = false,
                 status_changed_at = now()
             WHERE wishlist.user_id = r.user_id
               AND wishlist.set_id = target_set_id;
-
+            
             -- Populate return record
-            confirm_assign_sets_to_users.envio_id := new_envio_id;
+            confirm_assign_sets_to_users.shipment_id := new_shipment_id;
             confirm_assign_sets_to_users.user_id := r.user_id;
             confirm_assign_sets_to_users.set_id := target_set_id;
-            confirm_assign_sets_to_users.order_id := new_order_id;
             confirm_assign_sets_to_users.user_name := r.full_name;
             confirm_assign_sets_to_users.user_email := r.email;
             confirm_assign_sets_to_users.user_phone := r.phone;
             confirm_assign_sets_to_users.set_name := v_set_name;
             confirm_assign_sets_to_users.set_ref := v_set_ref;
             confirm_assign_sets_to_users.set_weight := v_set_weight;
-            confirm_assign_sets_to_users.set_dim := v_set_dim;
-            confirm_assign_sets_to_users.pudo_id := r.correos_id_pudo;
-            confirm_assign_sets_to_users.pudo_name := r.correos_name;
-            confirm_assign_sets_to_users.pudo_address := r.correos_full_address;
-            confirm_assign_sets_to_users.pudo_cp := r.correos_zip_code;
-            confirm_assign_sets_to_users.pudo_city := r.correos_city;
-            confirm_assign_sets_to_users.pudo_province := r.correos_province;
+            confirm_assign_sets_to_users.pudo_id := v_pudo_id;
+            confirm_assign_sets_to_users.pudo_name := v_pudo_name;
+            confirm_assign_sets_to_users.pudo_address := v_pudo_address;
+            confirm_assign_sets_to_users.pudo_cp := v_pudo_cp;
+            confirm_assign_sets_to_users.pudo_city := v_pudo_city;
+            confirm_assign_sets_to_users.pudo_province := v_pudo_province;
             confirm_assign_sets_to_users.created_at := v_created_at;
             
             RETURN NEXT;
@@ -192,7 +229,7 @@ $$;
 ALTER FUNCTION "public"."confirm_assign_sets_to_users"("p_user_ids" "uuid"[]) OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."confirm_assign_sets_to_users"("p_user_ids" "uuid"[]) IS 'Confirms set assignments for users. Creates orders, shipments, updates inventory and wishlist. Requires PUDO point configured (enforced by frontend validation).';
+COMMENT ON FUNCTION "public"."confirm_assign_sets_to_users"("p_user_ids" "uuid"[]) IS 'Confirms set assignments to users. Creates shipments with complete PUDO information including pudo_type, brickshare_pudo_id, and shipping_province for proper logistics integration.';
 
 
 
@@ -262,21 +299,49 @@ CREATE OR REPLACE FUNCTION "public"."generate_delivery_qr"("p_shipment_id" "uuid
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 DECLARE
-    v_qr_code TEXT; v_expires_at TIMESTAMPTZ; v_max_attempts INTEGER := 10; v_attempt INTEGER := 0;
+    v_qr_code TEXT;
+    v_expires_at TIMESTAMPTZ;
+    v_max_attempts INTEGER := 10;
+    v_attempt INTEGER := 0;
 BEGIN
-    v_expires_at := now() + interval '30 days';
+    -- Set expires_at to NULL for permanent codes
+    v_expires_at := NULL;
+    
+    -- Generate unique QR code
     LOOP
-        v_qr_code := generate_qr_code(); v_attempt := v_attempt + 1;
-        IF NOT EXISTS (SELECT 1 FROM shipments WHERE delivery_qr_code = v_qr_code OR return_qr_code = v_qr_code) THEN EXIT; END IF;
-        IF v_attempt >= v_max_attempts THEN RAISE EXCEPTION 'Unable to generate unique QR code after % attempts', v_max_attempts; END IF;
+        v_qr_code := generate_qr_code();
+        v_attempt := v_attempt + 1;
+        
+        IF NOT EXISTS (
+            SELECT 1 FROM shipments 
+            WHERE delivery_qr_code = v_qr_code OR return_qr_code = v_qr_code
+        ) THEN
+            EXIT;
+        END IF;
+        
+        IF v_attempt >= v_max_attempts THEN
+            RAISE EXCEPTION 'Unable to generate unique QR code after % attempts', v_max_attempts;
+        END IF;
     END LOOP;
-    UPDATE shipments SET delivery_qr_code = v_qr_code, delivery_qr_expires_at = v_expires_at, updated_at = now() WHERE id = p_shipment_id;
+    
+    -- Update shipment with QR code (no expiration)
+    UPDATE shipments 
+    SET 
+        delivery_qr_code = v_qr_code,
+        delivery_qr_expires_at = v_expires_at,
+        updated_at = now()
+    WHERE id = p_shipment_id;
+    
     RETURN QUERY SELECT v_qr_code, v_expires_at;
 END;
 $$;
 
 
 ALTER FUNCTION "public"."generate_delivery_qr"("p_shipment_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."generate_delivery_qr"("p_shipment_id" "uuid") IS 'Generates a permanent (non-expiring) delivery QR code for a shipment.';
+
 
 
 CREATE OR REPLACE FUNCTION "public"."generate_qr_code"() RETURNS "text"
@@ -340,21 +405,49 @@ CREATE OR REPLACE FUNCTION "public"."generate_return_qr"("p_shipment_id" "uuid")
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 DECLARE
-    v_qr_code TEXT; v_expires_at TIMESTAMPTZ; v_max_attempts INTEGER := 10; v_attempt INTEGER := 0;
+    v_qr_code TEXT;
+    v_expires_at TIMESTAMPTZ;
+    v_max_attempts INTEGER := 10;
+    v_attempt INTEGER := 0;
 BEGIN
-    v_expires_at := now() + interval '30 days';
+    -- Set expires_at to NULL for permanent codes
+    v_expires_at := NULL;
+    
+    -- Generate unique QR code
     LOOP
-        v_qr_code := generate_qr_code(); v_attempt := v_attempt + 1;
-        IF NOT EXISTS (SELECT 1 FROM shipments WHERE delivery_qr_code = v_qr_code OR return_qr_code = v_qr_code) THEN EXIT; END IF;
-        IF v_attempt >= v_max_attempts THEN RAISE EXCEPTION 'Unable to generate unique QR code after % attempts', v_max_attempts; END IF;
+        v_qr_code := generate_qr_code();
+        v_attempt := v_attempt + 1;
+        
+        IF NOT EXISTS (
+            SELECT 1 FROM shipments 
+            WHERE delivery_qr_code = v_qr_code OR return_qr_code = v_qr_code
+        ) THEN
+            EXIT;
+        END IF;
+        
+        IF v_attempt >= v_max_attempts THEN
+            RAISE EXCEPTION 'Unable to generate unique QR code after % attempts', v_max_attempts;
+        END IF;
     END LOOP;
-    UPDATE shipments SET return_qr_code = v_qr_code, return_qr_expires_at = v_expires_at, updated_at = now() WHERE id = p_shipment_id;
+    
+    -- Update shipment with QR code (no expiration)
+    UPDATE shipments 
+    SET 
+        return_qr_code = v_qr_code,
+        return_qr_expires_at = v_expires_at,
+        updated_at = now()
+    WHERE id = p_shipment_id;
+    
     RETURN QUERY SELECT v_qr_code, v_expires_at;
 END;
 $$;
 
 
 ALTER FUNCTION "public"."generate_return_qr"("p_shipment_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."generate_return_qr"("p_shipment_id" "uuid") IS 'Generates a permanent (non-expiring) return QR code for a shipment.';
+
 
 
 CREATE OR REPLACE FUNCTION "public"."get_user_active_pudo"("p_user_id" "uuid") RETURNS TABLE("pudo_type" "text", "pudo_id" "text", "pudo_name" "text", "pudo_address" "text", "pudo_city" "text", "pudo_postal_code" "text")
@@ -833,47 +926,113 @@ CREATE OR REPLACE FUNCTION "public"."validate_qr_code"("p_qr_code" "text") RETUR
     AS $$
 DECLARE
     v_shipment RECORD;
-    v_is_valid BOOLEAN := false; v_error_message TEXT := NULL; v_validation_type TEXT := NULL; v_shipment_info JSONB;
+    v_is_valid BOOLEAN := false;
+    v_error_message TEXT := NULL;
+    v_validation_type TEXT := NULL;
+    v_shipment_info JSONB;
 BEGIN
-    SELECT s.id, s.order_id, s.shipment_status as status, s.pickup_type,
-        s.delivery_qr_code, s.delivery_qr_expires_at, s.delivery_validated_at,
-        s.return_qr_code, s.return_qr_expires_at, s.return_validated_at,
-        s.brickshare_pudo_id, o.set_id, st.set_name, st.set_ref as set_number, st.set_theme as theme
+    -- Fetch shipment by QR code
+    SELECT 
+        s.id, 
+        s.user_id,
+        s.set_id,
+        s.set_ref,
+        s.shipment_status as status, 
+        s.pudo_type,
+        s.delivery_qr_code, 
+        s.delivery_qr_expires_at, 
+        s.delivery_validated_at,
+        s.return_qr_code, 
+        s.return_qr_expires_at, 
+        s.return_validated_at,
+        s.brickshare_pudo_id,
+        st.set_name, 
+        st.set_ref as set_number, 
+        st.theme
     INTO v_shipment
-    FROM shipments s JOIN orders o ON s.order_id = o.id LEFT JOIN sets st ON o.set_id = st.id
+    FROM shipments s 
+    LEFT JOIN sets st ON s.set_id = st.id
     WHERE s.delivery_qr_code = p_qr_code OR s.return_qr_code = p_qr_code;
 
+    -- QR code not found
     IF NOT FOUND THEN
-        RETURN QUERY SELECT NULL::UUID, NULL::TEXT, false, 'QR code not found'::TEXT, NULL::JSONB; RETURN;
+        RETURN QUERY SELECT 
+            NULL::UUID, 
+            NULL::TEXT, 
+            false, 
+            'QR code not found'::TEXT, 
+            NULL::JSONB;
+        RETURN;
     END IF;
 
-    IF v_shipment.pickup_type != 'brickshare' THEN
-        RETURN QUERY SELECT v_shipment.id, NULL::TEXT, false, 'This shipment is not for Brickshare pickup point'::TEXT, NULL::JSONB; RETURN;
+    -- Only Brickshare PUDO shipments use QR validation
+    IF v_shipment.pudo_type != 'brickshare' THEN
+        RETURN QUERY SELECT 
+            v_shipment.id, 
+            NULL::TEXT, 
+            false, 
+            'This shipment is not for Brickshare pickup point'::TEXT, 
+            NULL::JSONB;
+        RETURN;
     END IF;
 
+    -- Validate delivery QR
     IF v_shipment.delivery_qr_code = p_qr_code THEN
         v_validation_type := 'delivery';
-        IF v_shipment.delivery_validated_at IS NOT NULL THEN v_error_message := 'QR code already used';
-        ELSIF v_shipment.delivery_qr_expires_at < now() THEN v_error_message := 'QR code has expired';
-        ELSE v_is_valid := true; END IF;
+        
+        IF v_shipment.delivery_validated_at IS NOT NULL THEN
+            v_error_message := 'QR code already used';
+        -- REMOVED: expiration check
+        -- ELSIF v_shipment.delivery_qr_expires_at < now() THEN
+        --     v_error_message := 'QR code has expired';
+        ELSE
+            v_is_valid := true;
+        END IF;
+        
+    -- Validate return QR
     ELSIF v_shipment.return_qr_code = p_qr_code THEN
         v_validation_type := 'return';
-        IF v_shipment.return_validated_at IS NOT NULL THEN v_error_message := 'QR code already used';
-        ELSIF v_shipment.return_qr_expires_at < now() THEN v_error_message := 'QR code has expired';
-        ELSIF v_shipment.delivery_validated_at IS NULL THEN v_error_message := 'Cannot return a set that has not been delivered yet';
-        ELSE v_is_valid := true; END IF;
+        
+        IF v_shipment.return_validated_at IS NOT NULL THEN
+            v_error_message := 'QR code already used';
+        -- REMOVED: expiration check
+        -- ELSIF v_shipment.return_qr_expires_at < now() THEN
+        --     v_error_message := 'QR code has expired';
+        ELSIF v_shipment.delivery_validated_at IS NULL THEN
+            v_error_message := 'Cannot return a set that has not been delivered yet';
+        ELSE
+            v_is_valid := true;
+        END IF;
     END IF;
 
-    v_shipment_info := jsonb_build_object('order_id', v_shipment.order_id, 'set_id', v_shipment.set_id, 'set_name', v_shipment.set_name,
-        'set_number', v_shipment.set_number, 'theme', v_shipment.theme, 'status', v_shipment.status,
-        'brickshare_pudo_id', v_shipment.brickshare_pudo_id, 'validation_type', v_validation_type);
+    -- Build shipment info JSON
+    v_shipment_info := jsonb_build_object(
+        'user_id', v_shipment.user_id,
+        'set_id', v_shipment.set_id,
+        'set_name', v_shipment.set_name,
+        'set_number', v_shipment.set_number,
+        'set_ref', v_shipment.set_ref,
+        'theme', v_shipment.theme,
+        'status', v_shipment.status,
+        'brickshare_pudo_id', v_shipment.brickshare_pudo_id,
+        'validation_type', v_validation_type
+    );
 
-    RETURN QUERY SELECT v_shipment.id, v_validation_type, v_is_valid, v_error_message, v_shipment_info;
+    RETURN QUERY SELECT 
+        v_shipment.id, 
+        v_validation_type, 
+        v_is_valid, 
+        v_error_message, 
+        v_shipment_info;
 END;
 $$;
 
 
 ALTER FUNCTION "public"."validate_qr_code"("p_qr_code" "text") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."validate_qr_code"("p_qr_code" "text") IS 'Validates Brickshare QR codes for delivery/return. QR codes are permanent (no expiration) but single-use (validated_at timestamps).';
+
 
 SET default_tablespace = '';
 
@@ -922,11 +1081,9 @@ CREATE TABLE IF NOT EXISTS "public"."shipments" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "user_id" "uuid" NOT NULL,
     "assigned_date" timestamp with time zone,
-    "estimated_delivery_date" timestamp with time zone,
     "actual_delivery_date" timestamp with time zone,
     "user_delivery_date" timestamp with time zone,
     "warehouse_reception_date" timestamp with time zone,
-    "estimated_return_date" "date",
     "shipment_status" "text" DEFAULT 'pendiente'::"text" NOT NULL,
     "shipping_address" "text" NOT NULL,
     "shipping_city" "text" NOT NULL,
@@ -939,7 +1096,6 @@ CREATE TABLE IF NOT EXISTS "public"."shipments" (
     "additional_notes" "text",
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "warehouse_pickup_date" timestamp with time zone,
     "return_request_date" timestamp with time zone,
     "pickup_provider" "text",
     "set_ref" "text",
@@ -948,7 +1104,6 @@ CREATE TABLE IF NOT EXISTS "public"."shipments" (
     "correos_shipment_id" "text",
     "label_url" "text",
     "pickup_id" "text",
-    "last_tracking_update" timestamp with time zone,
     "swikly_wish_id" "text",
     "swikly_wish_url" "text",
     "swikly_status" "text" DEFAULT 'pending'::"text",
@@ -963,9 +1118,12 @@ CREATE TABLE IF NOT EXISTS "public"."shipments" (
     "return_validated_at" timestamp with time zone,
     "brickshare_metadata" "jsonb" DEFAULT '{}'::"jsonb",
     "brickshare_package_id" "text",
-    CONSTRAINT "check_shipment_status" CHECK (("shipment_status" = ANY (ARRAY['pending'::"text", 'preparation'::"text", 'in_transit_pudo'::"text", 'delivered_pudo'::"text", 'delivered_user'::"text", 'in_return_pudo'::"text", 'in_return'::"text", 'returned'::"text", 'cancelled'::"text"]))),
+    "pudo_type" "text",
+    "shipping_province" "text",
+    CONSTRAINT "check_shipment_status" CHECK (("shipment_status" = ANY (ARRAY['pending'::"text", 'assigned'::"text", 'preparation'::"text", 'in_transit_pudo'::"text", 'delivered_pudo'::"text", 'delivered_user'::"text", 'in_return_pudo'::"text", 'in_return'::"text", 'returned'::"text", 'cancelled'::"text"]))),
     CONSTRAINT "envios_pickup_type_check" CHECK (("pickup_type" = ANY (ARRAY['correos'::"text", 'brickshare'::"text"]))),
-    CONSTRAINT "envios_swikly_status_check" CHECK (("swikly_status" = ANY (ARRAY['pending'::"text", 'wish_created'::"text", 'accepted'::"text", 'released'::"text", 'captured'::"text", 'expired'::"text", 'cancelled'::"text"])))
+    CONSTRAINT "envios_swikly_status_check" CHECK (("swikly_status" = ANY (ARRAY['pending'::"text", 'wish_created'::"text", 'accepted'::"text", 'released'::"text", 'captured'::"text", 'expired'::"text", 'cancelled'::"text"]))),
+    CONSTRAINT "shipments_pudo_type_check" CHECK (("pudo_type" = ANY (ARRAY['correos'::"text", 'brickshare'::"text"])))
 );
 
 
@@ -973,10 +1131,6 @@ ALTER TABLE "public"."shipments" OWNER TO "postgres";
 
 
 COMMENT ON COLUMN "public"."shipments"."shipment_status" IS 'Allowed values: preparacion, ruta_envio, entregado, devuelto, ruta_devolucion, cancelado';
-
-
-
-COMMENT ON COLUMN "public"."shipments"."warehouse_pickup_date" IS 'Date when the shipment was picked up from the warehouse';
 
 
 
@@ -1008,11 +1162,19 @@ COMMENT ON COLUMN "public"."shipments"."pickup_id" IS 'External identifier for t
 
 
 
-COMMENT ON COLUMN "public"."shipments"."last_tracking_update" IS 'Timestamp of the last synchronization with Correos Tracking API';
-
-
-
 COMMENT ON COLUMN "public"."shipments"."brickshare_package_id" IS 'ID del package en Brickshare_logistics. Usado cuando pickup_type="brickshare" para sincronización con el sistema de PUDO.';
+
+
+
+COMMENT ON COLUMN "public"."shipments"."pudo_type" IS 'Type of PUDO point used: correos (Correos PUDO) or brickshare (Brickshare deposit)';
+
+
+
+COMMENT ON COLUMN "public"."shipments"."shipping_province" IS 'Province for the shipping address (required for logistics integration)';
+
+
+
+COMMENT ON CONSTRAINT "check_shipment_status" ON "public"."shipments" IS 'Valid shipment status values. Delivery flow: assigned → preparation → in_transit_pudo → delivered_pudo → delivered_user. Return flow: in_return_pudo → in_return → returned';
 
 
 
@@ -1309,6 +1471,42 @@ COMMENT ON COLUMN "public"."sets"."set_ref" IS 'Official LEGO catalog reference 
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."shipment_update_logs" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "shipment_id" "uuid" NOT NULL,
+    "updated_by" "text" NOT NULL,
+    "updated_fields" "text"[] NOT NULL,
+    "old_values" "jsonb",
+    "new_values" "jsonb" NOT NULL,
+    "source_ip" "text",
+    "user_agent" "text",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."shipment_update_logs" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."shipment_update_logs" IS 'Audit log for all shipment updates via logistics API and admin panel';
+
+
+
+COMMENT ON COLUMN "public"."shipment_update_logs"."updated_by" IS 'Source of the update: admin, logistics_api, user, or system';
+
+
+
+COMMENT ON COLUMN "public"."shipment_update_logs"."updated_fields" IS 'Array of field names that were modified in this update';
+
+
+
+COMMENT ON COLUMN "public"."shipment_update_logs"."old_values" IS 'JSONB snapshot of field values before the update';
+
+
+
+COMMENT ON COLUMN "public"."shipment_update_logs"."new_values" IS 'JSONB snapshot of field values after the update';
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."shipping_orders" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "user_id" "uuid" NOT NULL,
@@ -1443,7 +1641,7 @@ COMMENT ON TABLE "public"."users_brickshare_dropping" IS 'Stores user-selected B
 
 
 
-COMMENT ON COLUMN "public"."users_brickshare_dropping"."brickshare_pudo_id" IS 'Reference to Brickshare PUDO location ID. No FK constraint to allow dynamic locations from external APIs.';
+COMMENT ON COLUMN "public"."users_brickshare_dropping"."brickshare_pudo_id" IS 'ID of the Brickshare PUDO location. Can be any string identifier from the /api/locations-local endpoint or the brickshare_pudo_locations table. The id_correos_pudo field from PudoSelector is mapped to this field when tipo_punto is Deposito.';
 
 
 
@@ -1578,6 +1776,11 @@ ALTER TABLE ONLY "public"."set_piece_list"
 
 
 
+ALTER TABLE ONLY "public"."shipment_update_logs"
+    ADD CONSTRAINT "shipment_update_logs_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."shipping_orders"
     ADD CONSTRAINT "shipping_orders_pkey" PRIMARY KEY ("id");
 
@@ -1676,10 +1879,6 @@ CREATE INDEX "idx_envios_estado" ON "public"."shipments" USING "btree" ("shipmen
 
 
 
-CREATE INDEX "idx_envios_fecha_entrega" ON "public"."shipments" USING "btree" ("estimated_delivery_date" DESC);
-
-
-
 CREATE INDEX "idx_envios_numero_seguimiento" ON "public"."shipments" USING "btree" ("tracking_number");
 
 
@@ -1733,6 +1932,18 @@ CREATE INDEX "idx_set_piece_list_lego_ref" ON "public"."set_piece_list" USING "b
 
 
 CREATE INDEX "idx_set_piece_list_set_id" ON "public"."set_piece_list" USING "btree" ("set_id");
+
+
+
+CREATE INDEX "idx_shipment_update_logs_created_at" ON "public"."shipment_update_logs" USING "btree" ("created_at" DESC);
+
+
+
+CREATE INDEX "idx_shipment_update_logs_shipment_id" ON "public"."shipment_update_logs" USING "btree" ("shipment_id", "created_at" DESC);
+
+
+
+CREATE INDEX "idx_shipment_update_logs_updated_by" ON "public"."shipment_update_logs" USING "btree" ("updated_by", "created_at" DESC);
 
 
 
@@ -1960,6 +2171,11 @@ ALTER TABLE ONLY "public"."set_piece_list"
 
 
 
+ALTER TABLE ONLY "public"."shipment_update_logs"
+    ADD CONSTRAINT "shipment_update_logs_shipment_id_fkey" FOREIGN KEY ("shipment_id") REFERENCES "public"."shipments"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."shipping_orders"
     ADD CONSTRAINT "shipping_orders_set_id_fkey" FOREIGN KEY ("set_id") REFERENCES "public"."sets"("id") ON DELETE CASCADE;
 
@@ -2021,6 +2237,12 @@ CREATE POLICY "Admins and operators can insert" ON "public"."reception_operation
 
 
 CREATE POLICY "Admins and operators can update" ON "public"."reception_operations" FOR UPDATE TO "authenticated" USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") OR "public"."has_role"("auth"."uid"(), 'operador'::"public"."app_role"))) WITH CHECK (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") OR "public"."has_role"("auth"."uid"(), 'operador'::"public"."app_role")));
+
+
+
+CREATE POLICY "Admins and operators can view all logs" ON "public"."shipment_update_logs" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
+   FROM "public"."user_roles"
+  WHERE (("user_roles"."user_id" = "auth"."uid"()) AND ("user_roles"."role" = ANY (ARRAY['admin'::"public"."app_role", 'operador'::"public"."app_role"]))))));
 
 
 
@@ -2088,6 +2310,10 @@ CREATE POLICY "Operators can update shipments" ON "public"."shipments" FOR UPDAT
 
 
 
+CREATE POLICY "Service role can insert logs" ON "public"."shipment_update_logs" FOR INSERT TO "service_role" WITH CHECK (true);
+
+
+
 CREATE POLICY "Set piece lists are viewable by everyone" ON "public"."set_piece_list" FOR SELECT USING (true);
 
 
@@ -2149,6 +2375,12 @@ CREATE POLICY "Users can update their own profile" ON "public"."users" FOR UPDAT
 
 
 CREATE POLICY "Users can update their own wishlist" ON "public"."wishlist" FOR UPDATE TO "authenticated" USING (("auth"."uid"() = "user_id")) WITH CHECK (("auth"."uid"() = "user_id"));
+
+
+
+CREATE POLICY "Users can view logs for their own shipments" ON "public"."shipment_update_logs" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
+   FROM "public"."shipments"
+  WHERE (("shipments"."id" = "shipment_update_logs"."shipment_id") AND ("shipments"."user_id" = "auth"."uid"())))));
 
 
 
@@ -2264,6 +2496,9 @@ ALTER TABLE "public"."set_piece_list" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."sets" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."shipment_update_logs" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."shipments" ENABLE ROW LEVEL SECURITY;
@@ -2559,6 +2794,12 @@ GRANT ALL ON TABLE "public"."set_review_stats" TO "service_role";
 GRANT ALL ON TABLE "public"."sets" TO "anon";
 GRANT ALL ON TABLE "public"."sets" TO "authenticated";
 GRANT ALL ON TABLE "public"."sets" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."shipment_update_logs" TO "anon";
+GRANT ALL ON TABLE "public"."shipment_update_logs" TO "authenticated";
+GRANT ALL ON TABLE "public"."shipment_update_logs" TO "service_role";
 
 
 

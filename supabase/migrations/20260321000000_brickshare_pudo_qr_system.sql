@@ -334,12 +334,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Insert sample Brickshare PUDO locations (you can modify these)
-INSERT INTO brickshare_pudo_locations (id, name, address, city, postal_code, province, latitude, longitude, contact_email, is_active)
-VALUES 
-    ('BS-PUDO-001', 'Brickshare Madrid Centro', 'Calle Gran Vía 28', 'Madrid', '28013', 'Madrid', 40.4200, -3.7038, 'madrid.centro@brickshare.com', true),
-    ('BS-PUDO-002', 'Brickshare Barcelona Eixample', 'Passeig de Gràcia 100', 'Barcelona', '08008', 'Barcelona', 41.3926, 2.1640, 'barcelona.eixample@brickshare.com', true)
-ON CONFLICT (id) DO NOTHING;
+-- NOTE: PUDO locations are now managed via migrationfile 20260327150000_fix_pudo_ids_format.sql
+-- This ensures IDs follow the format: brickshare-XXX (never BS-PUDO-XXX)
+-- See: docs/PUDO_IDS_FIX.md for details on the normalization
 
 -- Grant necessary permissions
 GRANT SELECT ON brickshare_pudo_locations TO authenticated;

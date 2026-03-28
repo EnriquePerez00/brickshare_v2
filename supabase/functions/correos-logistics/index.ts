@@ -215,15 +215,12 @@ serve(async (req) => {
                         shipping_city, 
                         shipping_postal_code, 
                         user_id,
-                        order_id,
-                        orders (
-                            set_id,
-                            sets (
-                                set_name,
-                                set_ref,
-                                set_weight,
-                                set_dim
-                            )
+                        set_id,
+                        sets:set_id (
+                            set_name,
+                            set_ref,
+                            set_weight,
+                            set_dim
                         ),
                         users:user_id (
                             full_name,
@@ -261,8 +258,8 @@ serve(async (req) => {
                             telefono: shipment.users?.phone,
                         },
                         bultos: [{
-                            peso: shipment.orders?.sets?.set_weight || 1,
-                            ...parseDimensions(shipment.orders?.sets?.set_dim)
+                            peso: shipment.sets?.set_weight || 1,
+                            ...parseDimensions(shipment.sets?.set_dim)
                         }],
                         añadidos: [
                             {
@@ -311,15 +308,12 @@ serve(async (req) => {
                         shipping_city, 
                         shipping_postal_code, 
                         user_id,
-                        order_id,
-                        orders (
-                            set_id,
-                            sets (
-                                set_name,
-                                set_ref,
-                                set_weight,
-                                set_dim
-                            )
+                        set_id,
+                        sets:set_id (
+                            set_name,
+                            set_ref,
+                            set_weight,
+                            set_dim
                         ),
                         users:user_id (
                             full_name,
@@ -369,8 +363,8 @@ serve(async (req) => {
                             provincia: OFFICE_ADDRESS.provincia,
                         },
                         bultos: [{
-                            peso: shipment.orders?.sets?.set_weight || 1,
-                            ...parseDimensions(shipment.orders?.sets?.set_dim)
+                            peso: shipment.sets?.set_weight || 1,
+                            ...parseDimensions(shipment.sets?.set_dim)
                         }],
                         caracteristicas: {
                             etiqueta_sin_etiqueta: "S"
@@ -410,7 +404,7 @@ serve(async (req) => {
                     html: `
                         <div style="font-family: sans-serif; max-width: 600px; margin: auto; color: #333;">
                             <h2 style="color: #1a1a1a;">¡Hola ${shipment.users?.full_name}!</h2>
-                            <p>Has solicitado la devolución de tu set de LEGO <strong>${shipment.orders?.sets?.set_name}</strong>. Hemos activado el servicio <strong>"Etiqueta sin Etiqueta"</strong> para tu comodidad.</p>
+                            <p>Has solicitado la devolución de tu set de LEGO <strong>${shipment.sets?.set_name}</strong>. Hemos activado el servicio <strong>"Etiqueta sin Etiqueta"</strong> para tu comodidad.</p>
                             
                             <div style="background: #fdf6b2; padding: 30px; border-radius: 12px; border: 1px solid #facc15; text-align: center; margin: 24px 0;">
                                 <p style="margin: 0 0 10px 0; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #854d0e; font-weight: bold;">CÓDIGO DE DEVOLUCIÓN</p>

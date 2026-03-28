@@ -53,3 +53,4 @@ supabase/dump_reset.sql
 # Keep schema documentation (auto-generated but versioned)
 !docs/DATABASE_SCHEMA.md
 !docs/schema_dump.sql
+supabase/.env

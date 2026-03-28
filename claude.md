@@ -1,678 +1,815 @@
 # Brickshare — Documentación Técnica Completa
 
-> Plataforma de alquiler de sets LEGO  
+> Plataforma de alquiler circular de sets LEGO  
 > Repositorio: https://github.com/EnriquePerez00/brickshare_v2  
-> Última actualización: 22/03/2026
+> Última actualización: 25/03/2026
 
 ---
 
-# Reglas de Consumo de Tokens
+# ⚡ Reglas de Consumo de Tokens
+
 1. **Respostas Concisas:** No me des explicaciones largas a menos que te lo pida. Ve directo al código.
 2. **Lectura Selectiva:** Antes de leer archivos grandes, pregúntame o lee solo las líneas relevantes.
 3. **No repitas código:** Si solo cambias una línea, no me devuelvas el archivo entero; usa bloques de diff o solo la parte afectada.
 4. **Pensamiento Interno:** Minimiza el razonamiento paso a paso si la solución es trivial.
 
-### ❌ __NUNCA hagas:__
+---
+
+# 🚫 REGLAS CRÍTICAS
+
+### ❌ NUNCA hagas:
+```bash
+supabase db reset  # ¡NUNCA ejecutes esto directamente!
+```
+
+### ✅ SIEMPRE usa:
+```bash
+./scripts/safe-db-reset.sh  # Hace backup automático antes del reset
+```
+
+### ⚠️ IMPORTANTE: SOLO BASES DE DATOS LOCALES
+
+**Regla fundamental**: Este proyecto NO usa Supabase Cloud. Todo el desarrollo se realiza con instancias locales de Supabase sobre Docker.
+
+Si encuentras URLs con `.supabase.co` o `.supabase.com` en cualquier archivo, son errores que deben corregirse.
+
+---
+
+## 1. Configuración de Bases de Datos
+
+### Base de Datos de Desarrollo (LOCAL - Puerto 54322)
 
 ```bash
-supabase db reset
+# Credenciales de desarrollo (Supabase Docker local - directorio /supabase)
+Base de datos: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+API URL: http://127.0.0.1:54321
+Studio: http://127.0.0.1:54323
+Anon Key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Service Role: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
-### ✅ __SIEMPRE usa:__
-
+**Obtener credenciales actuales**:
 ```bash
-./scripts/db-reset.sh
+cd /Users/I764690/Code_personal/Brickshare
+supabase status
 ```
 
+**Características**:
+- ✅ BD principal para desarrollo y pruebas
+- ✅ Datos seed completos y actualizados
+- ✅ ~90 migraciones aplicadas automáticamente
+- ✅ Reinicio seguro con `./scripts/safe-db-reset.sh`
+- ✅ Backups automáticos en `supabase/backups/historic/`
 
-## 1. Esquema del Repositorio
-
-```
-brickshare_v2/
-├── apps/
-│   └── web/                          # Frontend web principal
-│       ├── src/
-│       │   ├── components/           # Componentes React
-│       │   │   ├── admin/            # Panel de administración
-│       │   │   │   ├── inventory/    #   Gestión de inventario
-│       │   │   │   ├── operations/   #   Operaciones (envíos, devoluciones, asignaciones)
-│       │   │   │   └── users/        #   Gestión de usuarios
-│       │   │   └── ui/               # Componentes UI reutilizables (shadcn/ui)
-│       │   ├── contexts/             # Contextos React (AuthContext, etc.)
-│       │   ├── hooks/                # Custom hooks (useOrders, useShipments, etc.)
-│       │   ├── lib/                  # Servicios y utilidades (supabaseClient, pudoService)
-│       │   ├── pages/                # Páginas (Dashboard, Auth, Catalogo, Admin)
-│       │   └── types/                # Tipos TypeScript del frontend
-│       ├── public/                   # Assets estáticos
-│       ├── package.json              # Dependencias del frontend
-│       ├── vite.config.ts            # Configuración de Vite
-│       ├── tailwind.config.ts        # Configuración de Tailwind CSS
-│       └── tsconfig.json             # Configuración de TypeScript
-│
-├── packages/
-│   └── shared/                       # Código compartido entre apps
-│       └── src/
-│           └── types/                # Tipos compartidos (pudo.ts, etc.)
-│
-├── supabase/
-│   ├── config.toml                   # Configuración de Supabase local
-│   ├── functions/                    # Edge Functions (Deno runtime)
-│   │   ├── brickshare-qr-api/       # API de validación de códigos QR
-│   │   ├── change-subscription/      # Cambio de plan de suscripción
-│   │   ├── correos-logistics/        # Integración logística con Correos
-│   │   ├── correos-pudo/             # Puntos PUDO de Correos
-│   │   ├── create-checkout-session/  # Sesión de pago Stripe
-│   │   ├── create-logistics-package/ # Creación de paquetes logísticos
-│   │   ├── create-subscription-intent/ # Intent de suscripción Stripe
-│   │   ├── create-swikly-wish/       # Garantías Swikly
-│   │   ├── delete-user/              # Eliminación de cuenta
-│   │   ├── fetch-lego-data/          # Importación datos LEGO (Brickset/Rebrickable)
-│   │   ├── process-assignment-payment/ # Procesamiento de pago de asignación
-│   │   ├── send-brickshare-qr-email/ # Envío de QR por email
-│   │   ├── send-email/               # Servicio genérico de email (Resend)
-│   │   ├── stripe-webhook/           # Webhook de Stripe
-│   │   ├── submit-donation/          # Procesamiento de donaciones
-│   │   ├── swikly-manage-wish/       # Gestión de deseos Swikly
-│   │   └── swikly-webhook/           # Webhook de Swikly
-│   ├── migrations/                   # ~90+ migraciones SQL ordenadas cronológicamente
-│   └── snippets/                     # Snippets SQL de utilidad
-│
-├── scripts/                          # Scripts de utilidad
-│   ├── check-set-ref.ts              # Verificación de referencias de sets
-│   ├── install-hooks.sh              # Instalación de git hooks
-│   ├── reset-test-data.sql           # Reset de datos de prueba
-│   ├── seed-admin-and-sets.sql       # Seed de admin y sets iniciales
-│   ├── seed-sets-from-brickset.ts    # Importación de sets desde Brickset
-│   ├── update-schema-docs.sh         # Actualización automática de docs de esquema
-│   ├── verify-seed.ts                # Verificación de seed
-│   └── verify-supabase-cli.sh        # Verificación de CLI de Supabase
-│
-├── src/
-│   └── types/
-│       └── supabase.ts               # Tipos TypeScript generados de Supabase
-│
-├── docs/                             # Documentación técnica
-│   ├── ARCHITECTURE.md               # Arquitectura del sistema
-│   ├── DATABASE_SCHEMA.md            # Esquema de base de datos (auto-generado)
-│   ├── schema_dump.sql               # Dump SQL completo del esquema
-│   ├── API_REFERENCE.md              # Referencia de API
-│   ├── LOCAL_DEVELOPMENT.md          # Guía de desarrollo local
-│   ├── CONTRIBUTING.md               # Guía de contribución
-│   ├── DEVELOPMENT_ROADMAP.md        # Roadmap de desarrollo
-│   ├── BRICKSHARE_PUDO*.md           # Documentación del sistema PUDO
-│   └── ...                           # Otras guías y documentación
-│
-├── package.json                      # Monorepo root (npm workspaces)
-├── vercel.json                       # Configuración de despliegue en Vercel
-├── .env.example                      # Variables de entorno de ejemplo
-└── .gitignore
+**Iniciar**:
+```bash
+cd /Users/I764690/Code_personal/Brickshare
+supabase start
 ```
 
 ---
 
-## 2. Stack Tecnológico
+### Archivo .env.local (Desarrollo)
 
-### 2.1 Frontend Web
+```bash
+# Supabase Local (obtener con 'supabase status')
+VITE_SUPABASE_URL=http://127.0.0.1:54321
+VITE_SUPABASE_ANON_KEY=<anon_key_from_supabase_status>
+VITE_SUPABASE_SERVICE_ROLE_KEY=<service_role_from_supabase_status>
+SUPABASE_SERVICE_ROLE_KEY=<service_role_from_supabase_status>
+
+# Stripe (test keys)
+VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...
+STRIPE_SECRET_KEY=<your_stripe_secret_key>...
+STRIPE_WEBHOOK_SECRET=<your_webhook_secret>...
+
+# Swikly (garantías)
+SWIKLY_API_KEY=your_key
+SWIKLY_API_URL=https://api.swikly.com
+
+# Correos API (logística)
+CORREOS_API_USER=your_user
+CORREOS_API_PASSWORD=your_password
+CORREOS_SENDER_CODE=your_code
+CORREOS_API_URL=https://api.correos.es
+
+# Resend (emails)
+RESEND_API_KEY=re_...
+
+# LEGO APIs (opcional)
+BRICKSET_API_KEY=your_key
+REBRICKABLE_API_KEY=your_key
+
+# App
+VITE_APP_URL=http://localhost:5173
+```
+
+---
+
+## 2. Estructura del Repositorio
+
+```
+Brickshare/
+├── apps/
+│   └── web/                          # 🎯 Frontend principal (React + Vite)
+│       ├── src/
+│       │   ├── pages/                # Rutas principales
+│       │   │   ├── Index.tsx         # Landing page
+│       │   │   ├── Auth.tsx          # Login/Registro
+│       │   │   ├── Catalogo.tsx      # Catálogo de sets
+│       │   │   ├── Dashboard.tsx     # Panel usuario
+│       │   │   ├── Admin.tsx         # Backoffice admin
+│       │   │   └── Operations.tsx    # Panel operador
+│       │   ├── components/           # Componentes React
+│       │   │   ├── admin/            # Componentes backoffice
+│       │   │   │   ├── inventory/    # Gestión inventario
+│       │   │   │   │   ├── InventoryManager.tsx
+│       │   │   │   │   ├── InventoryPiecesManager.tsx
+│       │   │   │   │   ├── MaintenanceList.tsx
+│       │   │   │   │   └── PiecePurchaseManager.tsx
+│       │   │   │   ├── operations/   # Operaciones logísticas
+│       │   │   │   │   ├── SetAssignment.tsx
+│       │   │   │   │   ├── ShipmentsList.tsx
+│       │   │   │   │   ├── ReturnsList.tsx
+│       │   │   │   │   ├── LabelPrinting.tsx
+│       │   │   │   │   └── LabelGeneration.tsx
+│       │   │   │   ├── products/     # Gestión de sets
+│       │   │   │   │   └── ProductsManager.tsx
+│       │   │   │   ├── users/        # Gestión de usuarios
+│       │   │   │   │   ├── UsersManager.tsx
+│       │   │   │   │   └── WishlistsViewer.tsx
+│       │   │   │   └── logistics/    # Logística
+│       │   │   │       └── LogisticsManager.tsx
+│       │   │   └── ui/               # shadcn/ui components
+│       │   ├── hooks/                # Custom hooks
+│       │   │   ├── useProducts.ts    # Gestión de sets
+│       │   │   ├── useShipments.ts   # Gestión de envíos
+│       │   │   ├── useWishlist.ts    # Lista de deseos
+│       │   │   ├── usePudo.ts        # Puntos PUDO
+│       │   │   └── useAssignedShipments.ts
+│       │   ├── contexts/             # React Context
+│       │   │   └── AuthContext.tsx   # Autenticación global
+│       │   ├── integrations/         # Cliente Supabase
+│       │   │   └── supabase/
+│       │   │       ├── client.ts     # Cliente tipado
+│       │   │       └── types.ts      # Tipos de BD
+│       │   ├── lib/                  # Utilidades
+│       │   │   ├── pudoService.ts    # Servicio PUDO
+│       │   │   └── utils.ts          # Helpers generales
+│       │   ├── test/                 # Infraestructura de testing
+│       │   │   ├── setup.ts          # Configuración Vitest
+│       │   │   ├── mocks/            # Mocks MSW
+│       │   │   └── fixtures/         # Datos de prueba
+│       │   └── __tests__/            # Tests
+│       │       ├── unit/             # Tests unitarios
+│       │       └── integration/      # Tests de integración
+│       ├── e2e/                      # Tests E2E (Playwright)
+│       │   ├── user-journeys/        # Flujos de usuario
+│       │   ├── admin-journeys/       # Flujos de admin
+│       │   ├── operator-journeys/    # Flujos de operador
+│       │   ├── error-scenarios/      # Casos de error
+│       │   └── helpers/              # Helpers E2E
+│       ├── public/                   # Assets estáticos
+│       ├── package.json              # Dependencias frontend
+│       ├── vite.config.ts            # Config Vite
+│       ├── playwright.config.ts      # Config Playwright
+│       └── vitest.config.ts          # Config Vitest
+│
+├── packages/
+│   └── shared/                       # Código compartido
+│       └── src/
+│           └── types/                # Tipos compartidos
+│               └── pudo.ts           # Tipos PUDO
+│
+├── supabase/
+│   ├── config.toml                   # Configuración Supabase
+│   ├── seed.sql                      # Datos iniciales
+│   ├── .env                          # Variables Edge Functions
+│   ├── functions/                    # 🔥 Edge Functions (Deno)
+│   │   ├── brickshare-qr-api/       # API QR validación
+│   │   ├── change-subscription/      # Cambio suscripción
+│   │   ├── correos-logistics/        # Logística Correos
+│   │   ├── correos-pudo/             # Puntos PUDO
+│   │   ├── create-checkout-session/  # Pago Stripe
+│   │   ├── create-logistics-package/ # Paquetes logísticos
+│   │   ├── create-subscription-intent/
+│   │   ├── create-swikly-wish/       # Garantías Swikly
+│   │   ├── delete-user/              # Eliminar cuenta
+│   │   ├── fetch-lego-data/          # Enriquecer sets
+│   │   ├── process-assignment-payment/
+│   │   ├── send-brickshare-qr-email/ # Email QR
+│   │   ├── send-email/               # Email genérico
+│   │   ├── stripe-webhook/           # Webhook Stripe
+│   │   ├── submit-donation/          # Donaciones
+│   │   ├── swikly-manage-wish/       # Gestión Swikly
+│   │   ├── swikly-webhook/           # Webhook Swikly
+│   │   └── update-shipment/          # Actualizar envío
+│   ├── migrations/                   # ⚠️ ~90 migraciones (NUNCA ELIMINAR)
+│   ├── backups/                      # Backups automáticos
+│   │   └── historic/                 # Backups históricos
+│   └── snippets/                     # SQL snippets útiles
+│
+├── supabase-main/                    # Instancia "producción" local
+│   ├── config.toml
+│   ├── functions/
+│   └── migrations/
+│
+├── scripts/                          # 🔧 ~40 Scripts de utilidad
+│   ├── safe-db-reset.sh              # ✅ Reset seguro con backup
+│   ├── restore-data.sh               # Restaurar backup
+│   ├── sync-auth-users-to-local.ts   # Sync usuarios
+│   ├── seed-sets-from-brickset.ts    # Importar sets
+│   ├── verify-edge-functions.sh      # Verificar functions
+│   ├── test-*.sh                     # Scripts de testing
+│   └── README_*.md                   # Docs de scripts
+│
+├── docs/                             # 📚 Documentación técnica
+│   ├── PROJECT_OVERVIEW.md           # Visión general
+│   ├── ARCHITECTURE.md               # Arquitectura
+│   ├── DATABASE_SCHEMA.md            # Esquema BD (auto-gen)
+│   ├── schema_dump.sql               # Dump SQL completo
+│   ├── API_REFERENCE.md              # Edge Functions
+│   ├── LOCAL_DEVELOPMENT.md          # Setup desarrollo
+│   ├── BRICKSHARE_PUDO*.md           # Sistema PUDO
+│   └── ...                           # Más docs técnicos
+│
+├── tests/                            # Documentación de testing
+│   ├── PHASE_1_UNIT_TESTS.md         # Tests unitarios
+│   ├── PHASE_2_INTEGRATION_TESTS.md  # Tests integración
+│   ├── PHASE_3_E2E_TESTS.md          # Tests E2E
+│   └── PHASE_4_CI_CD.md              # CI/CD
+│
+├── .github/
+│   └── workflows/                    # GitHub Actions
+│       ├── test.yml                  # CI tests
+│       ├── quality.yml               # Linting
+│       └── deploy-preview.yml        # Preview deploys
+│
+├── src/
+│   └── types/
+│       └── supabase.ts               # Tipos TS auto-generados
+│
+├── package.json                      # Monorepo root
+├── .env.local                        # Variables entorno
+├── .clinerules                       # Reglas de Cline
+└── claude.md                         # Este archivo
+```
+
+---
+
+## 3. Stack Tecnológico
+
+### 3.1 Frontend Web
 
 | Tecnología | Versión | Propósito |
 |---|---|---|
-| **Vite** | ^7.3.1 | Build tool y dev server |
-| **React** | ^18.3.1 | Librería UI |
-| **TypeScript** | ^5.8.3 | Tipado estático |
-| **Tailwind CSS** | ^3.4.17 | Framework de estilos utilitarios |
-| **shadcn/ui (Radix UI)** | Varios | Componentes UI accesibles (Dialog, Select, Tabs, etc.) |
-| **React Router DOM** | ^6.30.1 | Enrutamiento SPA |
-| **TanStack React Query** | ^5.83.0 | Cache y sincronización de datos del servidor |
+| **Vite** | ^7.3.1 | Build tool y dev server ultra-rápido |
+| **React** | ^18.3.1 | Librería UI con hooks |
+| **TypeScript** | ^5.8.3 | Tipado estático end-to-end |
+| **Tailwind CSS** | ^3.4.17 | Framework CSS utilitario |
+| **shadcn/ui** | Latest | Componentes accesibles (Radix UI) |
+| **React Router DOM** | ^6.30.1 | Routing SPA |
+| **TanStack Query** | ^5.83.0 | Data fetching, caché y sincronización |
 | **React Hook Form** | ^7.61.1 | Gestión de formularios |
 | **Zod** | ^3.25.76 | Validación de esquemas |
 | **Stripe.js** | ^8.7.0 | Pagos en el frontend |
-| **Recharts** | ^2.15.4 | Gráficos y visualización de datos |
-| **Framer Motion** | ^12.26.2 | Animaciones |
-| **date-fns** | ^3.6.0 | Utilidades de fechas |
-| **Lucide React** | ^0.462.0 | Iconos |
-| **Sonner** | ^1.7.4 | Notificaciones toast |
-| **PapaParse** | ^5.5.3 | Parsing de CSV |
+| **Recharts** | ^2.15.4 | Gráficos y analytics |
+| **Framer Motion** | ^12.26.2 | Animaciones fluidas |
+| **date-fns** | ^3.6.0 | Manipulación de fechas |
+| **Lucide React** | ^0.462.0 | Iconos modernos |
+| **Sonner** | ^1.7.4 | Toast notifications |
+| **PapaParse** | ^5.5.3 | Parsing CSV |
+| **QRCode.react** | ^4.2.0 | Generación códigos QR |
 
-### 2.2 Backend (Supabase)
+### 3.2 Testing
+
+| Herramienta | Versión | Propósito |
+|---|---|---|
+| **Vitest** | ^3.2.4 | Test runner (50+ tests unitarios) |
+| **Testing Library** | ^16.3.2 | Testing componentes React |
+| **Playwright** | ^1.58.2 | E2E testing (10+ journeys) |
+| **MSW** | ^2.12.14 | API mocking |
+| **@faker-js/faker** | ^10.3.0 | Datos de prueba |
+
+### 3.3 Backend (Supabase)
 
 | Tecnología | Propósito |
 |---|---|
 | **Supabase** | Backend as a Service (BaaS) |
-| **PostgreSQL** | Base de datos relacional |
-| **Supabase Auth** | Autenticación (email/password, JWT, RLS) |
-| **Supabase Edge Functions** | Funciones serverless (runtime Deno/TypeScript) |
-| **Supabase Storage** | Almacenamiento de archivos (etiquetas de envío, imágenes) |
-| **Supabase Realtime** | Suscripciones WebSocket (preparado para uso futuro) |
-| **Row Level Security (RLS)** | Control de acceso a nivel de fila en todas las tablas |
+| **PostgreSQL 17** | Base de datos relacional |
+| **Supabase Auth** | Autenticación JWT + RLS |
+| **Edge Functions** | Serverless (Deno runtime) |
+| **Supabase Storage** | Almacenamiento archivos |
+| **Row Level Security** | Control acceso nivel fila |
 
-### 2.3 Integraciones Externas
+### 3.4 Integraciones Externas
 
-| Servicio | Propósito |
-|---|---|
-| **Stripe** | Pagos, suscripciones y webhooks |
-| **Correos API** | Logística de envíos y puntos PUDO (Pick Up / Drop Off) |
-| **Swikly** | Garantías y depósitos de seguridad |
-| **Resend** | Envío de emails transaccionales |
-| **Brickset / Rebrickable** | Importación de datos de sets LEGO (piezas, imágenes, detalles) |
+| Servicio | Propósito | Variables Requeridas |
+|---|---|---|
+| **Stripe** | Pagos y suscripciones | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` |
+| **Correos API** | Logística y envíos PUDO | `CORREOS_API_USER`, `CORREOS_API_PASSWORD` |
+| **Swikly** | Garantías y depósitos | `SWIKLY_API_KEY` |
+| **Resend** | Emails transaccionales | `RESEND_API_KEY` |
+| **Brickset** | Datos sets LEGO | `BRICKSET_API_KEY` (opcional) |
+| **Rebrickable** | Piezas LEGO | `REBRICKABLE_API_KEY` (opcional) |
 
-### 2.4 Herramientas de Desarrollo
+### 3.5 DevOps y CI/CD
 
 | Herramienta | Propósito |
 |---|---|
-| **npm workspaces** | Gestión de monorepo |
-| **ESLint** | Linting de código |
-| **Vitest** | Framework de testing |
-| **Testing Library** | Testing de componentes React |
-| **Docker** | Supabase local (PostgreSQL, Auth, etc.) |
-| **Supabase CLI** | Gestión de migraciones, funciones y tipos |
-| **Vercel** | Despliegue del frontend en producción |
+| **Docker** | Supabase local (PostgreSQL, Auth, Storage) |
+| **Supabase CLI** | Migraciones, funciones, tipos |
+| **GitHub Actions** | CI/CD (4 workflows) |
+| **Vercel** | Deployment frontend |
+| **ESLint** | Linting código |
 
-### 2.5 Sistema de Roles (RBAC)
+### 3.6 Sistema de Roles (RBAC)
 
-| Rol | Descripción |
-|---|---|
-| `admin` | Acceso total: gestión de sets, usuarios, inventario, operaciones |
-| `operador` | Operaciones: gestión de envíos, recepciones, inventario |
-| `user` | Usuario final: catálogo, wishlist, suscripción, seguimiento de envíos |
+| Rol | Acceso | Tablas con Acceso |
+|---|---|---|
+| `user` | Cliente suscriptor | `users`, `wishlist`, `shipments` (propios), `reviews` (propios) |
+| `admin` | Acceso total backoffice | Todas las tablas |
+| `operador` | Operaciones logísticas | `shipments`, `inventory_sets`, `reception_operations` |
 
 ---
 
-## 3. Esquema de Base de Datos
+## 4. Edge Functions (Supabase — Deno Runtime)
 
-### 3.1 Tipos Enumerados
-
-#### `app_role`
-```sql
-ENUM ('admin', 'user', 'operador')
-```
-Roles de la aplicación para el sistema RBAC.
-
-#### `operation_type`
-```sql
-ENUM ('recepcion paquete', 'analisis_peso', 'deposito_fulfillment', 'higienizado', 'retorno_stock')
-```
-Tipos de operaciones de backoffice registrables.
-
----
-
-### 3.2 Tablas
-
----
-
-#### `users`
-
-**Descripción**: Perfil de usuario vinculado a `auth.users`. Se crea automáticamente al registrar un nuevo usuario mediante el trigger `handle_new_user`.
-
-| Campo | Tipo | Nulo | Default | Restricciones | Significado |
-|---|---|:---:|---|---|---|
-| `id` | uuid | ✗ | `gen_random_uuid()` | PK | Identificador interno del perfil |
-| `user_id` | uuid | ✗ | — | UNIQUE, FK → `auth.users(id)` ON DELETE CASCADE | ID del usuario en `auth.users` |
-| `full_name` | text | ✓ | — | — | Nombre completo del usuario |
-| `email` | text | ✓ | — | — | Email del usuario (copiado de auth) |
-| `avatar_url` | text | ✓ | — | — | URL del avatar del usuario |
-| `phone` | text | ✓ | — | — | Teléfono de contacto |
-| `address` | text | ✓ | — | — | Dirección postal |
-| `address_extra` | text | ✓ | — | — | Información adicional de dirección (piso, puerta, etc.) |
-| `zip_code` | text | ✓ | — | — | Código postal |
-| `city` | text | ✓ | — | — | Ciudad |
-| `province` | text | ✓ | — | — | Provincia |
-| `impact_points` | integer | ✓ | `0` | — | Puntos de impacto social acumulados |
-| `subscription_type` | text | ✓ | — | — | Plan de suscripción (Brick Starter, Pro, Master) |
-| `subscription_status` | text | ✓ | `'active'` | CHECK: `active`, `inactive` | Estado de la suscripción |
-| `profile_completed` | boolean | ✓ | `false` | — | Si el usuario completó su perfil (dirección, teléfono, etc.) |
-| `user_status` | text | ✓ | `'no_set'` | CHECK: `no_set`, `set_shipping`, `received`, `has_set`, `set_returning`, `suspended`, `cancelled` | Estado del usuario en el ciclo de alquiler |
-| `stripe_customer_id` | text | ✓ | — | UNIQUE | ID de cliente en Stripe |
-| `referral_code` | text | ✓ | — | UNIQUE (case-insensitive) | Código de referido (6 chars, auto-generado al INSERT) |
-| `referred_by` | uuid | ✓ | — | FK → `auth.users(id)` ON DELETE SET NULL | ID del usuario que lo refirió |
-| `referral_credits` | integer | ✗ | `0` | — | Créditos acumulados por referidos exitosos |
-| `created_at` | timestamptz | ✗ | `now()` | — | Fecha de creación |
-| `updated_at` | timestamptz | ✗ | `now()` | Auto-update via trigger | Fecha de última actualización |
+| Función | JWT | Rol | Propósito |
+|---|:---:|---|---|
+| `brickshare-qr-api` | ✅ | Admin/Operador | Validación códigos QR en puntos PUDO |
+| `change-subscription` | ✅ | User | Cambiar/cancelar plan Stripe |
+| `correos-logistics` | ✅ | Admin/Operador | Crear envíos con Correos API |
+| `correos-pudo` | ❌ | Public | Consultar puntos PUDO cercanos |
+| `create-checkout-session` | ✅ | User | Crear sesión pago Stripe |
+| `create-logistics-package` | ✅ | Admin | Crear paquete logístico |
+| `create-subscription-intent` | ✅ | User | Intent suscripción Stripe |
+| `create-swikly-wish` | ✅ | Admin | Crear garantía Swikly |
+| `delete-user` | ✅ | User/Admin | Eliminar cuenta (GDPR) |
+| `fetch-lego-data` | ✅ | Admin | Enriquecer sets desde APIs |
+| `process-assignment-payment` | ✅ | Admin | Pago asignación set |
+| `send-brickshare-qr-email` | ✅ | Admin | Email con QR entrega/devolución |
+| `send-email` | ✅ | Service | Email genérico vía Resend |
+| `stripe-webhook` | ❌ | Stripe | Recibir eventos Stripe |
+| `submit-donation` | ❌ | Public | Registrar donaciones |
+| `swikly-manage-wish` | ✅ | Admin | Gestionar garantías Swikly |
+| `swikly-webhook` | ❌ | Swikly | Recibir eventos Swikly |
+| `update-shipment` | ✅ | Admin/Operador | Actualizar estado envío |
 
 ---
 
-#### `user_roles`
+## 5. Tablas Principales de la Base de Datos
 
-**Descripción**: Asignación de roles a usuarios. Un usuario puede tener múltiples roles.
+### Tabla `users` (Perfiles de Usuario)
 
-| Campo | Tipo | Nulo | Default | Restricciones | Significado |
-|---|---|:---:|---|---|---|
-| `id` | uuid | ✗ | `gen_random_uuid()` | PK | Identificador del registro |
-| `user_id` | uuid | ✗ | — | FK → `auth.users(id)` ON DELETE CASCADE, UNIQUE(user_id, role) | ID del usuario en auth |
-| `role` | app_role | ✗ | — | ENUM: `admin`, `user`, `operador` | Rol asignado |
-| `created_at` | timestamptz | ✗ | `now()` | — | Fecha de asignación |
+Perfil completo vinculado a `auth.users`. Se crea automáticamente al registrar usuario.
 
----
+**Campos clave**:
+- `user_id` (FK → auth.users) — ID del usuario
+- `subscription_type` — Plan: `brick_starter`, `brick_pro`, `brick_master`
+- `subscription_status` — Estado: `active`, `inactive`
+- `user_status` — Estado ciclo: `no_set`, `set_shipping`, `received`, `has_set`, `set_returning`, `suspended`, `cancelled`
+- `stripe_customer_id` — ID cliente Stripe
+- `referral_code` — Código referido (6 chars, auto-generado)
+- `referred_by` — Usuario que refirió
+- `referral_credits` — Créditos acumulados por referidos
 
-#### `sets`
+### Tabla `sets` (Catálogo LEGO)
 
-**Descripción**: Catálogo de sets LEGO disponibles para alquiler.
+Catálogo de sets disponibles para alquiler.
 
-| Campo | Tipo | Nulo | Default | Restricciones | Significado |
-|---|---|:---:|---|---|---|
-| `id` | uuid | ✗ | `gen_random_uuid()` | PK | Identificador del set |
-| `set_name` | text | ✗ | — | — | Nombre del set LEGO |
-| `set_description` | text | ✓ | — | — | Descripción del set |
-| `set_image_url` | text | ✓ | — | — | URL de la imagen principal |
-| `set_theme` | text | ✗ | — | — | Tema LEGO (City, Technic, Star Wars, etc.) |
-| `set_subtheme` | text | ✓ | — | — | Subtema dentro del tema principal |
-| `set_age_range` | text | ✗ | — | — | Rango de edad recomendado (ej: "6-12") |
-| `set_piece_count` | integer | ✗ | — | — | Número total de piezas |
-| `set_ref` | text | ✓ | — | — | Número de referencia oficial LEGO (ej: "75192") |
-| `set_weight` | numeric | ✓ | — | — | Peso del set (en gramos) |
-| `set_minifigs` | numeric | ✓ | — | — | Número de minifiguras incluidas |
-| `set_price` | numeric | ✓ | `100.00` | — | Precio de referencia del set (para depósito/valor) |
-| `set_pvp_release` | numeric | ✓ | — | — | PVP de lanzamiento original |
-| `current_value_new` | numeric | ✓ | — | — | Valor de mercado actual (nuevo) |
-| `current_value_used` | numeric | ✓ | — | — | Valor de mercado actual (usado) |
-| `set_status` | text | ✓ | `'inactive'` | CHECK: `active`, `inactive`, `in_repair` | Estado del set en el sistema |
-| `catalogue_visibility` | boolean | ✗ | `true` | — | Si es visible en el catálogo público |
-| `skill_boost` | text[] | ✓ | — | — | Habilidades que potencia (creatividad, motricidad, etc.) |
-| `year_released` | integer | ✓ | — | — | Año de lanzamiento |
-| `barcode_upc` | text | ✓ | — | — | Código de barras UPC |
-| `barcode_ean` | text | ✓ | — | — | Código de barras EAN |
-| `created_at` | timestamptz | ✗ | `now()` | — | Fecha de creación |
-| `updated_at` | timestamptz | ✗ | `now()` | Auto-update via trigger | Fecha de última actualización |
+**Campos clave**:
+- `set_ref` — Referencia LEGO (ej: "75192")
+- `set_name` — Nombre del set
+- `set_theme` — Tema (Star Wars, City, Technic...)
+- `set_piece_count` — Número de piezas
+- `set_age_range` — Edad recomendada
+- `set_price` — Precio referencia
+- `set_status` — Estado: `active`, `inactive`, `in_repair`
+- `catalogue_visibility` — Visible en catálogo público
 
----
+### Tabla `inventory_sets` (Inventario Físico)
 
-#### `set_piece_list`
+Control de stock de cada set.
 
-**Descripción**: Lista detallada de piezas que componen cada set LEGO. Se importa desde APIs externas (Rebrickable/Brickset).
+**Campos clave**:
+- `inventory_set_total_qty` — Cantidad en almacén
+- `in_shipping` — Unidades en envío
+- `in_use` — Unidades con usuarios
+- `in_return` — Unidades en devolución
+- `in_repair` — Unidades en reparación
 
-| Campo | Tipo | Nulo | Default | Restricciones | Significado |
-|---|---|:---:|---|---|---|
-| `id` | uuid | ✗ | `gen_random_uuid()` | PK | Identificador del registro |
-| `set_id` | uuid | ✗ | — | FK → `sets(id)` ON DELETE CASCADE | Set al que pertenece la pieza |
-| `set_ref` | text | ✗ | — | — | Referencia del set (para búsqueda rápida) |
-| `piece_ref` | text | ✗ | — | — | Referencia/ID de la pieza en LEGO |
-| `color_ref` | text | ✓ | — | — | Referencia del color |
-| `color_id` | integer | ✓ | — | — | ID numérico del color (Rebrickable) |
-| `piece_description` | text | ✓ | — | — | Descripción de la pieza |
-| `piece_qty` | integer | ✗ | `1` | — | Cantidad de esta pieza en el set |
-| `piece_weight` | numeric | ✓ | — | — | Peso individual de la pieza (gramos) |
-| `piece_image_url` | text | ✓ | — | — | URL de la imagen de la pieza |
-| `piece_studdim` | text | ✓ | — | — | Dimensiones en studs (ej: "2x4") |
-| `element_id` | text | ✓ | — | — | ID de elemento LEGO |
-| `is_spare` | boolean | ✓ | `false` | — | Si es una pieza de repuesto |
-| `part_cat_id` | integer | ✓ | — | — | ID de categoría de pieza (Rebrickable) |
-| `year_from` | integer | ✓ | — | — | Primer año en que se fabricó esta pieza |
-| `year_to` | integer | ✓ | — | — | Último año en que se fabricó esta pieza |
-| `is_trans` | boolean | ✓ | `false` | — | Si la pieza es translúcida |
-| `external_ids` | jsonb | ✓ | — | — | IDs externos (BrickLink, BrickOwl, etc.) |
-| `created_at` | timestamptz | ✗ | `now()` | — | Fecha de creación |
-| `updated_at` | timestamptz | ✗ | `now()` | Auto-update via trigger | Fecha de última actualización |
+### Tabla `shipments` (Envíos y Tracking)
 
----
+Gestiona todo el ciclo de vida del envío.
 
-#### `inventory_sets`
+**Estados**: `pending`, `preparation`, `assigned`, `in_transit`, `delivered`, `returned`, `return_in_transit`, `cancelled`
 
-**Descripción**: Control de inventario de cada set. Rastrea unidades en diferentes estados (almacén, envío, uso, reparación). Se crea automáticamente al insertar un set (trigger `handle_new_set_inventory`).
+**Campos PUDO**:
+- `pickup_type` — `correos` (externo) o `brickshare` (propio)
+- `brickshare_pudo_id` — ID punto PUDO Brickshare
+- `correos_shipment_id` — ID envío Correos
 
-| Campo | Tipo | Nulo | Default | Restricciones | Significado |
-|---|---|:---:|---|---|---|
-| `id` | uuid | ✗ | `gen_random_uuid()` | PK | Identificador del registro |
-| `set_id` | uuid | ✗ | — | UNIQUE, FK → `sets(id)` ON DELETE CASCADE | Set al que pertenece |
-| `set_ref` | text | ✓ | — | — | Referencia LEGO del set |
-| `inventory_set_total_qty` | integer | ✗ | `0` | — | Cantidad total de unidades disponibles en almacén |
-| `in_shipping` | integer | ✗ | `0` | — | Unidades actualmente en proceso de envío |
-| `in_use` | integer | ✗ | `0` | — | Unidades actualmente en uso por usuarios |
-| `in_return` | integer | ✗ | `0` | — | Unidades en proceso de devolución |
-| `in_repair` | integer | ✗ | `0` | — | Unidades en reparación (piezas faltantes) |
-| `spare_parts_order` | text | ✓ | — | — | Notas sobre pedidos de piezas de repuesto |
-| `created_at` | timestamptz | ✗ | `now()` | — | Fecha de creación |
-| `updated_at` | timestamptz | ✗ | `now()` | Auto-update via trigger | Fecha de última actualización |
+**Campos QR**:
+- `delivery_qr_code` — QR validación entrega
+- `return_qr_code` — QR validación devolución
+- `delivery_validated_at` — Fecha validación entrega
+- `return_validated_at` — Fecha validación devolución
 
----
+**Campos Swikly**:
+- `swikly_wish_id` — ID garantía
+- `swikly_status` — Estado: `pending`, `wish_created`, `accepted`, `released`, `captured`
+- `swikly_deposit_amount` — Monto depósito (céntimos)
 
-#### `shipments`
+### Tabla `wishlist` (Lista de Deseos)
 
-**Descripción**: Tabla central de envíos. Gestiona todo el ciclo de vida de un envío: asignación → preparación → envío → entrega → devolución.
+Lista de sets deseados por usuarios para asignación automática.
 
-| Campo | Tipo | Nulo | Default | Restricciones | Significado |
-|---|---|:---:|---|---|---|
-| `id` | uuid | ✗ | `gen_random_uuid()` | PK | Identificador del envío |
-| `user_id` | uuid | ✗ | — | FK → `auth.users(id)` CASCADE, FK → `users(user_id)` CASCADE | Usuario destinatario |
-| `set_id` | uuid | ✓ | — | FK → `sets(id)` ON DELETE SET NULL | Set enviado |
-| `set_ref` | text | ✓ | — | — | Referencia LEGO del set (para consulta rápida) |
-| `shipment_status` | text | ✗ | `'pending'` | CHECK: `pending`, `preparation`, `assigned`, `in_transit`, `delivered`, `returned`, `return_in_transit`, `cancelled` | Estado actual del envío |
-| `shipping_address` | text | ✗ | — | — | Dirección de envío |
-| `shipping_city` | text | ✗ | — | — | Ciudad de envío |
-| `shipping_zip_code` | text | ✗ | — | — | Código postal de envío |
-| `shipping_country` | text | ✗ | `'España'` | — | País de envío |
-| `shipping_provider` | text | ✓ | — | — | Proveedor de envío |
-| `pickup_provider_address` | text | ✓ | — | — | Dirección del punto de recogida |
-| `tracking_number` | text | ✓ | UNIQUE | — | Número de seguimiento |
-| `carrier` | text | ✓ | — | — | Transportista |
-| `additional_notes` | text | ✓ | — | — | Notas adicionales del envío |
-| `assigned_date` | timestamptz | ✓ | — | — | Fecha de asignación del set |
-| `estimated_delivery_date` | timestamptz | ✓ | — | — | Fecha estimada de entrega |
-| `actual_delivery_date` | timestamptz | ✓ | — | — | Fecha real de entrega |
-| `user_delivery_date` | timestamptz | ✓ | — | — | Fecha en la que el usuario recogió el paquete |
-| `warehouse_pickup_date` | timestamptz | ✓ | — | — | Fecha de recogida desde almacén |
-| `warehouse_reception_date` | timestamptz | ✓ | — | — | Fecha de recepción en almacén (devolución) |
-| `estimated_return_date` | date | ✓ | — | — | Fecha estimada de devolución |
-| `return_request_date` | timestamptz | ✓ | — | — | Fecha en la que el usuario solicitó la devolución |
-| `pickup_provider` | text | ✓ | — | — | Transportista encargado de la recogida de devolución |
-| `handling_processed` | boolean | ✓ | `false` | — | Si la operación de recepción en almacén ya fue procesada |
-| `pickup_type` | text | ✓ | `'correos'` | CHECK: `correos`, `brickshare` | Tipo de punto de recogida |
-| **Integración Correos** | | | | | |
-| `correos_shipment_id` | text | ✓ | — | — | ID de envío en Correos (API Preregister) |
-| `label_url` | text | ✓ | — | — | Ruta a la etiqueta de envío generada |
-| `pickup_id` | text | ✓ | — | — | ID externo de recogida programada |
-| `last_tracking_update` | timestamptz | ✓ | — | — | Última sincronización con Correos Tracking API |
-| **Integración Swikly (Depósitos)** | | | | | |
-| `swikly_wish_id` | text | ✓ | — | — | ID del wish en Swikly |
-| `swikly_wish_url` | text | ✓ | — | — | URL del wish de Swikly para el usuario |
-| `swikly_status` | text | ✓ | `'pending'` | CHECK: `pending`, `wish_created`, `accepted`, `released`, `captured`, `expired`, `cancelled` | Estado del depósito Swikly |
-| `swikly_deposit_amount` | integer | ✓ | — | — | Monto del depósito en céntimos |
-| **Sistema PUDO Brickshare** | | | | | |
-| `brickshare_pudo_id` | text | ✓ | — | — | ID del punto PUDO de Brickshare |
-| `brickshare_package_id` | text | ✓ | — | — | ID del package en Brickshare Logistics |
-| `brickshare_metadata` | jsonb | ✓ | `'{}'` | — | Metadatos adicionales del sistema PUDO |
-| **Códigos QR** | | | | | |
-| `delivery_qr_code` | text | ✓ | — | UNIQUE | Código QR para validar entrega |
-| `delivery_qr_expires_at` | timestamptz | ✓ | — | — | Fecha de expiración del QR de entrega |
-| `delivery_validated_at` | timestamptz | ✓ | — | — | Fecha en la que se validó la entrega por QR |
-| `return_qr_code` | text | ✓ | — | UNIQUE | Código QR para validar devolución |
-| `return_qr_expires_at` | timestamptz | ✓ | — | — | Fecha de expiración del QR de devolución |
-| `return_validated_at` | timestamptz | ✓ | — | — | Fecha en la que se validó la devolución por QR |
-| `created_at` | timestamptz | ✗ | `now()` | — | Fecha de creación |
-| `updated_at` | timestamptz | ✗ | `now()` | Auto-update via trigger | Fecha de última actualización |
+**Campos**:
+- `user_id`, `set_id`
+- `status` — `true` = activo, `false` = ya asignado/removido
+- `status_changed_at` — Fecha último cambio
+
+### Tabla `reviews` (Reseñas)
+
+Valoraciones de sets por usuarios.
+
+**Campos**:
+- `rating` — 1 a 5 estrellas
+- `comment` — Texto libre
+- `age_fit` — ¿Apropiado para edad indicada?
+- `difficulty` — Dificultad construcción (1-5)
+- `would_reorder` — ¿Volvería a alquilar?
+
+### Tabla `referrals` (Programa de Referidos)
+
+Tracking de referidos y recompensas.
+
+**Estados**: `pending`, `credited`, `rejected`
+
+**Campos**:
+- `referrer_id` — Usuario que refirió
+- `referee_id` — Usuario referido
+- `reward_credits` — Créditos otorgados
+- `stripe_coupon_id` — Cupón Stripe generado
+
+### Tabla `brickshare_pudo_locations` (Puntos PUDO Propios)
+
+Puntos de recogida/entrega gestionados por Brickshare.
+
+**Campos**:
+- `id` — Identificador del punto
+- `name`, `address`, `city`, `postal_code`
+- `latitude`, `longitude` — Coordenadas
+- `opening_hours` — Horarios (JSONB)
+- `is_active` — Si está operativo
+
+### Tabla `reception_operations` (Operaciones de Recepción)
+
+Registro de recepciones y mantenimiento post-devolución.
+
+**Campos**:
+- `event_id` (FK → shipments) — Envío asociado
+- `weight_measured` — Peso medido en recepción
+- `reception_completed` — Si recepción completada
+- `missing_parts` — Notas piezas faltantes
+
+### Tabla `qr_validation_logs` (Logs Validación QR)
+
+Registro de todas las validaciones QR.
+
+**Campos**:
+- `shipment_id` — Envío asociado
+- `qr_code` — Código validado
+- `validation_type` — `delivery` o `return`
+- `validation_status` — `success`, `expired`, `invalid`, `already_used`
 
 ---
 
-#### `shipping_orders`
-
-**Descripción**: Registro de órdenes de envío con transportistas externos.
-
-| Campo | Tipo | Nulo | Default | Restricciones | Significado |
-|---|---|:---:|---|---|---|
-| `id` | uuid | ✗ | `gen_random_uuid()` | PK | Identificador de la orden |
-| `user_id` | uuid | ✗ | — | FK → `users(user_id)` ON DELETE CASCADE | Usuario asociado |
-| `set_id` | uuid | ✗ | — | FK → `sets(id)` ON DELETE CASCADE | Set a enviar |
-| `shipping_order_date` | timestamptz | ✓ | `now()` | — | Fecha de la orden de envío |
-| `tracking_ref` | text | ✓ | — | — | Referencia de seguimiento |
-| `created_at` | timestamptz | ✓ | `now()` | — | Fecha de creación |
-| `updated_at` | timestamptz | ✓ | `now()` | Auto-update via trigger | Fecha de última actualización |
-
----
-
-#### `reception_operations`
-
-**Descripción**: Registro de operaciones de recepción y mantenimiento de sets devueltos por los usuarios. Se crea automáticamente cuando un envío pasa al estado `returned` (trigger `handle_shipment_warehouse_received`).
-
-| Campo | Tipo | Nulo | Default | Restricciones | Significado |
-|---|---|:---:|---|---|---|
-| `id` | uuid | ✗ | `gen_random_uuid()` | PK | Identificador de la operación |
-| `event_id` | uuid | ✓ | — | FK → `shipments(id)` ON DELETE SET NULL | Envío asociado |
-| `user_id` | uuid | ✗ | — | FK → `auth.users(id)` ON DELETE CASCADE | Usuario que devolvió el set |
-| `set_id` | uuid | ✗ | — | FK → `sets(id)` ON DELETE CASCADE | Set devuelto |
-| `weight_measured` | numeric(10,2) | ✓ | — | — | Peso real medido en la recepción (gramos) |
-| `reception_completed` | boolean | ✗ | `false` | — | Si la recepción y verificación está completada |
-| `missing_parts` | text | ✓ | — | — | Notas sobre piezas faltantes |
-| `created_at` | timestamptz | ✗ | `now()` | — | Fecha de creación |
-| `updated_at` | timestamptz | ✗ | `now()` | Auto-update via trigger | Fecha de última actualización |
-
----
-
-#### `backoffice_operations`
-
-**Descripción**: Log de operaciones de backoffice realizadas por admins y operadores.
-
-| Campo | Tipo | Nulo | Default | Restricciones | Significado |
-|---|---|:---:|---|---|---|
-| `event_id` | uuid | ✗ | `gen_random_uuid()` | PK | Identificador del evento |
-| `user_id` | uuid | ✓ | — | FK → `auth.users(id)` ON DELETE SET NULL | Usuario que realizó la operación |
-| `operation_type` | operation_type | ✗ | — | ENUM: `recepcion paquete`, `analisis_peso`, `deposito_fulfillment`, `higienizado`, `retorno_stock` | Tipo de operación realizada |
-| `operation_time` | timestamptz | ✗ | `now()` | — | Momento de la operación |
-| `metadata` | jsonb | ✓ | — | — | Datos adicionales de la operación |
-
----
-
-#### `wishlist`
-
-**Descripción**: Lista de deseos de los usuarios. Se usa para asignar sets automáticamente a los usuarios según sus preferencias.
-
-| Campo | Tipo | Nulo | Default | Restricciones | Significado |
-|---|---|:---:|---|---|---|
-| `id` | uuid | ✗ | `gen_random_uuid()` | PK | Identificador del registro |
-| `user_id` | uuid | ✗ | — | FK → `auth.users(id)` ON DELETE CASCADE, UNIQUE(user_id, set_id) | Usuario |
-| `set_id` | uuid | ✗ | — | — | Set deseado |
-| `status` | boolean | ✗ | `true` | — | `true` = activo en wishlist, `false` = ya fue asignado/removido |
-| `status_changed_at` | timestamptz | ✓ | `now()` | — | Fecha del último cambio de estado |
-| `created_at` | timestamptz | ✗ | `now()` | — | Fecha en que se añadió a la wishlist |
-
----
-
-#### `donations`
-
-**Descripción**: Gestión de donaciones de piezas LEGO al proyecto.
-
-| Campo | Tipo | Nulo | Default | Restricciones | Significado |
-|---|---|:---:|---|---|---|
-| `id` | uuid | ✗ | `gen_random_uuid()` | PK | Identificador de la donación |
-| `user_id` | uuid | ✓ | — | FK → `auth.users(id)` ON DELETE SET NULL | Usuario donante (opcional, puede ser anónimo) |
-| `name` | text | ✗ | — | — | Nombre del donante |
-| `email` | text | ✗ | — | — | Email del donante |
-| `phone` | text | ✓ | — | — | Teléfono del donante |
-| `address` | text | ✓ | — | — | Dirección para recogida |
-| `estimated_weight` | numeric | ✗ | — | — | Peso estimado de la donación (kg) |
-| `delivery_method` | text | ✗ | — | CHECK: `pickup-point`, `home-pickup` | Método de entrega de la donación |
-| `reward` | text | ✗ | — | CHECK: `economic`, `social` | Tipo de recompensa elegida |
-| `children_benefited` | integer | ✗ | — | — | Estimación de niños beneficiados |
-| `co2_avoided` | numeric | ✗ | — | — | Estimación de CO₂ evitado (kg) |
-| `status` | text | ✗ | `'pending'` | CHECK: `pending`, `confirmed`, `shipped`, `received`, `processed`, `completed` | Estado de la donación |
-| `tracking_code` | text | ✓ | — | — | Código de seguimiento del envío de la donación |
-| `created_at` | timestamptz | ✗ | `now()` | — | Fecha de creación |
-| `updated_at` | timestamptz | ✗ | `now()` | Auto-update via trigger | Fecha de última actualización |
-
----
-
-#### `reviews`
-
-**Descripción**: Reseñas y valoraciones de los usuarios sobre sets LEGO alquilados.
-
-| Campo | Tipo | Nulo | Default | Restricciones | Significado |
-|---|---|:---:|---|---|---|
-| `id` | uuid | ✗ | `gen_random_uuid()` | PK | Identificador de la reseña |
-| `user_id` | uuid | ✗ | — | FK → `auth.users(id)` ON DELETE CASCADE | Usuario autor de la reseña |
-| `set_id` | uuid | ✗ | — | FK → `sets(id)` ON DELETE CASCADE | Set reseñado |
-| `envio_id` | uuid | ✓ | — | FK → `shipments(id)` ON DELETE SET NULL, UNIQUE (si no nulo) | Envío asociado (una reseña por envío) |
-| `rating` | smallint | ✗ | — | CHECK: 1–5 | Puntuación de 1 a 5 estrellas |
-| `comment` | text | ✓ | — | — | Comentario de texto libre |
-| `age_fit` | boolean | ✓ | — | — | ¿El set era apropiado para el rango de edad indicado? |
-| `difficulty` | smallint | ✓ | — | CHECK: 1–5 | Dificultad de construcción (1=muy fácil, 5=muy difícil) |
-| `would_reorder` | boolean | ✓ | — | — | ¿El usuario alquilaría este set otra vez? |
-| `is_published` | boolean | ✗ | `true` | — | Si la reseña es visible públicamente |
-| `created_at` | timestamptz | ✗ | `now()` | — | Fecha de creación |
-| `updated_at` | timestamptz | ✗ | `now()` | Auto-update via trigger | Fecha de última actualización |
-
----
-
-#### `referrals`
-
-**Descripción**: Programa de referidos. Rastrea quién refirió a quién y el estado de las recompensas.
-
-| Campo | Tipo | Nulo | Default | Restricciones | Significado |
-|---|---|:---:|---|---|---|
-| `id` | uuid | ✗ | `gen_random_uuid()` | PK | Identificador del referido |
-| `referrer_id` | uuid | ✗ | — | FK → `auth.users(id)` ON DELETE CASCADE | Usuario que refirió |
-| `referee_id` | uuid | ✗ | — | FK → `auth.users(id)` ON DELETE CASCADE, UNIQUE | Usuario referido |
-| `status` | text | ✗ | `'pending'` | CHECK: `pending`, `credited`, `rejected` | `pending`=registro completado, `credited`=recompensa aplicada, `rejected`=no calificó |
-| `reward_credits` | integer | ✗ | `1` | — | Créditos otorgados (1 = 1 mes gratis equivalente) |
-| `stripe_coupon_id` | text | ✓ | — | — | ID del cupón en Stripe (si aplica) |
-| `credited_at` | timestamptz | ✓ | — | — | Fecha en la que se acreditó la recompensa |
-| `created_at` | timestamptz | ✗ | `now()` | — | Fecha de creación |
-| `updated_at` | timestamptz | ✗ | `now()` | Auto-update via trigger | Fecha de última actualización |
-
----
-
-#### `brickshare_pudo_locations`
-
-**Descripción**: Puntos de recogida y entrega (PUDO) propios de Brickshare.
-
-| Campo | Tipo | Nulo | Default | Restricciones | Significado |
-|---|---|:---:|---|---|---|
-| `id` | text | ✗ | — | PK | Identificador del punto PUDO |
-| `name` | text | ✗ | — | — | Nombre del punto |
-| `address` | text | ✗ | — | — | Dirección |
-| `city` | text | ✗ | — | — | Ciudad |
-| `postal_code` | text | ✗ | — | — | Código postal |
-| `province` | text | ✗ | — | — | Provincia |
-| `latitude` | numeric(10,8) | ✓ | — | — | Latitud geográfica |
-| `longitude` | numeric(11,8) | ✓ | — | — | Longitud geográfica |
-| `contact_phone` | text | ✓ | — | — | Teléfono de contacto del punto |
-| `contact_email` | text | ✓ | — | — | Email de contacto del punto |
-| `opening_hours` | jsonb | ✓ | — | — | Horarios de apertura (estructura JSON) |
-| `is_active` | boolean | ✓ | `true` | — | Si el punto está activo |
-| `notes` | text | ✓ | — | — | Notas internas |
-| `created_at` | timestamptz | ✓ | `now()` | — | Fecha de creación |
-| `updated_at` | timestamptz | ✓ | `now()` | — | Fecha de última actualización |
-
----
-
-#### `users_correos_dropping`
-
-**Descripción**: Punto PUDO de Correos seleccionado por cada usuario para recibir y devolver sus envíos.
-
-| Campo | Tipo | Nulo | Default | Restricciones | Significado |
-|---|---|:---:|---|---|---|
-| `user_id` | uuid | ✗ | — | PK, FK → `users(user_id)` ON DELETE CASCADE | Usuario (1 punto por usuario) |
-| `correos_id_pudo` | text | ✗ | — | — | ID del punto PUDO en Correos |
-| `correos_name` | text | ✗ | — | — | Nombre del punto |
-| `correos_point_type` | text | ✗ | — | CHECK: `Oficina`, `Citypaq`, `Locker` | Tipo de punto PUDO |
-| `correos_street` | text | ✗ | — | — | Calle |
-| `correos_street_number` | text | ✓ | — | — | Número de calle |
-| `correos_zip_code` | text | ✗ | — | — | Código postal |
-| `correos_city` | text | ✗ | — | — | Ciudad |
-| `correos_province` | text | ✗ | — | — | Provincia |
-| `correos_country` | text | ✗ | `'España'` | — | País |
-| `correos_full_address` | text | ✗ | — | — | Dirección completa formateada |
-| `correos_latitude` | numeric(10,8) | ✗ | — | — | Latitud |
-| `correos_longitude` | numeric(11,8) | ✗ | — | — | Longitud |
-| `correos_opening_hours` | text | ✓ | — | — | Horario de apertura (texto libre) |
-| `correos_structured_hours` | jsonb | ✓ | — | — | Horario estructurado (JSON) |
-| `correos_available` | boolean | ✗ | `true` | — | Si el punto está disponible |
-| `correos_phone` | text | ✓ | — | — | Teléfono del punto |
-| `correos_email` | text | ✓ | — | — | Email del punto |
-| `correos_internal_code` | text | ✓ | — | — | Código interno de Correos |
-| `correos_locker_capacity` | integer | ✓ | — | — | Capacidad del locker (si aplica) |
-| `correos_additional_services` | text[] | ✓ | — | — | Servicios adicionales disponibles |
-| `correos_accessibility` | boolean | ✓ | `false` | — | Si tiene acceso para personas con movilidad reducida |
-| `correos_parking` | boolean | ✓ | `false` | — | Si tiene parking disponible |
-| `correos_selection_date` | timestamptz | ✗ | `now()` | — | Fecha de selección del punto |
-| `created_at` | timestamptz | ✗ | `now()` | — | Fecha de creación |
-| `updated_at` | timestamptz | ✗ | `now()` | Auto-update via trigger | Fecha de última actualización |
-
----
-
-#### `qr_validation_logs`
-
-**Descripción**: Registro de validaciones de códigos QR para entregas y devoluciones en puntos PUDO Brickshare.
-
-| Campo | Tipo | Nulo | Default | Restricciones | Significado |
-|---|---|:---:|---|---|---|
-| `id` | uuid | ✗ | `gen_random_uuid()` | PK | Identificador del log |
-| `shipment_id` | uuid | ✗ | — | FK → `shipments(id)` ON DELETE CASCADE | Envío asociado |
-| `qr_code` | text | ✗ | — | — | Código QR validado |
-| `validation_type` | text | ✗ | — | CHECK: `delivery`, `return` | Tipo de validación |
-| `validated_by` | text | ✓ | — | — | Identificador de quien validó |
-| `validated_at` | timestamptz | ✓ | `now()` | — | Momento de la validación |
-| `validation_status` | text | ✗ | — | CHECK: `success`, `expired`, `invalid`, `already_used` | Resultado de la validación |
-| `metadata` | jsonb | ✓ | `'{}'` | — | Datos adicionales |
-| `created_at` | timestamptz | ✓ | `now()` | — | Fecha de creación |
-
----
-
-### 3.3 Vistas
-
-#### `brickshare_pudo_shipments`
-Vista filtrada de `shipments` que muestra solo envíos gestionados a través de puntos PUDO de Brickshare (`pickup_type = 'brickshare'`).
-
-#### `set_avg_ratings`
-Vista que calcula la valoración media y el número de reseñas por set (solo reseñas publicadas).
-
-#### `set_review_stats`
-Vista con estadísticas detalladas de reseñas por set: distribución de estrellas, dificultad media y conteo de "volvería a pedir".
-
----
-
-### 3.4 Funciones RPC Principales
+## 6. Funciones RPC Principales
 
 | Función | Parámetros | Descripción |
 |---|---|---|
-| `preview_assign_sets_to_users()` | — | Muestra las asignaciones propuestas de sets a usuarios elegibles, priorizando la wishlist y evitando duplicados |
-| `confirm_assign_sets_to_users(p_user_ids)` | `uuid[]` | Confirma la asignación: crea envíos, actualiza inventario, cambia estado del usuario y desactiva la wishlist correspondiente |
-| `delete_assignment_and_rollback(p_envio_id)` | `uuid` | Elimina una asignación y revierte los cambios en inventario, wishlist y estado del usuario |
-| `update_set_status_from_return(p_set_id, p_new_status, p_envio_id)` | `uuid, text, uuid` | Actualiza el estado de un set tras la devolución (active, inactive, in_repair) |
-| `generate_delivery_qr(p_shipment_id)` | `uuid` | Genera un código QR único para validar la entrega (expira en 30 días) |
-| `generate_return_qr(p_shipment_id)` | `uuid` | Genera un código QR único para validar la devolución (expira en 30 días) |
-| `validate_qr_code(p_qr_code)` | `text` | Valida un código QR y devuelve información del envío asociado |
-| `confirm_qr_validation(p_qr_code, p_validated_by)` | `text, text` | Confirma la validación de un QR, actualizando el estado del envío |
-| `has_role(_user_id, _role)` | `uuid, app_role` | Verifica si un usuario tiene un rol específico (usado en políticas RLS) |
-| `process_referral_credit(p_referee_user_id)` | `uuid` | Procesa un crédito de referido: acredita puntos al referidor |
-| `increment_referral_credits(p_user_id, p_amount)` | `uuid, int` | Incrementa los créditos de referido de un usuario |
+| `preview_assign_sets_to_users()` | — | Muestra asignaciones propuestas según wishlist |
+| `confirm_assign_sets_to_users(p_user_ids)` | `uuid[]` | Confirma asignaciones: crea shipments, actualiza inventario |
+| `delete_assignment_and_rollback(p_envio_id)` | `uuid` | Elimina asignación y revierte cambios |
+| `update_set_status_from_return(p_set_id, p_new_status, p_envio_id)` | `uuid, text, uuid` | Actualiza estado set tras devolución |
+| `generate_delivery_qr(p_shipment_id)` | `uuid` | Genera QR entrega (permanente, no expira) |
+| `generate_return_qr(p_shipment_id)` | `uuid` | Genera QR devolución (permanente, no expira) |
+| `validate_qr_code(p_qr_code)` | `text` | Valida QR y retorna info envío |
+| `confirm_qr_validation(p_qr_code, p_validated_by)` | `text, text` | Confirma validación QR |
+| `has_role(_user_id, _role)` | `uuid, app_role` | Verifica rol usuario (RLS) |
+| `process_referral_credit(p_referee_user_id)` | `uuid` | Procesa crédito referido |
 
 ---
 
-### 3.5 Triggers Principales
+## 7. Flujos de Negocio Principales
 
-| Tabla | Trigger | Evento | Descripción |
-|---|---|---|---|
-| `users` | `users_generate_referral_code` | BEFORE INSERT | Genera automáticamente un código de referido único de 6 caracteres |
-| `users` | `update_users_updated_at` | BEFORE UPDATE | Actualiza `updated_at` automáticamente |
-| `sets` | `on_set_created` | AFTER INSERT | Crea automáticamente un registro en `inventory_sets` con qty=2 |
-| `shipments` | `on_shipment_delivered` | AFTER UPDATE | Cuando el estado cambia a `delivered`, actualiza `user_status` a `has_set` |
-| `shipments` | `on_shipment_return_user_status` | AFTER UPDATE | Cuando el estado cambia a `return_in_transit`, actualiza `user_status` a `no_set` |
-| `shipments` | `on_shipment_return_transit_inv` | AFTER UPDATE | Cuando el estado cambia a `return_in_transit`, incrementa `in_return` en inventario |
-| `shipments` | `on_shipment_warehouse_received` | BEFORE UPDATE | Cuando el estado cambia a `returned`, crea una `reception_operation` y registra la fecha |
-| `reception_operations` | `on_reception_completed` | AFTER UPDATE | Cuando `reception_completed` = true, actualiza inventario y estado del set (activo o en reparación) |
-| Todas las tablas | `update_*_updated_at` | BEFORE UPDATE | Actualiza `updated_at` automáticamente |
-
----
-
-### 3.6 Diagrama de Relaciones (Simplificado)
-
+### 7.1 Suscripción
 ```
-auth.users (Supabase Auth)
-    │
-    ├──→ users (1:1 via user_id)
-    │       ├──→ users_correos_dropping (1:1 via user_id)
-    │       └──→ shipping_orders (1:N via user_id)
-    │
-    ├──→ user_roles (1:N via user_id)
-    ├──→ wishlist (1:N via user_id)
-    ├──→ donations (1:N via user_id)
-    ├──→ reviews (1:N via user_id)
-    ├──→ referrals (1:N como referrer_id o referee_id)
-    ├──→ shipments (1:N via user_id)
-    ├──→ reception_operations (1:N via user_id)
-    └──→ backoffice_operations (1:N via user_id)
-
-sets
-    ├──→ set_piece_list (1:N via set_id)
-    ├──→ inventory_sets (1:1 via set_id)
-    ├──→ shipments (1:N via set_id)
-    ├──→ reviews (1:N via set_id)
-    ├──→ reception_operations (1:N via set_id)
-    └──→ shipping_orders (1:N via set_id)
-
-shipments
-    ├──→ reception_operations (1:N via event_id)
-    ├──→ qr_validation_logs (1:N via shipment_id)
-    └──→ reviews (1:1 via envio_id)
+Usuario → Selecciona plan → Stripe Checkout → 
+Webhook confirma pago → Perfil actualizado → 
+Usuario accede Dashboard
 ```
 
+### 7.2 Asignación de Sets (Admin)
+```
+Admin ejecuta preview_assign_sets_to_users() → 
+Revisa propuesta →
+confirm_assign_sets_to_users([user_ids]) →
+  - Crea shipments (estado: assigned)
+  - Actualiza inventory_sets (decrementa stock, incrementa in_shipping)
+  - Cambia user_status a 'set_shipping'
+  - Desactiva wishlist correspondiente
+  - Genera QR codes (delivery + return)
+```
+
+### 7.3 Envío y Entrega
+```
+Admin genera etiqueta (correos-logistics) →
+Correos recoge paquete →
+PUDO/Usuario recibe →
+Validación QR (brickshare-qr-api) →
+Estado shipment: delivered →
+user_status: has_set
+```
+
+### 7.4 Devolución y Recepción
+```
+Usuario solicita devolución (Dashboard) →
+Estado shipment: return_in_transit →
+user_status: no_set →
+Validación QR retorno →
+Recepción en almacén (trigger crea reception_operation) →
+Operador completa recepción (peso, piezas) →
+reception_completed = true (trigger actualiza inventario) →
+Set vuelve a stock (active o in_repair según estado)
+```
+
+### 7.5 Sistema PUDO Dual
+
+**Correos PUDO (Externo)**:
+- Usuario selecciona punto Correos cercano
+- `correos-pudo` function consulta API Correos
+- Info guardada en `users_correos_dropping`
+
+**Brickshare PUDO (Propio)**:
+- Puntos gestionados por Brickshare
+- Validación QR en punto
+- `brickshare_pudo_locations` tabla maestra
+- `brickshare-qr-api` function valida entregas/devoluciones
+
+### 7.6 Programa de Referidos
+```
+Usuario A comparte código referido →
+Usuario B se registra con código →
+Usuario B completa suscripción →
+process_referral_credit() →
+Usuario A recibe créditos →
+Stripe coupon auto-generado
+```
+
 ---
 
-### 3.7 Row Level Security (RLS)
+## 8. Sistema de Testing
 
-Todas las tablas tienen RLS habilitado. Los patrones principales son:
+### 8.1 Tests Unitarios (Vitest)
 
-| Patrón | Descripción | Tablas |
-|---|---|---|
-| **Lectura pública** | Cualquiera puede leer (sin autenticación) | `sets`, `set_piece_list`, `inventory_sets`, `brickshare_pudo_locations` (solo activos) |
-| **Solo datos propios** | Usuarios solo ven/modifican sus propios datos | `users`, `wishlist`, `shipments`, `donations`, `reviews`, `users_correos_dropping`, `shipping_orders`, `qr_validation_logs` |
-| **Admin total** | Admin tiene acceso completo | `sets`, `users`, `user_roles`, `wishlist`, `set_piece_list`, `donations` |
-| **Admin + Operador** | Admin y Operador tienen acceso completo | `shipments`, `inventory_sets`, `reception_operations`, `backoffice_operations`, `referrals`, `reviews` |
-| **Reseñas publicadas** | Cualquiera puede leer reseñas publicadas | `reviews` (donde `is_published = true`) |
+**Ubicación**: `apps/web/src/__tests__/unit/`
+
+**Cobertura**: 50+ tests
+- Hooks: `useProducts`, `useShipments`, `useWishlist`, `useAuth`
+- Components: `ProfileCompletionModal`, `DeleteAccountDialog`, `ShipmentTimeline`
+- Utils: `pudoService`, `validation`, `formatting`
+
+**Ejecutar**:
+```bash
+npm run test           # Run once
+npm run test:watch     # Watch mode
+```
+
+### 8.2 Tests de Integración (Vitest)
+
+**Ubicación**: `apps/web/src/__tests__/integration/`
+
+**Cobertura**: 15+ tests de flujos completos
+- User flows: autenticación, suscripción, wishlist, account management
+- Admin flows: dashboard, inventory, analytics, user management, shipments
+- Operator flows: operations, logistics
+
+**Ejecutar**:
+```bash
+npm run test
+```
+
+### 8.3 Tests E2E (Playwright)
+
+**Ubicación**: `apps/web/e2e/`
+
+**Cobertura**: 10+ journeys completos
+- User journeys: onboarding, subscription, rental cycle
+- Admin journeys: user management, assignment operations
+- Operator journeys: logistics operations
+- Error scenarios: payment failures, logistics failures
+
+**Ejecutar**:
+```bash
+npm run test:e2e           # Run all
+npm run test:e2e:ui        # UI mode
+npm run test:e2e:headed    # Headed mode
+npm run test:e2e:debug     # Debug mode
+```
+
+### 8.4 CI/CD (GitHub Actions)
+
+**Workflows**:
+1. `.github/workflows/test.yml` — Tests (unit + integration + E2E)
+2. `.github/workflows/quality.yml` — Linting y type checking
+3. `.github/workflows/deploy-preview.yml` — Preview deployments
+4. `.github/dependabot.yml` — Dependency updates
+
+---
+
+## 9. Scripts de Utilidad Principales
+
+### Gestión de BD
+
+| Script | Propósito |
+|---|---|
+| `./scripts/safe-db-reset.sh` | ✅ Reset seguro con backup automático |
+| `./scripts/restore-data.sh` | Restaurar backup específico |
+| `scripts/verify-seed-results.ts` | Verificar integridad seed |
+| `scripts/sync-auth-users-to-local.ts` | Sincronizar usuarios auth |
+
+### Testing y Verificación
+
+| Script | Propósito |
+|---|---|
+| `scripts/verify-edge-functions.sh` | Verificar todas las Edge Functions |
+| `scripts/test-pudo-api.sh` | Test API PUDO Correos |
+| `scripts/test-logistics-api.sh` | Test API logística |
+| `scripts/test-complete-flow-with-emails.sh` | Test flujo completo con emails |
+
+### Datos y Seeds
+
+| Script | Propósito |
+|---|---|
+| `scripts/seed-sets-from-brickset.ts` | Importar sets desde Brickset |
+| `scripts/create-user-brickshare.sql` | Crear usuario test |
+| `scripts/simulate-brickshare-assignment.ts` | Simular asignación completa |
+
+### Documentación
+
+| Script | Propósito |
+|---|---|
+| `scripts/update-schema-docs.sh` | Actualizar `docs/DATABASE_SCHEMA.md` |
+| `npm run dump-schema` | Alias del script anterior |
+
+---
+
+## 10. Comandos de Desarrollo
+
+### Desarrollo Local
+
+```bash
+# Frontend
+npm run dev                    # → http://localhost:5173
+npm run build                  # Build producción
+npm run preview                # Preview build
+
+# Backend
+supabase start                 # Iniciar Supabase local
+supabase status                # Ver credenciales
+supabase stop                  # Detener servicios
+
+# Base de datos
+./scripts/safe-db-reset.sh     # Reset con backup
+psql postgresql://postgres:postgres@127.0.0.1:54322/postgres  # Conectar
+
+# Regenerar tipos
+supabase gen types typescript --local > src/types/supabase.ts
+```
+
+### Testing
+
+```bash
+# Unit + Integration
+npm run test                   # Run once
+npm run test:watch             # Watch mode
+
+# E2E
+npm run test:e2e               # Run all E2E
+npm run test:e2e:ui            # Interactive UI
+npm run test:e2e:headed        # Ver browser
+npm run test:e2e:debug         # Debug mode
+
+# CI/CD (localmente)
+./scripts/ci-test.sh           # Simular CI
+```
+
+### Linting y Quality
+
+```bash
+npm run lint                   # ESLint
+npm run lint:fix               # Auto-fix
+```
+
+---
+
+## 11. Convenciones y Reglas Estrictas
+
+### Código
+- **TypeScript estricto** en todo el proyecto
+- **Componentes funcionales** con hooks (NO clases)
+- **shadcn/ui** para UI — NO crear custom si existe en shadcn
+- **TanStack Query** para data fetching — usar `staleTime` para caché
+- **Zod** para validación con `react-hook-form`
+- **date-fns** para fechas (NO moment.js)
+- **Sonner** para toast notifications
+- **❌ NUNCA harcodear valores configurables** en el código (URLs, IDs, claves, hosts, puertos, etc.)
+  - Todas las variables configurables deben provenir de `import.meta.env` (frontend) o `Deno.env.get()` (Edge Functions)
+  - Excepciones permitidas: constantes de lógica de negocio, enums estáticos, valores hardcoded en datos de test
+  - Ejemplos de lo que NO se debe harcodear: `BS-PUDO-001`, URLs API, direcciones de servidores, configuraciones por entorno
+
+### Base de Datos
+- **NUNCA eliminar** archivos en `supabase/migrations/`
+- **SIEMPRE** crear nuevas migraciones: `supabase migration new <nombre>`
+- **RLS habilitado** en todas las tablas
+- **set_ref** (ej: "75192") es el identificador humano de sets
+- **user_id** siempre referencia `auth.users.id`
+
+### Edge Functions
+- **Deno runtime** — usar `Deno.env.get()` para env vars
+- **CORS headers** en todas las respuestas
+- **JWT verificación** en `supabase/config.toml`
+- **Service Role Key** solo servidor — NUNCA en frontend
+
+### Git
+- Commits: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`
+- Pre-commit hook auto-actualiza `docs/DATABASE_SCHEMA.md`
+
+---
+
+## 12. Estado Actual y Limitaciones
+
+### ✅ Completado
+- Frontend web 100% funcional
+- Autenticación con Supabase Auth + RLS
+- Catálogo con enriquecimiento APIs externas
+- Suscripciones Stripe completas
+- Sistema PUDO dual (Correos + Brickshare)
+- Integración logística completa (Correos API)
+- Sistema QR permanente para validación
+- Backoffice admin completo
+- Panel operador logístico (web)
+- **App móvil operadores PUDO** (React Native/Expo en `../Brickshare_logistics/apps/mobile/`)
+- Wishlist, reviews, referidos, donaciones
+- Sistema de testing completo (Unit + Integration + E2E)
+- CI/CD con GitHub Actions
+- Programa de referidos funcional
+- Sistema de garantías con Swikly
+
+### ⚠️ En Desarrollo / Limitaciones
+- App iOS consumidor incompleta (React Native/Expo en `apps/ios/`)
+- Sin Supabase Cloud — 100% desarrollo local
+- Cobertura tests ~60% (objetivo: 80%)
+- Documentación API externa (Correos) limitada
+- Sin monitoring/alerting en producción
+
+### 📋 Próximos Pasos
+1. Completar paridad app iOS con web
+2. Aumentar cobertura tests a 80%+
+3. Implementar sistema de notificaciones push
+4. Dashboard analytics avanzado
+5. Sistema de recomendaciones ML
+
+---
+
+## 13. Documentación de Referencia
+
+Antes de preguntar, consulta:
+
+| Archivo | Contenido |
+|---|---|
+| `docs/PROJECT_OVERVIEW.md` | Visión general, estado proyecto |
+| `docs/ARCHITECTURE.md` | Diseño técnico, diagramas |
+| `docs/DATABASE_SCHEMA.md` | Esquema completo auto-generado |
+| `docs/LOCAL_DEVELOPMENT.md` | Setup, comandos, troubleshooting |
+| `docs/API_REFERENCE.md` | Edge Functions detalladas |
+| `docs/BRICKSHARE_PUDO.md` | Integración PUDO/Correos |
+| `tests/START_HERE.md` | Guía inicio testing |
+| `README.md` | Quick start básico |
+
+---
+
+## 14. App Móvil para Operadores PUDO
+
+**Ubicación**: `../Brickshare_logistics/apps/mobile/`
+
+Aplicación React Native (Expo) completa para operadores de puntos PUDO. Permite validar códigos QR para recepción de sets (entrega/devolución) con funcionalidad offline-first.
+
+---
+
+**Última actualización**: 27/03/2026  
+**Modo de desarrollo**: 100% Local (Docker + Supabase CLI)  
+**App Operadores**: Disponible en `../Brickshare_logistics/apps/mobile/`

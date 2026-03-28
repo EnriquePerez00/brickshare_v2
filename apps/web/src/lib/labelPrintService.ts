@@ -39,7 +39,7 @@ export async function updateShipmentStatus(
 ): Promise<void> {
   const { error } = await supabase
     .from("shipments")
-    .update({ shipping_status: status })
+    .update({ shipment_status: status })
     .in("id", shipmentIds);
 
   if (error) throw error;
