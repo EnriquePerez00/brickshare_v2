@@ -64,9 +64,13 @@ DECLARE
     v_pudo_cp TEXT;
     v_pudo_city TEXT;
     v_pudo_province TEXT;
+    v_brickshare_pudo_id TEXT;
     v_created_at TIMESTAMPTZ;
     v_pudo_type TEXT;
-    v_brickshare_pudo_id UUID;
+    v_user_address TEXT;
+    v_user_city TEXT;
+    v_user_zip_code TEXT;
+    v_user_province TEXT;
 BEGIN
     -- Loop through each user to confirm their assignment
     FOR r IN (
@@ -76,7 +80,11 @@ BEGIN
             u.email,
             u.phone,
             u.pudo_type,
-            u.pudo_id as user_pudo_id,
+            u.pudo_id,
+            u.address as user_address,
+            u.city as user_city,
+            u.zip_code as user_zip_code,
+            u.province as user_province,
             -- Correos PUDO data
             ucd.correos_id_pudo,
             ucd.correos_name,
@@ -106,7 +114,13 @@ BEGIN
         -- Store pudo_type for later use
         v_pudo_type := r.pudo_type;
         
-        -- Determine PUDO data based on type
+        -- Store user address data
+        v_user_address := r.user_address;
+        v_user_city := r.user_city;
+        v_user_zip_code := r.user_zip_code;
+        v_user_province := r.user_province;
+        
+        -- Determine PUDO data based on type and store brickshare_pudo_id
         IF v_pudo_type = 'correos' THEN
             v_pudo_id := r.correos_id_pudo;
             v_pudo_name := r.correos_name;
@@ -116,12 +130,13 @@ BEGIN
             v_pudo_province := r.correos_province;
             v_brickshare_pudo_id := NULL;
         ELSIF v_pudo_type = 'brickshare' THEN
-            v_pudo_id := r.user_pudo_id;
+            v_pudo_id := r.brickshare_pudo_id;
             v_pudo_name := r.brickshare_pudo_name;
             v_pudo_address := r.brickshare_address;
             v_pudo_cp := r.brickshare_postal_code;
             v_pudo_city := r.brickshare_city;
             v_pudo_province := r.brickshare_province;
+            -- Store the brickshare_pudo_id for shipment insertion
             v_brickshare_pudo_id := r.brickshare_pudo_id;
         ELSE
             -- Skip user if no PUDO configured
@@ -156,20 +171,20 @@ BEGIN
                 in_shipping = in_shipping + 1
             WHERE inventory_sets.set_id = target_set_id;
             
-            -- Create shipment with PUDO address data, pudo_type, brickshare_pudo_id, and shipping_province
+            -- Create shipment with USER address data and brickshare_pudo_id
             INSERT INTO public.shipments (
                 user_id,
                 set_id,
                 set_ref,
                 shipment_status,
                 assigned_date,
-                pudo_type,
-                brickshare_pudo_id,
                 shipping_address,
                 shipping_city,
                 shipping_zip_code,
                 shipping_province,
-                shipping_country
+                shipping_country,
+                pudo_type,
+                brickshare_pudo_id
             )
             VALUES (
                 r.user_id,
@@ -177,13 +192,13 @@ BEGIN
                 v_set_ref,
                 'assigned',
                 now(),
+                COALESCE(v_user_address, 'Pending assignment'),
+                COALESCE(v_user_city, 'Pending'),
+                COALESCE(v_user_zip_code, '00000'),
+                COALESCE(v_user_province, 'Pending'),
+                'España',
                 v_pudo_type,
-                v_brickshare_pudo_id,
-                COALESCE(v_pudo_address, 'Pending assignment'),
-                COALESCE(v_pudo_city, 'Pending'),
-                COALESCE(v_pudo_cp, '00000'),
-                COALESCE(v_pudo_province, 'Pending'),
-                'España'
+                v_brickshare_pudo_id
             )
             RETURNING shipments.id, shipments.created_at
             INTO new_shipment_id, v_created_at;
@@ -229,7 +244,7 @@ $$;
 ALTER FUNCTION "public"."confirm_assign_sets_to_users"("p_user_ids" "uuid"[]) OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."confirm_assign_sets_to_users"("p_user_ids" "uuid"[]) IS 'Confirms set assignments to users. Creates shipments with complete PUDO information including pudo_type, brickshare_pudo_id, and shipping_province for proper logistics integration.';
+COMMENT ON FUNCTION "public"."confirm_assign_sets_to_users"("p_user_ids" "uuid"[]) IS 'Confirms set assignments to users. Populates shipment address fields from user data and stores brickshare_pudo_id when pudo_type is brickshare. Dynamic lookup from brickshare_pudo_locations based on user.pudo_id, no hardcoding.';
 
 
 
@@ -448,6 +463,21 @@ ALTER FUNCTION "public"."generate_return_qr"("p_shipment_id" "uuid") OWNER TO "p
 
 COMMENT ON FUNCTION "public"."generate_return_qr"("p_shipment_id" "uuid") IS 'Generates a permanent (non-expiring) return QR code for a shipment.';
 
+
+
+CREATE OR REPLACE FUNCTION "public"."get_set_by_ref"("p_set_ref" "text") RETURNS TABLE("set_name" "text", "set_ref" "text", "theme" "text")
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+BEGIN
+  RETURN QUERY
+  SELECT s.set_name, s.set_ref, s.theme
+  FROM sets s
+  WHERE s.set_ref = p_set_ref;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."get_set_by_ref"("p_set_ref" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."get_user_active_pudo"("p_user_id" "uuid") RETURNS TABLE("pudo_type" "text", "pudo_id" "text", "pudo_name" "text", "pudo_address" "text", "pudo_city" "text", "pudo_postal_code" "text")
@@ -717,7 +747,13 @@ DECLARE
     v_matches_wishlist BOOLEAN;
     v_pudo_type TEXT;
 BEGIN
-    -- Loop through eligible users (those without a set and are regular users)
+    -- Loop through ONLY eligible users who:
+    -- 1. Status: no_set or set_returning
+    -- 2. NOT admin or operador
+    -- 3. PUDO configured (pudo_id IS NOT NULL)
+    -- 4. Payment method configured (stripe_payment_method_id IS NOT NULL)
+    -- 5. Active subscription (subscription_status = 'active')
+    -- 6. HAVE AT LEAST ONE ACTIVE WISHLIST ITEM (NEW REQUIREMENT)
     FOR r IN (
         SELECT u.user_id, u.full_name, u.pudo_type
         FROM public.users u
@@ -728,12 +764,24 @@ BEGIN
               WHERE ur.user_id = u.user_id
               AND ur.role IN ('admin', 'operador')
           )
+          -- STRICT VALIDATION: PUDO must be configured
+          AND u.pudo_id IS NOT NULL
+          -- STRICT VALIDATION: Payment method must be configured
+          AND u.stripe_payment_method_id IS NOT NULL
+          -- STRICT VALIDATION: Subscription must be active
+          AND u.subscription_status = 'active'
+          -- NEW: REQUIRE USER TO HAVE ACTIVE WISHLIST ITEMS
+          AND EXISTS (
+              SELECT 1 FROM public.wishlist w
+              WHERE w.user_id = u.user_id
+              AND w.status = true
+          )
     ) LOOP
         v_set_id := NULL;
         v_matches_wishlist := FALSE;
         v_pudo_type := r.pudo_type;
         
-        -- Try to find set from user's wishlist that they haven't had before
+        -- Find set from user's wishlist that they haven't had before
         SELECT w.set_id, s.set_name, s.set_ref, 
                COALESCE(s.set_price, 100.00), i.inventory_set_total_qty
         INTO v_set_id, v_set_name, v_set_ref, v_set_price, v_current_stock
@@ -752,25 +800,10 @@ BEGIN
         ORDER BY w.created_at ASC  -- Prioritize by wishlist order
         LIMIT 1;
         
-        -- If found in wishlist, mark as match
+        -- Return assignment ONLY if a set was found in wishlist
+        -- Users without valid wishlist matches will NOT appear in preview
         IF v_set_id IS NOT NULL THEN
             v_matches_wishlist := TRUE;
-        ELSE
-            -- No valid wishlist match, choose random available set
-            SELECT s.id, s.set_name, s.set_ref, 
-                   COALESCE(s.set_price, 100.00), i.inventory_set_total_qty
-            INTO v_set_id, v_set_name, v_set_ref, v_set_price, v_current_stock
-            FROM public.sets s
-            JOIN public.inventory_sets i ON s.id = i.set_id
-            WHERE i.inventory_set_total_qty > 0
-            ORDER BY RANDOM()
-            LIMIT 1;
-            
-            v_matches_wishlist := FALSE;
-        END IF;
-        
-        -- Return assignment if a set was found
-        IF v_set_id IS NOT NULL THEN
             preview_assign_sets_to_users.user_id := r.user_id;
             preview_assign_sets_to_users.user_name := r.full_name;
             preview_assign_sets_to_users.set_id := v_set_id;
@@ -790,7 +823,17 @@ $$;
 ALTER FUNCTION "public"."preview_assign_sets_to_users"() OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."preview_assign_sets_to_users"() IS 'Generates a preview of set assignments for eligible users. Includes pudo_type to determine if Correos preregistration should be executed.';
+COMMENT ON FUNCTION "public"."preview_assign_sets_to_users"() IS 'Shows proposed set assignments ONLY for users with active wishlist items.
+Strict validation ensures:
+- User status is no_set or set_returning
+- PUDO point is configured (pudo_id IS NOT NULL)
+- Payment method is configured (stripe_payment_method_id IS NOT NULL)
+- Subscription is active (subscription_status = ''active'')
+- User has at least ONE active wishlist item (status = true)
+- Selected set has stock available and user hasn''t had it before
+
+Users missing ANY of these requirements will NOT appear in the preview.
+This incentivizes users to configure their wishlist before receiving sets.';
 
 
 
@@ -1073,7 +1116,11 @@ CREATE TABLE IF NOT EXISTS "public"."brickshare_pudo_locations" (
 ALTER TABLE "public"."brickshare_pudo_locations" OWNER TO "postgres";
 
 
-COMMENT ON TABLE "public"."brickshare_pudo_locations" IS 'Brickshare pickup and drop-off locations';
+COMMENT ON TABLE "public"."brickshare_pudo_locations" IS 'Brickshare PUDO locations. IDs MUST follow format: brickshare-XXX (never hardcode like BS-PUDO-001)';
+
+
+
+COMMENT ON COLUMN "public"."brickshare_pudo_locations"."id" IS 'Unique identifier in format brickshare-XXX (e.g., brickshare-001). IMPORTANT: Use dynamic values from API, never hardcode.';
 
 
 
@@ -1607,11 +1654,11 @@ COMMENT ON COLUMN "public"."users"."stripe_payment_method_id" IS 'Stripe Payment
 
 
 
-COMMENT ON COLUMN "public"."users"."pudo_id" IS 'Reference to the active PUDO point ID (either correos_id_pudo or brickshare_pudo_id)';
+COMMENT ON COLUMN "public"."users"."pudo_id" IS 'Reference to the active PUDO point ID. For Brickshare deposits, this matches the ID from the remote API (e.g., brickshare-001, brickshare-002). For Correos PUDOs, this is the correos_id_pudo.';
 
 
 
-COMMENT ON COLUMN "public"."users"."pudo_type" IS 'Type of PUDO point currently selected by the user (correos or brickshare)';
+COMMENT ON COLUMN "public"."users"."pudo_type" IS 'Type of PUDO point: correos (Correos API PUDO) or brickshare (Brickshare deposit). Must be set if user has pudo_id.';
 
 
 
@@ -1641,7 +1688,7 @@ COMMENT ON TABLE "public"."users_brickshare_dropping" IS 'Stores user-selected B
 
 
 
-COMMENT ON COLUMN "public"."users_brickshare_dropping"."brickshare_pudo_id" IS 'ID of the Brickshare PUDO location. Can be any string identifier from the /api/locations-local endpoint or the brickshare_pudo_locations table. The id_correos_pudo field from PudoSelector is mapped to this field when tipo_punto is Deposito.';
+COMMENT ON COLUMN "public"."users_brickshare_dropping"."brickshare_pudo_id" IS 'ID of the Brickshare PUDO location from remote API. Format: brickshare-XXX. No FK constraint to allow dynamic locations from external API.';
 
 
 
@@ -2584,6 +2631,12 @@ GRANT ALL ON FUNCTION "public"."generate_referral_code_users"() TO "service_role
 GRANT ALL ON FUNCTION "public"."generate_return_qr"("p_shipment_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."generate_return_qr"("p_shipment_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."generate_return_qr"("p_shipment_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."get_set_by_ref"("p_set_ref" "text") TO "anon";
+GRANT ALL ON FUNCTION "public"."get_set_by_ref"("p_set_ref" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_set_by_ref"("p_set_ref" "text") TO "service_role";
 
 
 
