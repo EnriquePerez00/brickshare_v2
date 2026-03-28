@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Etiqueta Envío - Enrique Perez - in_transit_pudo</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: 'Arial', sans-serif; 
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: #f0f0f0;
+      padding: 20px;
+    }
+    .page-wrapper {
+      text-align: center;
+    }
+    .label-container {
+      width: 10cm;
+      height: 5cm;
+      padding: 0.4cm;
+      box-sizing: border-box;
+      font-family: Arial, sans-serif;
+      border: 2px solid #000;
+      display: flex;
+      flex-direction: column;
+      background: white;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .label-content {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+    .label-header {
+      text-align: center;
+      margin-bottom: 4px;
+    }
+    .label-header h1 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: bold;
+      letter-spacing: 2px;
+    }
+    .divider {
+      height: 2px;
+      background: #000;
+      margin: 3px 0;
+    }
+    .label-section {
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+      margin: 3px 0;
+    }
+    .label-icon {
+      font-size: 14px;
+      min-width: 18px;
+    }
+    .label-text {
+      flex: 1;
+      font-size: 10px;
+      line-height: 1.2;
+    }
+    .label-text strong {
+      font-size: 11px;
+    }
+    .pudo-type {
+      font-weight: bold;
+      margin-bottom: 2px;
+    }
+    .pudo-address {
+      white-space: pre-line;
+      color: #333;
+    }
+    .ref-section {
+      margin-top: auto;
+      padding-top: 3px;
+      border-top: 1px solid #ccc;
+    }
+    .ref-line,
+    .tracking-line {
+      display: flex;
+      gap: 6px;
+      margin: 2px 0;
+    }
+    .ref-label,
+    .tracking-label {
+      font-size: 9px;
+      color: #666;
+    }
+    .ref-code {
+      font-size: 12px;
+      font-weight: bold;
+      font-family: 'Courier New', monospace;
+    }
+    .tracking-code {
+      font-size: 11px;
+      font-weight: bold;
+      font-family: 'Courier New', monospace;
+      letter-spacing: 1px;
+    }
+    .qr-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 4px;
+      padding-top: 4px;
+      border-top: 2px solid #000;
+    }
+    .qr-section img {
+      display: block;
+      width: 80px;
+      height: 80px;
+    }
+    .qr-uuid {
+      font-size: 6px;
+      font-family: 'Courier New', monospace;
+      color: #666;
+      margin-top: 2px;
+      word-break: break-all;
+      text-align: center;
+      max-width: 160px;
+    }
+
+    /* Info panel below label */
+    .info-panel {
+      margin-top: 30px;
+      text-align: left;
+      max-width: 10cm;
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .info-panel h2 {
+      font-size: 16px;
+      margin-bottom: 12px;
+      color: #333;
+      border-bottom: 2px solid #667eea;
+      padding-bottom: 6px;
+    }
+    .info-row {
+      display: flex;
+      margin: 6px 0;
+      font-size: 13px;
+    }
+    .info-label {
+      font-weight: bold;
+      min-width: 140px;
+      color: #555;
+    }
+    .info-value {
+      color: #333;
+      font-family: 'Courier New', monospace;
+    }
+    .status-badge {
+      display: inline-block;
+      background: #fbbf24;
+      color: #92400e;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    .preview-footer {
+      margin-top: 20px;
+      color: #999;
+      font-size: 12px;
+    }
+    
+    @media print {
+      body { 
+        margin: 0; 
+        padding: 0; 
+        background: white;
+        display: block;
+      }
+      .label-container { 
+        border: 1px solid #000;
+        box-shadow: none;
+        width: 10cm;
+        height: 5cm;
+        position: absolute;
+        left: 0;
+        top: 0;
+      }
+      .info-panel,
+      .preview-footer {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-wrapper">
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- ETIQUETA DE ENVÍO (10cm × 5cm)            -->
+    <!-- ═══════════════════════════════════════════ -->
+    <div class="label-container">
+      <div class="label-content">
+        <div class="label-header">
+          <h1>BRICKSHARE</h1>
+          <div class="divider"></div>
+        </div>
+        
+        <div class="label-section">
+          <div class="label-icon">👤</div>
+          <div class="label-text">
+            <strong>Enrique Perez</strong>
+          </div>
+        </div>
+
+        <div class="label-section">
+          <div class="label-icon">📍</div>
+          <div class="label-text">
+            <div class="pudo-type">Brickshare PUDO</div>
+            <div class="pudo-address">Brickshare Madrid Centro
+Calle Gran Vía 28
+28013 Madrid</div>
+          </div>
+        </div>
+
+        <div class="label-section">
+          <div class="label-icon">📦</div>
+          <div class="label-text">
+            <strong>Set: 4478</strong>
+          </div>
+        </div>
+
+        <div class="label-section ref-section">
+          <div class="label-icon">🔢</div>
+          <div class="label-text">
+            <div class="ref-line">
+              <span class="ref-label">REF:</span>
+              <span class="ref-code">#1059C59A</span>
+            </div>
+            <div class="tracking-line">
+              <span class="tracking-label">Envío:</span>
+              <span class="tracking-code">------</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="qr-section">
+          <!-- QR Code real generado con el UUID del shipment -->
+          <img 
+            src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=7a2d335c-8fa1-4e4e-94bb-d84b1059c59a" 
+            alt="QR Code: 7a2d335c-8fa1-4e4e-94bb-d84b1059c59a"
+          />
+          <div class="qr-uuid">7a2d335c-8fa1-4e4e-94bb-d84b1059c59a</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- PANEL DE INFORMACIÓN                       -->
+    <!-- ═══════════════════════════════════════════ -->
+    <div class="info-panel">
+      <h2>📋 Datos del Envío</h2>
+      <div class="info-row">
+        <span class="info-label">Shipment ID:</span>
+        <span class="info-value">7a2d335c-8fa1-4e4e-94bb-d84b1059c59a</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Estado:</span>
+        <span class="status-badge">in_transit_pudo</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Usuario:</span>
+        <span class="info-value">Enrique Perez</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Email:</span>
+        <span class="info-value">enriqueperezbcn1973@gmail.com</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Set LEGO:</span>
+        <span class="info-value">4478</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">PUDO Type:</span>
+        <span class="info-value">brickshare</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">PUDO ID:</span>
+        <span class="info-value">brickshare-001</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Delivery QR Code:</span>
+        <span class="info-value">BS-DEL-7A2D335C-8FA</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">QR en etiqueta:</span>
+        <span class="info-value">7a2d335c-8fa1-4e4e-94bb-d84b1059c59a (UUID)</span>
+      </div>
+    </div>
+
+    <div class="preview-footer">
+      <p><strong>Etiqueta de Envío Brickshare</strong> — Generada para impresión</p>
+      <p>Dimensiones: 10cm × 5cm | ⌘P para imprimir | Márgenes: Ninguno</p>
+    </div>
+  </div>
+</body>
+</html>

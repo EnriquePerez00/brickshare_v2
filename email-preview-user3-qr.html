@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>📧 Preview Email QR - user3 - Brickshare</title>
+  <style>
+    /* Wrapper para simular un cliente de correo */
+    body { 
+      font-family: Arial, sans-serif; 
+      background: #e5e5e5; 
+      margin: 0; 
+      padding: 20px;
+    }
+    .email-client-frame {
+      max-width: 700px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+    .email-client-toolbar {
+      background: #f5f5f5;
+      border-bottom: 1px solid #ddd;
+      padding: 12px 20px;
+      font-size: 13px;
+      color: #555;
+    }
+    .email-client-toolbar .from { color: #333; font-weight: bold; }
+    .email-client-toolbar .subject { font-size: 15px; color: #111; margin-top: 4px; }
+    .email-client-toolbar .to { color: #888; }
+    .email-client-toolbar .meta-row { margin: 3px 0; }
+    .email-body-wrapper {
+      padding: 0;
+    }
+    .preview-banner {
+      background: #667eea;
+      color: white;
+      text-align: center;
+      padding: 8px;
+      font-size: 12px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="preview-banner">
+    ⚡ Vista previa del email enviado a user3@brickshare.com
+  </div>
+
+  <div class="email-client-frame">
+    <!-- Barra de metadatos del email -->
+    <div class="email-client-toolbar">
+      <div class="meta-row"><strong>De:</strong> <span class="from">Brickshare &lt;onboarding@resend.dev&gt;</span></div>
+      <div class="meta-row"><strong>Para:</strong> <span class="to">user3@brickshare.com</span></div>
+      <div class="meta-row subject"><strong>Asunto:</strong> Tu código QR para recoger: Fallingwater</div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- CONTENIDO EXACTO DEL EMAIL (del template de la edge fn) -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div class="email-body-wrapper">
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          
+          <!-- HEADER -->
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+            <h1 style="margin: 0; font-size: 24px;">¡Tu pedido está listo para recoger! 🎉</h1>
+          </div>
+          
+          <!-- CONTENT -->
+          <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+            <p>Hola user3,</p>
+            
+            <p>Tu set <strong>Fallingwater</strong> está listo para ser recogido en nuestro punto Brickshare.</p>
+            
+            <!-- QR BOX -->
+            <div style="background: white; padding: 30px; text-align: center; margin: 20px 0; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+              <h2 style="margin: 0 0 15px 0; font-size: 18px; color: #333;">Tu Código QR para Recoger: Fallingwater (21005)</h2>
+              
+              <!-- QR Code Image (generado con la misma API que usa la edge function) -->
+              <img 
+                src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=BS-DEL-54A82B94-1DD" 
+                alt="QR Code" 
+                style="max-width: 300px; height: auto; margin: 20px auto; display: block;"
+              />
+              
+              <div style="font-size: 20px; font-weight: bold; color: #667eea; letter-spacing: 2px; font-family: 'Courier New', monospace; margin-top: 15px;">
+                BS-DEL-54A82B94-1DD
+              </div>
+              <p style="margin-top: 15px; color: #666; font-size: 14px;">Presenta este código en el punto de recogida</p>
+            </div>
+
+            <!-- INFO BOX - PUDO -->
+            <div style="background: white; padding: 20px; margin: 20px 0; border-left: 4px solid #667eea; border-radius: 5px;">
+              <h3 style="margin: 0 0 10px 0;">📍 Punto de Recogida</h3>
+              <p style="margin: 5px 0;"><strong>Brickshare Madrid Centro</strong></p>
+              <p style="margin: 5px 0;">Calle Gran Vía 28</p>
+              <p style="margin: 5px 0;">28013 Madrid</p>
+            </div>
+
+            <h3>¿Cómo funciona?</h3>
+            <ol style="padding-left: 20px;">
+              <li>Dirígete al punto Brickshare en el horario de apertura</li>
+              <li>Muestra tu código QR al personal</li>
+              <li>Ellos escanearán el código para validar la entrega</li>
+              <li>¡Recoge tu set y disfruta! 🧱</li>
+            </ol>
+
+            <p>Si tienes alguna pregunta, no dudes en contactarnos.</p>
+            
+            <p>¡Que disfrutes construyendo!</p>
+            <p><strong>El equipo de Brickshare</strong></p>
+          </div>
+          
+          <!-- FOOTER -->
+          <div style="text-align: center; padding: 20px; color: #666; font-size: 14px;">
+            <p>© 2026 Brickshare. Todos los derechos reservados.</p>
+            <p>Este es un correo automático, por favor no respondas a este mensaje.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Info técnica debajo -->
+  <div style="max-width: 700px; margin: 20px auto; background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); font-family: Arial, sans-serif; font-size: 13px;">
+    <h3 style="margin-top: 0; color: #333; border-bottom: 2px solid #667eea; padding-bottom: 6px;">📋 Datos técnicos del envío</h3>
+    <table style="width: 100%; border-collapse: collapse;">
+      <tr><td style="padding: 4px 8px; font-weight: bold; color: #555; width: 180px;">Shipment ID:</td><td style="padding: 4px 8px; font-family: monospace;">54a82b94-1dda-4771-a8bf-7ef3e06e5d74</td></tr>
+      <tr style="background: #f9f9f9;"><td style="padding: 4px 8px; font-weight: bold; color: #555;">Estado:</td><td style="padding: 4px 8px;"><span style="background: #fbbf24; color: #92400e; padding: 2px 10px; border-radius: 12px; font-weight: bold; font-size: 12px;">in_transit_pudo</span></td></tr>
+      <tr><td style="padding: 4px 8px; font-weight: bold; color: #555;">Usuario:</td><td style="padding: 4px 8px;">user3</td></tr>
+      <tr style="background: #f9f9f9;"><td style="padding: 4px 8px; font-weight: bold; color: #555;">Email:</td><td style="padding: 4px 8px;">user3@brickshare.com</td></tr>
+      <tr><td style="padding: 4px 8px; font-weight: bold; color: #555;">Set LEGO:</td><td style="padding: 4px 8px;">Fallingwater (21005) - Architecture</td></tr>
+      <tr style="background: #f9f9f9;"><td style="padding: 4px 8px; font-weight: bold; color: #555;">Delivery QR Code:</td><td style="padding: 4px 8px; font-family: monospace; font-weight: bold; color: #667eea;">BS-DEL-54A82B94-1DD</td></tr>
+      <tr><td style="padding: 4px 8px; font-weight: bold; color: #555;">Return QR Code:</td><td style="padding: 4px 8px; font-family: monospace;">BS-RET-54A82B94-1DD</td></tr>
+      <tr style="background: #f9f9f9;"><td style="padding: 4px 8px; font-weight: bold; color: #555;">PUDO Type:</td><td style="padding: 4px 8px;">brickshare</td></tr>
+      <tr><td style="padding: 4px 8px; font-weight: bold; color: #555;">PUDO ID:</td><td style="padding: 4px 8px; font-family: monospace;">brickshare-001</td></tr>
+      <tr style="background: #f9f9f9;"><td style="padding: 4px 8px; font-weight: bold; color: #555;">PUDO Location:</td><td style="padding: 4px 8px;">Brickshare Madrid Centro - Calle Gran Vía 28, 28013 Madrid</td></tr>
+      <tr><td style="padding: 4px 8px; font-weight: bold; color: #555;">Edge Function:</td><td style="padding: 4px 8px; font-family: monospace;">send-brickshare-qr-email</td></tr>
+      <tr style="background: #f9f9f9;"><td style="padding: 4px 8px; font-weight: bold; color: #555;">Email Provider:</td><td style="padding: 4px 8px;">Resend</td></tr>
+    </table>
+  </div>
+
+</body>
+</html>

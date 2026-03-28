@@ -1,0 +1,3201 @@
+openapi: 3.1.0
+servers:
+  - description: Production
+    url: https://api.v2.swikly.com/v1
+  - description: Sandbox
+    url: https://api.sandbox.swikly.com/v1
+
+info:
+  version: 1.1.0
+  title: Swikly API
+  description: |
+    # Presentation
+
+    ## Available Resources
+
+    ### 1. Account
+    - Represents the account of the application.
+    - Most endpoints require an account_id in the url, this account_id can be found in Swikly "Applications and integrations" > "Developer" > "Account ID".
+      - [Production Developer panel](https://app.v2.swikly.com/applications-integrations/developer/)
+      - [Sandbox Developer panel](https://app.sandbox.swikly.com/applications-integrations/developer/)
+
+    <details>
+      <summary><strong>Developer panel screenshot</strong></summary>
+
+      ![account_id](openapi/img/account_id_in_swikly.webp)
+    </details>
+
+    ### 2. Users
+    - Represents the users of the application.
+
+    ### 3. Requests
+    - An object that contains all information related to **Operations** (Deposit, No-Show, and Payment), **End-Users**, and **Utilities** (such as checkout URL, creation date, etc.).
+    - Used to create and manage **Operations**.
+
+    #### Key Rules:
+    - A **Request** must include at least one **Operation**.
+    - A **Request** can combine different **Operations** (e.g., a **Deposit** and a **Payment**).
+    - A **Request** cannot contain duplicate operations (e.g., two **Deposits** in the same request are not allowed).
+
+    #### Sub-Resources of a Request:
+    - **Deposit**:
+      - An **Operation** that contains all information related to the deposit.
+      - Deposits can be **Reclaimed**.
+    - **No-Show**:
+      - An **Operation** that contains all information related to no-show penalties.
+      - No-Shows can be **Reclaimed**.
+    - **Payment**:
+      - An **Operation** that contains all information related to payments.
+      - Payments can be **Refunded**.
+    - **End-User**:
+      - Contains all information related to the person securing the **Request**.
+
+    ### 4. Reclaims
+
+    > A reclaim is used to collect funds secured by a deposit or a no-show. This typically occurs if damage is discovered and covered by a security deposit, or if someone fails to appear for an appointment for which a no-show was collected.
+
+    - Contains all information related to the **Reclaim** states of an **Operation**.
+    - **Reclaims** are used to cash-in a **Deposit** or a **No-Show**.
+    - **Reclaims** can be **Refunded**.
+    - You can process and manage a **Reclaim** directly from the **Request**.
+    - **Not recommended**: In **Advanced Mode**, you can manage the **Reclaim** resource independently.
+
+    ### 5. Refunds
+
+    > A refund is used to return funds previously collected, either because too much was collected via a reclaim or to reimburse a payment. The refunded amount is transferred back to the original payment method used by the end user.
+
+    - Contains all information related to the **Refund** states of an **Operation**.
+    - **Refunds** are used to return funds for a completed **Payment** or **Reclaim**.
+    - You can process a **Refund** directly from the **Request**.
+    - **Not recommended**: In **Advanced Mode**, you can manage the **Refund** resource independently.
+
+    ## Terminology
+
+    - **Secure a Request**: Refers to the moment the end-user complete the checkout for a Request. Meaning he has filled all of its information and secure the Security Deposit / No-show or paid the Payment.
+
+    # REST API
+    The Swikly API is organized around REST. Our API has predictable, resource-oriented URLs, and uses HTTP response codes to indicate API errors.
+
+    ## HTTP Scheme
+    All API requests must be made over HTTPS. Calls made over plain HTTP will fail.
+
+    ## Headers
+    All API requests must contain an `Accept: application/json` header.
+
+    ## Rate Limiting
+    Each user accessing the API has a default limit of 120 requests per minute.
+
+    Rate limiting information will be returned in the response headers:
+      - X-RateLimit-Limit: 120
+      - X-RateLimit-Remaining: 58
+
+    Reaching the rate limit, will return an error message "Too Many Attempts." with 429 status code.
+
+    Additional headers will be returned once the rate-limit is reached:
+
+      - Retry-After: 37
+      - X-RateLimit-Remaining: 1693405224
+
+    Retry-After is the number of seconds before the next limit reset happens.
+
+    X-RateLimit-Remaining is the UNIX timestamp at which the next limit reset happens.
+
+    ## Errors
+
+    ### Here is a list of HTTP status codes with their associated payloads:
+
+    * 400
+    ```json
+    {
+      "code": "ERR_REC_002",
+      "message": "The amount requested exceeds the amount available.",
+      "context": [],
+    }
+    ```
+    * 401
+    ```json
+    {
+      "message": "Please authenticate to access this resource."
+    }
+    ```
+    * 403
+    ```json
+    {
+      "message": "This action is unauthorized."
+    }
+    ```
+    * 404
+    ```json
+    {
+      "message": "Page not found."
+    }
+    ```
+    * 422
+    ```json
+    {
+      "message": "The callback url is not a valid URL.",
+      "code": "ERR_PARAMS",
+      "errors": {
+        "callbackUrl": [
+          "The callback url is not a valid URL."
+        ]
+      }
+    }
+    ```
+    * 429
+    ```json
+    {
+      "message": "Too Many Attempts."
+    }
+    ```
+    * 500
+    ```json
+    {
+      "message": "Server Error"
+    }
+    ```
+
+    ## Callbacks & webhooks
+
+    ### Webhook Signatures
+
+    Our app will sign all webhook events sent to your endpoints with a signature. This signature appears in each webhook request's `Swikly-Signature` header.
+    It allows you to verify that the events were sent by Swikly rather than a third party.
+
+    Before you can verify signatures, you need to retrieve your account's `secret`. You can find it by calling [`GET /accounts`](#get-/accounts)
+    or from your dashboard, in `Applications and integrations > Developer > Link credentials (or Secret)`.
+
+    The `Swikly-Signature` header included in each signed webhook request contains a timestamp and a signature.
+    The timestamp is prefixed by t=, and the signature is prefixed by its algorithm name: `sha256` only for now.
+    ```
+    Swikly-Signature: t=1739352941,sha256=7244dc6a957d9583516a170ff07242499e58e74da34afd732a60f900e8e162e1
+    ```
+
+    Swikly generates signatures using a hash-based message authentication code ([HMAC](https://en.wikipedia.org/wiki/Hash-based_message_authentication_code))
+    with [SHA-256](https://en.wikipedia.org/wiki/SHA-2). To [prevent downgrade attacks](https://en.wikipedia.org/wiki/Downgrade_attack), ignore all schemes that aren’t the most recently documented one.
+
+    ### Validate Signatures
+
+    **Step 1: Extract the _Timestamp_ and _Signature_ from the Header**
+
+    Split the header using the `,` character as the separator to get a list of elements.
+    Then split each element using the `=` character as the separator, to get a prefix and value pair.
+
+    The value for the prefix `t` corresponds to the timestamp and `sha256` corresponds to the signature. You can ignore other elements.
+
+    **Step 2: Prepare the `signed_payload` string**
+
+    The `signed_payload` string is created by concatenating:
+    - The timestamp (as a string)
+    - The character `.`
+    - The actual JSON payload (that is, the request body)
+
+    For example:
+    ```
+    1739352941.{"event":"requestSecured","request":{...}}
+    ```
+
+    > Don't apply any formatting on the request body payload; take it as it is. If you apply formatting, it will add white-space characters that will result in a wrong signature construction.
+
+    **Step 3: Determine the Expected Signature**
+
+    Compute an HMAC with the SHA256 hash function. Use your account’s `secret` as the key, and use the `signed_payload` string as the message.
+
+    **Step 4: Compare the Signatures**
+
+    Compare the signature in the header to the expected signature.
+    For an equality match, compute the difference between the current timestamp and the received timestamp,
+    then decide if the difference is within your tolerance.
+
+    Examples:
+
+    <details>
+      <summary><strong>Node.js</strong></summary>
+
+      ```javascript
+      const crypto = require('crypto');
+
+      // Variables you must get by yourself
+      const secret = 'YOUR_ACCOUNT_SECRET';
+      const requestBody = 'THE_HTTP_REQUEST_RAW_BODY';
+      const signatureHeader = "t=1739352941,sha256=f51f716227106db033b792ca240323c77d673b5640ba8588077f939566c676ac";
+      // Values you can configure
+      const maxAllowedTimestampSeconds = 10*60; // a 10 minutes old timestamp is okay
+
+      // Header parsing
+      const headerValues = signatureHeader
+        // Split every part
+        .split(',')
+        // Split key & values
+        .map(part => part.split('=').map(y => y.trim()))
+        // [key, value] array to object
+        .reduce((result, part) => {
+        result[part[0]] = part[1];
+        return result;
+        }, {});
+
+      const signatureTimestamp = headerValues['t'];
+      const signatureHash = headerValues['sha256'];
+      if (typeof signatureTimestamp === 'undefined' || typeof signatureHash === 'undefined') {
+        throw new Error('Invalid Signature header');
+      }
+
+      const toBeSignedPayload = signatureTimestamp + '.' + requestBody
+      const expected = crypto.createHmac('sha256', secret).update(toBeSignedPayload).digest("hex");
+
+      // Checks
+      const currentTimestamp = (new Date).getTime() / 1000; // In seconds
+      console.log('Timestamp age (seconds):', Math.floor(currentTimestamp - signatureTimestamp));
+      console.log('Timestamp is recent enough:', currentTimestamp - signatureTimestamp <= maxAllowedTimestampSeconds);
+      console.log('Hash is valid:', expected === signatureHash);
+      ```
+    </details>
+
+    <details>
+      <summary><strong>PHP</strong></summary>
+
+      ```php
+      // Variables you must get by yourself
+      $secret = 'YOUR_ACCOUNT_SECRET';
+      $requestBody = 'THE_HTTP_REQUEST_RAW_BODY';
+      $signatureHeader = "t=1739352941,sha256=f51f716227106db033b792ca240323c77d673b5640ba8588077f939566c676ac";
+
+      // Values you can configure
+      $maxAllowedTimestampSeconds = 10 * 60; // a 10 minutes old timestamp is okay
+
+      // Header parsing
+      $headerValues = [];
+      foreach (explode(',', $signatureHeader) as $part) {
+          $keyValue = explode('=', trim($part));
+          $headerValues[$keyValue[0]] = trim($keyValue[1]);
+      }
+
+      $signatureTimestamp = $headerValues['t'];
+      $signatureHash = $headerValues['sha256'];
+      if (!isset($headerValues['t'], $headerValues['sha256'])) {
+          throw new \InvalidArgumentException('Invalid Signature header');
+      }
+
+      $toBeSignedPayload = sprintf("%s.%s", $signatureTimestamp, $requestBody);
+      $expected = hash_hmac('sha256', $toBeSignedPayload, $secret);
+
+      // Checks
+      $currentTimestamp = time(); // In seconds
+      echo 'Timestamp age (seconds): ' . floor($currentTimestamp - $signatureTimestamp) . "\n";
+      echo 'Timestamp is recent enough: ' . ($currentTimestamp - $signatureTimestamp <= $maxAllowedTimestampSeconds ? 'true' : 'false') . "\n";
+      echo 'Hash is valid: ' . ($expected === $signatureHash ? 'true' : 'false') . "\n";
+      ```
+    </details>
+
+    ### Debug webhook integrations
+
+    You can find the list of sent callback's HTTP requests & responses in your dashboard: `Applications and integrations > Callback History`
+
+    # Usage
+
+    ## Regular usage
+
+    1. [Users](#tag--users)
+        - [Retrieve Current User Information](#get-/me)
+    1. [Requests](#tag--requests)
+        - [List an Account's Requests](#get-/accounts/-accountId-/requests)
+        - [Create a Request](#post-/accounts/-accountId-/requests)
+        - [Retrieve a Specific Request](#get-/accounts/-accountId-/requests/-requestId-)
+        - [Partially Update a Request](#patch-/accounts/-accountId-/requests/-requestId-)
+        - [Cancel a Request](#post-/accounts/-accountId-/requests/-requestId-/cancel)
+        - [Release a Request](#post-/accounts/-accountId-/requests/-requestId-/release)
+        - Reclaims
+            - [Upload a temporary file](#post-/accounts/-accountId-/files)
+            - [Create Reclaims from a Request](#post-/accounts/-accountId-/requests/-requestId-/create_reclaim)
+            - [Cancel Reclaims from a Request](#post-/accounts/-accountId-/requests/-requestId-/cancel_reclaim)
+        - Refunds
+            - [Create a Refund from a Request](#post-/accounts/-accountId-/requests/-requestId-/create_refund)
+
+    ## Advanced usage - For specific use cases
+
+    1. [Deposits](#tag--deposits)
+        - [Retrieve a Deposit](#get-/accounts/-accountId-/deposits/-depositId-)
+        - [Partially Update a Deposit](#patch-/accounts/-accountId-/deposits/-depositId-)
+    1. [No-Shows](#tag--no-shows)
+        - [Retrieve a No-Show](#get-/accounts/-accountId-/no-shows/-noShowId-)
+        - [Partially Update a No-Show](#patch-/accounts/-accountId-/no-shows/-noShowId-)
+    1. [Payments](#tag--payments)
+        - [Retrieve a Payment](#get-/accounts/-accountId-/payments/-paymentId-)
+        - [Partially Update a Payment](#patch-/accounts/-accountId-/payments/-paymentId-)
+    1. [Reclaims](#tag--reclaims)
+        - [List all Reclaims for an Account](#get-/accounts/-accountId-/reclaims)
+        - [List all Reclaims for a Request](#get-/accounts/-accountId-/requests/-requestId-/reclaims)
+        - [Retrieve a Reclaim](#get-/accounts/-accountId-/reclaims/-reclaimId-)
+        - [Create Reclaim from Deposit](#post-/accounts/-accountId-/deposits/-depositId-/reclaims)
+        - [Create Reclaim from No-Show](#post-/accounts/-accountId-/no-shows/-noShowId-/reclaims)
+        - [Upload & attach a file to an existing reclaim](#post-/accounts/-accountId-/reclaims/-reclaimId-/files)
+        - [Remove a file from a reclaim](#delete-/accounts/-accountId-/reclaims/-reclaimId-/files/-fileId-)
+    1. [Refunds](#tag--refunds)
+        - [Retrieve a Refund](#get-/accounts/-accountId-/refunds/-refundId-)
+        - [Refund a Payment](#post-/accounts/-accountId-/payments/-paymentId-/refunds)
+        - [Refund a Reclaim](#post-/accounts/-accountId-/reclaims/-reclaimId-/refunds)
+    1. [Short Links](#tag--short-links)
+        - [Create a Short Link](#post-/shortener/short-links)
+
+    # Other usages
+
+    ## Callbacks
+
+    You can find the documentation of callbacks defined at the **Request** level in this documentation,
+    and you can find the legacy (deprecated) callback [documentation in swikly-link](https://github.com/swikly/swikly-link/wiki/6.-Callback-URL-and-Redirect-URL-parameters)
+
+    ## Use Swikly in an iFrame
+
+    [Documentation in swikly-link](https://github.com/swikly/swikly-link/wiki/8.-Iframe-Integration)
+
+    # Environments
+
+    - [Production API documentation](https://api.v2.swikly.com/v1)
+    - [Sandbox API documentation](https://api.sandbox.swikly.com/v1)
+
+    # Sequence diagrams
+
+    <details>
+      <summary><strong>Request lifecycle</strong></summary>
+
+      ![diagram_request_lifecycle](openapi/img/diagrams/request_lifecycle.webp)
+    </details>
+
+    <details>
+      <summary><strong>Update Request</strong></summary>
+
+      ![diagram_update_request](openapi/img/diagrams/update_request.webp)
+    </details>
+
+    <details>
+      <summary><strong>Cancel or Release Request</strong></summary>
+
+      ![diagram_cancel_or_release_request](openapi/img/diagrams/cancel_or_release_request.webp)
+    </details>
+
+    <details>
+      <summary><strong>Reclaim lifecycle</strong></summary>
+
+      ![reclaim_request_lifecycle](openapi/img/diagrams/reclaim_request_lifecycle.webp)
+    </details>
+
+    <details>
+      <summary><strong>Cancel Reclaim</strong></summary>
+
+      ![diagram_cancel_reclaim](openapi/img/diagrams/cancel_reclaim.webp)
+    </details>
+
+    <details>
+      <summary><strong>Refund lifecycle</strong></summary>
+
+      ![refund _lifecycle](openapi/img/diagrams/refund_lifecycle.webp)
+    </details>
+
+    # User agent
+
+    When using our API, you must configure your HTTP client's [User Agent](https://en.wikipedia.org/wiki/User-Agent_header) header to match your company or project name.
+    It will be much easier for us to help you debug your API calls if we can find them using this value.
+
+    Example: Instead of the default values `Apache-HttpClient/4.5.14 (Java/21.0.2)` or `Guzzle/7.3 curl/7.21.4 PHP/8.3.1`, you should use `YourProjectName/1`.
+
+    # Authentication & API key
+
+    An `API key` is required to access any API endpoint. You can manage your own API keys in [your Swikly user account](https://app.v2.swikly.com/me/api-keys/).
+
+    > Tokens are dedicated to a user and a specific environment. If you want to use the `sandbox` environment, please create an account on the [sandbox app](https://app.sandbox.swikly.com/) and get your API key in [your sandbox account](https://app.sandbox.swikly.com/me/api-keys/).
+
+    > **Caution:** the `API key` is linked to a user and not to an account. It allows to access and modify data based on the related user's permissions.
+
+    > If you have a **legacy (V1)** credentials couple (`api_key` and `api_secret`), you can pass them with format `api_key:api_secret`, or you can still use both `API_KEY` and `API_SECRET` headers.
+
+paths:
+  /me:
+    get:
+      summary: Retrieve current user informations
+      tags:
+        - users
+      responses:
+        '200':
+          description: The currently authenticated user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+  /accounts:
+    get:
+      summary: List accounts
+      tags:
+        - accounts
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/perPage'
+      responses:
+        '200':
+          description: The accounts the current user has access to
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accounts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Account'
+                  meta:
+                    $ref: '#/components/schemas/ResultsMeta'
+
+  /accounts/{accountId}/requests:
+    get:
+      summary: List Requests
+      tags:
+        - requests
+      parameters:
+        - in: path
+          name: accountId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/perPage'
+        - in: query
+          name: with
+          description: load additional relationships, comma separated values
+          required: false
+          style: simple
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [ 'endUser', 'deposit', 'noShow', 'payment' ]
+        - in: query
+          name: search
+          description: |
+            Filter requests using either:
+            - A `customId` provided at the creation of the `request`
+            - The `request` | `deposit` | `no-show` | `payment` Id or its first 5 or 6 characters
+          required: false
+          style: simple
+          # If fill-request-fields-with-example=true, the first example will be used, and we do not want it
+          x-fill-example: no
+          schema:
+            type: string
+            examples:
+              requestIdPrefix:
+                value: "A12345"
+                description: "First 5 or 6 characters of the request Id"
+              customRequestId:
+                value: "my-custom-id"
+                description: "`customId` set during the request creation"
+        - in: query
+          name: include_legacy
+          description: If true, requests created on the legacy V1 app will be returned as well. They will be readonly on this app.
+          required: false
+          style: simple
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: The account Requests
+          headers:
+            swikly-account-id:
+              $ref: '#/components/headers/swikly-account-id'
+            swikly-account-trade-name:
+              $ref: '#/components/headers/swikly-account-trade-name'
+            swikly-account-currency:
+              $ref: '#/components/headers/swikly-account-currency'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requests:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Request'
+                  meta:
+                    $ref: '#/components/schemas/ResultsMeta'
+    post:
+      summary: Create a Request
+      description: Create a new **Request** by defining the **Operations** values and the **End-User** information.
+        Also defines the checkout behavior when **Request** lifecycle is updated. ie, callbacks, redirectURL...
+      tags:
+        - requests
+      parameters:
+        - in: path
+          name: accountId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - description
+                - language
+              properties:
+                description:
+                  type: string
+                language:
+                  type: string
+                  enum: [ fr, en, es, it, nl, de ]
+                  description: Language used for communication with the end user.
+                customId:
+                  allOf:
+                    - $ref: '#/components/schemas/Request/properties/customId'
+                    - description: Any custom ID you want to associate with the request.
+                customIdMustBeUnique:
+                  $ref: '#/components/schemas/Request/properties/customIdMustBeUnique'
+                skipToPaymentPageIfPossible:
+                  $ref: '#/components/schemas/Request/properties/skipToPaymentPageIfPossible'
+                freeText:
+                  $ref: '#/components/schemas/Request/properties/freeText'
+                firstName:
+                  $ref: '#/components/schemas/Request/properties/firstName'
+                lastName:
+                  $ref: '#/components/schemas/Request/properties/lastName'
+                email:
+                  $ref: '#/components/schemas/Request/properties/email'
+                phoneNumber:
+                  $ref: '#/components/schemas/Request/properties/phoneNumber'
+                birthDate:
+                  allOf:
+                    - $ref: '#/components/schemas/Date'
+                    - description: The birth date of the end user
+                startDate:
+                  allOf:
+                    - $ref: '#/components/schemas/Date'
+                    - description: "[deprecated] Use the Operation object."
+                endDate:
+                  allOf:
+                    - $ref: '#/components/schemas/Date'
+                    - description: "[deprecated] Use the Operation object."
+                callbackUrl:
+                  type: [ 'string', 'null' ]
+                  format: uri
+                  description: "[deprecated] Use 'callbacks' object instead. Once the request is secured, an `application/x-www.form-urlencoded` HTTP POST request will be sent to this URL. See https://github.com/swikly/swikly-link/wiki/6.-Callback-URL-and-Redirect-URL-parameters"
+                  examples: [ https://myserver.com/send/callback/here ]
+                redirectUrl:
+                  $ref: '#/components/schemas/RedirectUrl'
+                returnUrl:
+                  $ref: '#/components/schemas/ReturnUrl'
+                sendEmail:
+                  description: Send an email to notify the end user of your request.
+                  type: boolean
+                  default: true
+                sendSms:
+                  description: Send an sms to notify the end user of your request.
+                  type: boolean
+                  default: true
+                partnerTag:
+                  type: [ 'string', 'null' ]
+                  description: An authorized partner tag you want to associate with the request.
+                    If a partner tag is provided, no automatic reminder notifications will be sent to the end user.
+                  example: null
+                callbacks:
+                  type: object
+                  properties:
+                    requestSecured:
+                      $ref: '#/components/schemas/RequestSecuredCallback'
+                    allPendingReclaimsCompleted:
+                      $ref: '#/components/schemas/ReclaimFinishedCallback'
+                    allPendingRefundsCompleted:
+                      $ref: '#/components/schemas/RefundFinishedCallback'
+                deposit:
+                  type: object
+                  required: [ startDate, endDate, amount ]
+                  properties:
+                    startDate:
+                      $ref: '#/components/schemas/Date'
+                    endDate:
+                      $ref: '#/components/schemas/Date'
+                    amount:
+                      $ref: '#/components/schemas/Amount'
+                noShow:
+                  type: object
+                  required: [ date, amount ]
+                  properties:
+                    date:
+                      $ref: '#/components/schemas/Date'
+                    amount:
+                      $ref: '#/components/schemas/Amount'
+                payment:
+                  type: object
+                  required: [ amount ]
+                  properties:
+                    dueDate:
+                      $ref: '#/components/schemas/Date'
+                    amount:
+                      $ref: '#/components/schemas/Amount'
+                address:
+                  $ref: '#/components/schemas/Address'
+                depositAmount:
+                  allOf:
+                    - $ref: '#/components/schemas/Amount'
+                    - description: "[deprecated] Use the deposit object. The Deposit amount of the request in cents"
+                noShowAmount:
+                  allOf:
+                    - $ref: '#/components/schemas/Amount'
+                    - description: "[deprecated] Use the noShow object. The NoShow amount of the request in cents"
+                paymentAmount:
+                  allOf:
+                    - $ref: '#/components/schemas/Amount'
+                    - description: "[deprecated] Use the payment object. The Payment amount of the request in cents"
+            examples:
+              simpleDepositRequest:
+                summary: Request with a deposit only
+                description: Example request containing only a deposit, including the end user's first and last name. The "endDate" field MUST be today or later.
+                value:
+                  description: "My simple deposit request"
+                  language: "fr"
+                  firstName: "John"
+                  lastName: "Doe"
+                  deposit:
+                    startDate: "2026-06-10"
+                    endDate: "2026-06-12"
+                    amount: 12000
+              simpleNoShowRequest:
+                summary: Request with a no-show only
+                description: Example request containing only a no-show, including the end user's first and last name. The "date" field MUST be today or later.
+                value:
+                  description: "My simple no-show request"
+                  language: "fr"
+                  firstName: "John"
+                  lastName: "Doe"
+                  noShow:
+                    date: "2026-06-15"
+                    amount: 9900
+              simplePaymentRequest:
+                summary: Request with a payment only
+                description: Example request containing only a payment with a due date, including the end user's first and last name. The "dueDate" field MUST be today or later.
+                value:
+                  description: "My simple payment request"
+                  language: "fr"
+                  firstName: "John"
+                  lastName: "Doe"
+                  payment:
+                    dueDate: "2026-02-20"
+                    amount: 39900
+              multipleOperationsRequest:
+                summary: Request combining a deposit, a no-show, and a payment
+                description: Example request containing multiple operations. The deposit "endDate", no-show "date", and payment "dueDate" fields MUST be today or later.
+                value:
+                  description: "Request combining a deposit, a no-show, and a payment for the same end user."
+                  language: "en"
+                  firstName: "John"
+                  lastName: "Doe"
+                  email: "john.doe@fake.email"
+                  phoneNumber: "+33695825425"
+                  birthDate: "1995-05-26"
+                  deposit:
+                    startDate: "2026-06-02"
+                    endDate: "2026-06-05"
+                    amount: 44000
+                  noShow:
+                    date: "2026-06-15"
+                    amount: 9900
+                  payment:
+                    dueDate: "2026-06-20"
+                    amount: 39900
+                  address:
+                    country: "FR"
+                    postalCode: "69002"
+                    city: "Lyon"
+                    street: "12 rue des Oliviers"
+      responses:
+        '200':
+          description: The created Request
+          headers:
+            swikly-account-id:
+              $ref: '#/components/headers/swikly-account-id'
+            swikly-account-trade-name:
+              $ref: '#/components/headers/swikly-account-trade-name'
+            swikly-account-currency:
+              $ref: '#/components/headers/swikly-account-currency'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  request:
+                    $ref: '#/components/schemas/Request'
+      callbacks:
+        requestSecured:
+          "{$request.body#/callbacks/requestSecured}":
+            post:
+              parameters:
+                - $ref: '#/components/headers/callbacks-parameters/Swikly-Account-Id'
+                - $ref: '#/components/headers/callbacks-parameters/Swikly-Account-Trade-Name'
+                - $ref: '#/components/headers/callbacks-parameters/Swikly-Account-Currency'
+                - $ref: '#/components/headers/callbacks-parameters/Swikly-Signature'
+              requestBody:
+                description: Callback payload when Request is secured by End-user
+                required: true
+                content:
+                  application/json:
+                    schema:
+                      type: object
+                      required: [ event, request ]
+                      properties:
+                        event:
+                          type: string
+                          enum: [ "requestSecured" ]
+                        request:
+                          $ref: '#/components/schemas/Request'
+              responses:
+                "2XX":
+                  description: Your server should return any code between 200 and 299 if it accepts the callback. If it does not, the callback will be retried.
+        allPendingReclaimsCompleted:
+          "{$request.body#/callbacks/allPendingReclaimsCompleted}":
+            post:
+              parameters:
+                - $ref: '#/components/headers/callbacks-parameters/Swikly-Account-Id'
+                - $ref: '#/components/headers/callbacks-parameters/Swikly-Account-Trade-Name'
+                - $ref: '#/components/headers/callbacks-parameters/Swikly-Account-Currency'
+                - $ref: '#/components/headers/callbacks-parameters/Swikly-Signature'
+              requestBody:
+                description: Callback called when there is no pending Reclaim anymore (nor related operations) for a given Request.
+                required: true
+                content:
+                  application/json:
+                    schema:
+                      type: object
+                      required: [ event, request ]
+                      properties:
+                        event:
+                          type: string
+                          enum: [ "allPendingReclaimsCompleted" ]
+                        request:
+                          $ref: '#/components/schemas/Request'
+              responses:
+                "2XX":
+                  description: Your server should return any code between 200 and 299 if it accepts the callback. If it does not, the callback will be retried.
+        allPendingRefundsCompleted:
+          "{$request.body#/callbacks/allPendingRefundsCompleted}":
+            post:
+              parameters:
+                - $ref: '#/components/headers/callbacks-parameters/Swikly-Account-Id'
+                - $ref: '#/components/headers/callbacks-parameters/Swikly-Account-Trade-Name'
+                - $ref: '#/components/headers/callbacks-parameters/Swikly-Account-Currency'
+                - $ref: '#/components/headers/callbacks-parameters/Swikly-Signature'
+              requestBody:
+                description: Callback called when there is no pending Refund anymore for a given Request.
+                required: true
+                content:
+                  application/json:
+                    schema:
+                      type: object
+                      required: [ event, request ]
+                      properties:
+                        event:
+                          type: string
+                          enum: [ "allPendingRefundsCompleted" ]
+                        request:
+                          $ref: '#/components/schemas/Request'
+              responses:
+                "2XX":
+                  description: Your server should return any code between 200 and 299 if it accepts the callback. If it does not, the callback will be retried.
+
+  /accounts/{accountId}/requests/{requestId}:
+    get:
+      summary: Retrieve a Request
+      description: Contains all informations regarding the **Operations** and the **End-User** in the **Request**
+      tags:
+        - requests
+      parameters:
+        - in: path
+          name: accountId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+        - in: path
+          name: requestId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+        - in: query
+          name: with
+          description: load additional relationships, comma separated values
+          required: false
+          style: simple
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [ 'endUser', 'deposit', 'noShow', 'payment' ]
+      responses:
+        '200':
+          description: The Request
+          headers:
+            swikly-account-id:
+              $ref: '#/components/headers/swikly-account-id'
+            swikly-account-trade-name:
+              $ref: '#/components/headers/swikly-account-trade-name'
+            swikly-account-currency:
+              $ref: '#/components/headers/swikly-account-currency'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  request:
+                    $ref: '#/components/schemas/Request'
+
+    patch:
+      summary: Partially update a request
+      description: Update an existing **Request** to change its **Operations** values (amount and dates). You can update all the **Operations** at the same time.
+      tags:
+        - requests
+      parameters:
+        - in: path
+          name: accountId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+        - in: path
+          name: requestId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                deposit:
+                  type: object
+                  properties:
+                    startDate:
+                      allOf:
+                        - $ref: '#/components/schemas/Date'
+                        - description: New start date for the security deposit
+                    endDate:
+                      allOf:
+                        - $ref: '#/components/schemas/Date'
+                        - description: New end date for the security deposit
+                    amount:
+                      allOf:
+                        - $ref: '#/components/schemas/Amount'
+                        - description: New amount for the security deposit in cents. Can't be modify if the security deposit is already secured by end-user
+                noShow:
+                  type: object
+                  properties:
+                    date:
+                      allOf:
+                        - $ref: '#/components/schemas/Date'
+                        - description: New date for the no-show
+                    amount:
+                      allOf:
+                        - $ref: '#/components/schemas/Amount'
+                        - description: New amount for the no-show in cents. Can't be modify if the no-show is already secured by end-user
+                payment:
+                  type: object
+                  properties:
+                    dueDate:
+                      allOf:
+                        - $ref: '#/components/schemas/Date'
+                        - description: New maximum date for the payment to be paid.
+                    amount:
+                      allOf:
+                        - $ref: '#/components/schemas/Amount'
+                        - description: New amount for the payment in cents. Can't be modify if the payment is paid already.
+      responses:
+        '200':
+          description: The updated request
+          headers:
+            swikly-account-id:
+              $ref: '#/components/headers/swikly-account-id'
+            swikly-account-trade-name:
+              $ref: '#/components/headers/swikly-account-trade-name'
+            swikly-account-currency:
+              $ref: '#/components/headers/swikly-account-currency'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  request:
+                    $ref: '#/components/schemas/Request'
+
+  /accounts/{accountId}/requests/{requestId}/cancel:
+    post:
+      summary: Cancel a request
+      description: >
+        This will cancel all in progress **Operations** (deposit, noShow, payment) for a **Request**.
+        Additionally, any associated **Reclaims** in **Scheduled** status will be automatically deleted once their associated **Operation** has been **Canceled**.
+
+        A request cannot be canceled if it has already been secured by the end-user. In this case, you must release the request.
+        You can check if a request can be canceled by checking the `cancelable` field in the request object.
+        <br><br>
+        Caution - you CANNOT cancel a request if it has already been secured by the end-user. In this case, you must [release the request](#post-/accounts/-accountId-/requests/-requestId-/release).
+      tags:
+        - requests
+      parameters:
+        - in: path
+          name: accountId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+        - in: path
+          name: requestId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+      responses:
+        '200':
+          description: The updated request. The `cancelable` field will be set to false. If the request was already canceled or expired, a 200 response will be returned.
+          headers:
+            swikly-account-id:
+              $ref: '#/components/headers/swikly-account-id'
+            swikly-account-trade-name:
+              $ref: '#/components/headers/swikly-account-trade-name'
+            swikly-account-currency:
+              $ref: '#/components/headers/swikly-account-currency'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  request:
+                    $ref: '#/components/schemas/Request'
+
+  /accounts/{accountId}/requests/{requestId}/release:
+    post:
+      summary: Release a request
+      description: This will release all releasable in progress **Operations** (deposit, noShow) for a **Request**.
+        You can check if a request can be released by checking the `releasable` field in the request object.
+        <br><br>
+        Caution - you CANNOT release a request if it has NOT already been secured by the end-user. In this case, you must [cancel the request](#post-/accounts/-accountId-/requests/-requestId-/cancel).
+      tags:
+        - requests
+      parameters:
+        - in: path
+          name: accountId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+        - in: path
+          name: requestId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+      responses:
+        '200':
+          description: The updated request
+          headers:
+            swikly-account-id:
+              $ref: '#/components/headers/swikly-account-id'
+            swikly-account-trade-name:
+              $ref: '#/components/headers/swikly-account-trade-name'
+            swikly-account-currency:
+              $ref: '#/components/headers/swikly-account-currency'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  request:
+                    $ref: '#/components/schemas/Request'
+
+  /accounts/{accountId}/deposits/{depositId}:
+    get:
+      summary: Retrieve a single deposit
+      tags:
+        - _advanced deposits
+      parameters:
+        - in: path
+          name: accountId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+        - in: path
+          name: depositId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+        - in: query
+          name: with
+          description: load additional relationships, comma separated values
+          required: false
+          style: simple
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [ 'request', 'reclaimSummary', 'refundSummary' ]
+      responses:
+        '200':
+          description: The requested Deposit
+          headers:
+            swikly-account-id:
+              $ref: '#/components/headers/swikly-account-id'
+            swikly-account-trade-name:
+              $ref: '#/components/headers/swikly-account-trade-name'
+            swikly-account-currency:
+              $ref: '#/components/headers/swikly-account-currency'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deposit:
+                    $ref: '#/components/schemas/Deposit'
+    patch:
+      summary: Partially update a deposit
+      tags:
+        - _advanced deposits
+      parameters:
+        - in: path
+          name: accountId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+        - in: path
+          name: depositId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                startDate:
+                  $ref: '#/components/schemas/Date'
+                endDate:
+                  $ref: '#/components/schemas/Date'
+                amount:
+                  $ref: '#/components/schemas/Amount'
+                status:
+                  type: string
+                  enum:
+                    - Canceled
+                    - Released
+      responses:
+        '200':
+          description: The updated Deposit
+          headers:
+            swikly-account-id:
+              $ref: '#/components/headers/swikly-account-id'
+            swikly-account-trade-name:
+              $ref: '#/components/headers/swikly-account-trade-name'
+            swikly-account-currency:
+              $ref: '#/components/headers/swikly-account-currency'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deposit:
+                    $ref: '#/components/schemas/Deposit'
+
+  /accounts/{accountId}/no-shows/{noShowId}:
+    get:
+      summary: Retrieve a single no-show
+      tags:
+        - _advanced no-shows
+      parameters:
+        - in: path
+          name: accountId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+        - in: path
+          name: noShowId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+        - in: query
+          name: with
+          description: load additional relationships, comma separated values
+          required: false
+          style: simple
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [ 'request' ]
+      responses:
+        '200':
+          description: The requested No-Show
+          headers:
+            swikly-account-id:
+              $ref: '#/components/headers/swikly-account-id'
+            swikly-account-trade-name:
+              $ref: '#/components/headers/swikly-account-trade-name'
+            swikly-account-currency:
+              $ref: '#/components/headers/swikly-account-currency'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  no-show:
+                    $ref: '#/components/schemas/NoShow'
+    patch:
+      summary: Partially update a no-show
+      tags:
+        - _advanced no-shows
+      parameters:
+        - in: path
+          name: accountId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+        - in: path
+          name: noShowId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum:
+                    - Canceled
+                    - Released
+      responses:
+        '200':
+          description: The updated No-Show
+          headers:
+            swikly-account-id:
+              $ref: '#/components/headers/swikly-account-id'
+            swikly-account-trade-name:
+              $ref: '#/components/headers/swikly-account-trade-name'
+            swikly-account-currency:
+              $ref: '#/components/headers/swikly-account-currency'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  no-show:
+                    $ref: '#/components/schemas/NoShow'
+
+  /accounts/{accountId}/payments/{paymentId}:
+    get:
+      summary: Retrieve a single payment
+      tags:
+        - _advanced payments
+      parameters:
+        - in: path
+          name: accountId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+        - in: path
+          name: paymentId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+        - in: query
+          name: with
+          description: load additional relationships, comma separated values
+          required: false
+          style: simple
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [ 'request' ]
+      responses:
+        '200':
+          description: The requested Payment
+          headers:
+            swikly-account-id:
+              $ref: '#/components/headers/swikly-account-id'
+            swikly-account-trade-name:
+              $ref: '#/components/headers/swikly-account-trade-name'
+            swikly-account-currency:
+              $ref: '#/components/headers/swikly-account-currency'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  payment:
+                    $ref: '#/components/schemas/Payment'
+    patch:
+      summary: Partially update a payment
+      tags:
+        - _advanced payments
+      parameters:
+        - in: path
+          name: accountId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+        - in: path
+          name: paymentId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum:
+                    - Canceled
+      responses:
+        '200':
+          description: The updated Payment
+          headers:
+            swikly-account-id:
+              $ref: '#/components/headers/swikly-account-id'
+            swikly-account-trade-name:
+              $ref: '#/components/headers/swikly-account-trade-name'
+            swikly-account-currency:
+              $ref: '#/components/headers/swikly-account-currency'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  payment:
+                    $ref: '#/components/schemas/Payment'
+
+  /accounts/{accountId}/refunds/{refundId}:
+    get:
+      summary: Retrieve a refund
+      tags:
+        - _advanced refunds
+      parameters:
+        - in: path
+          name: accountId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+        - in: path
+          name: refundId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+      responses:
+        '200':
+          description: The requested Refund
+          headers:
+            swikly-account-id:
+              $ref: '#/components/headers/swikly-account-id'
+            swikly-account-trade-name:
+              $ref: '#/components/headers/swikly-account-trade-name'
+            swikly-account-currency:
+              $ref: '#/components/headers/swikly-account-currency'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  refund:
+                    $ref: '#/components/schemas/Refund'
+
+  /accounts/{accountId}/requests/{requestId}/create_refund:
+    post:
+      summary: Create a refund for a request operation
+      description: Create a Refund on an *Operation* by setting the Amount to Refund on the desired **Operation** (Deposit, No-Show, Payment). You must consider
+        setting an Amount that is inferior or equal to the refundableAmount of the **Operation**. This information is available in the Retrieve a Requests endpoint.
+        While the **Refund** is in progress, you can access the details per **operations** from the refundSummary of the Retrieve a Request endpoint.
+
+        When all refunds will be successfully finished, the request's `callbacks.allPendingRefundsCompleted` url will be called with the updated request.
+      tags:
+        - requests
+        - refunds
+      parameters:
+        - in: path
+          name: accountId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+        - in: path
+          name: requestId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - target
+                - amount
+                - reason
+              properties:
+                target:
+                  type: string
+                  enum: [ deposit, noShow, payment ]
+                amount:
+                  allOf:
+                    - $ref: '#/components/schemas/Amount'
+                    - description: The amount to refund. Must be inferior or equal to the refundableAmount
+                reason:
+                  type: string
+                  description: The reason for the refund.
+      responses:
+        '200':
+          description: The updated request with the refund informations
+          headers:
+            swikly-account-id:
+              $ref: '#/components/headers/swikly-account-id'
+            swikly-account-trade-name:
+              $ref: '#/components/headers/swikly-account-trade-name'
+            swikly-account-currency:
+              $ref: '#/components/headers/swikly-account-currency'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  request:
+                    $ref: '#/components/schemas/Request'
+
+  /accounts/{accountId}/payments/{paymentId}/refunds:
+    post:
+      summary: Refund a payment operation
+      tags:
+        - _advanced refunds
+      parameters:
+        - in: path
+          name: accountId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+        - in: path
+          name: paymentId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - amount
+                - reason
+              properties:
+                amount:
+                  $ref: '#/components/schemas/Amount'
+                reason:
+                  type: string
+                  examples:
+                    - Refund reason
+      responses:
+        '200':
+          description: The created Refund
+          headers:
+            swikly-account-id:
+              $ref: '#/components/headers/swikly-account-id'
+            swikly-account-trade-name:
+              $ref: '#/components/headers/swikly-account-trade-name'
+            swikly-account-currency:
+              $ref: '#/components/headers/swikly-account-currency'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  refund:
+                    $ref: '#/components/schemas/Refund'
+
+  /accounts/{accountId}/reclaims/{reclaimId}/refunds:
+    post:
+      summary: Refund a reclaim operation
+      tags:
+        - _advanced refunds
+      parameters:
+        - in: path
+          name: accountId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+        - in: path
+          name: reclaimId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - amount
+                - reason
+              properties:
+                amount:
+                  $ref: '#/components/schemas/Amount'
+                reason:
+                  type: string
+                  examples:
+                    - Refund reason
+      responses:
+        '200':
+          description: The created Refund
+          headers:
+            swikly-account-id:
+              $ref: '#/components/headers/swikly-account-id'
+            swikly-account-trade-name:
+              $ref: '#/components/headers/swikly-account-trade-name'
+            swikly-account-currency:
+              $ref: '#/components/headers/swikly-account-currency'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  refund:
+                    $ref: '#/components/schemas/Refund'
+
+  /accounts/{accountId}/reclaims:
+    get:
+      summary: Returns a list of reclaims for an account.
+      tags:
+        - _advanced reclaims
+      parameters:
+        - in: path
+          name: accountId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/perPage'
+        - in: query
+          name: with
+          description: load additional relationships, comma separated values
+          required: false
+          style: simple
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [ 'files' ]
+        - in: query
+          name: status
+          description: Filter reclaims by their status
+          required: false
+          schema:
+            type: string
+            enum: [ Initialized, Finished, Scheduled ]
+        - in: query
+          name: from
+          deprecated: true
+          description: "DEPRECATED: Use 'createdAt[from]' instead."
+          required: false
+          schema:
+            $ref: '#/components/schemas/Date'
+        - in: query
+          name: to
+          deprecated: true
+          description: "DEPRECATED: Use 'createdAt[to]' instead."
+          required: false
+          schema:
+            $ref: '#/components/schemas/Date'
+        - in: query
+          name: createdAt[from]
+          description: Return only reclaims created on or after the specified date (inclusive).
+          required: false
+          schema:
+            type: string
+            format: date
+            example: "2024-01-01"
+        - in: query
+          name: createdAt[to]
+          description: Return only reclaims created on or before the specified date (inclusive).
+          required: false
+          schema:
+            type: string
+            format: date
+            example: "2024-12-31"
+        - in: query
+          name: scheduledAt[from]
+          description: Return only reclaims scheduled on or after the specified date (inclusive).
+          required: false
+          schema:
+            type: string
+            format: date
+            example: "2024-01-01"
+        - in: query
+          name: scheduledAt[to]
+          description: Return only reclaims scheduled on or before the specified date (inclusive).
+          required: false
+          schema:
+            type: string
+            format: date
+            example: "2024-12-31"
+      responses:
+        '200':
+          description: A list of reclaims
+          headers:
+            swikly-account-id:
+              $ref: '#/components/headers/swikly-account-id'
+            swikly-account-trade-name:
+              $ref: '#/components/headers/swikly-account-trade-name'
+            swikly-account-currency:
+              $ref: '#/components/headers/swikly-account-currency'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reclaims:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Reclaim'
+                  meta:
+                    $ref: '#/components/schemas/ResultsMeta'
+
+  /accounts/{accountId}/requests/{requestId}/create_reclaim:
+    post:
+      summary: Create a reclaim for a request's deposit or noShow.
+      description: Create a **Reclaim** on an *Operation* by setting the Amount to Reclaim on the desired **Operation** (Deposit, No-Show). For unscheduled reclaims, you must consider
+        setting an Amount that is inferior or equal to the reclaimableAmount of the **Operation**. For scheduled reclaims, you must compare to the **schedulableReclaimAmount**. This information is available in the `Retrieve a Requests` endpoint.
+
+        When the Reclaim will be successfully completed, and if there is no other pending Reclaim-related operations,
+        the Request's `callbacks.allPendingReclaimsCompleted` url will be called with the updated Request.
+      tags:
+        - requests
+        - reclaims
+      parameters:
+        - in: path
+          name: accountId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+        - in: path
+          name: requestId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - target
+                - amount
+                - reason
+              properties:
+                target:
+                  type: string
+                  enum: [ deposit, noShow ]
+                amount:
+                  allOf:
+                    - $ref: '#/components/schemas/Amount'
+                    - description: The amount to reclaim. Must be inferior or equal to the reclaimableAmount
+                reason:
+                  type: string
+                  description: The reason for the reclaim.
+                files:
+                  type: array
+                  description: The temporary file ids to attach to the reclaim. Files must have been uploaded with the [/files](#post-/accounts/-accountId-/files) endpoint.
+                  items:
+                    $ref: '#/components/schemas/Id'
+                scheduledAt:
+                  allOf:
+                    - $ref: '#/components/schemas/Date'
+                    - description: The date when the reclaim's collection plan will be initiated. If provided, the reclaim is created with SCHEDULED status and the collection process will automatically begin on this date. If omitted, the reclaim is created with PENDING status and requires manual initiation. The date must be later than today and sooner than `maximumReclaimCreationDate`.
+      responses:
+        '200':
+          description: The updated request with the reclaim informations
+          headers:
+            swikly-account-id:
+              $ref: '#/components/headers/swikly-account-id'
+            swikly-account-trade-name:
+              $ref: '#/components/headers/swikly-account-trade-name'
+            swikly-account-currency:
+              $ref: '#/components/headers/swikly-account-currency'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  request:
+                    $ref: '#/components/schemas/Request'
+
+  /accounts/{accountId}/requests/{requestId}/cancel_reclaim:
+    post:
+      summary: Cancel a reclaim for a request's deposit or noShow.
+      description: This will cancel all in progress **Reclaims** from an **Operation**.
+        Additionally, if **Reclaims** are in **Scheduled** status, they will be automatically deleted if their associated **Operation** is still in **Pending** status.
+        If the Request contains a Deposit and a No-Show with cancelable Reclaims, you must cancel them by running 2 calls.
+        The cancelableAmount available in the reclaimSummary must be superior to 0 in order to cancel **Reclaims** of an **Operation**.
+      tags:
+        - requests
+        - reclaims
+      parameters:
+        - in: path
+          name: accountId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+        - in: path
+          name: requestId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - target
+              properties:
+                target:
+                  type: string
+                  enum: [ deposit, noShow ]
+      responses:
+        '200':
+          description: The updated request with the reclaim informations
+          headers:
+            swikly-account-id:
+              $ref: '#/components/headers/swikly-account-id'
+            swikly-account-trade-name:
+              $ref: '#/components/headers/swikly-account-trade-name'
+            swikly-account-currency:
+              $ref: '#/components/headers/swikly-account-currency'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  request:
+                    $ref: '#/components/schemas/Request'
+
+  /accounts/{accountId}/requests/{requestId}/reclaims:
+    get:
+      summary: List a request reclaims
+      tags:
+        - _advanced reclaims
+        - _advanced requests
+      parameters:
+        - in: path
+          name: accountId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+        - in: path
+          name: requestId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+        - in: query
+          name: with
+          description: load additional relationships, comma separated values
+          required: false
+          style: simple
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [ 'files' ]
+      responses:
+        '200':
+          description: A list of reclaims
+          headers:
+            swikly-account-id:
+              $ref: '#/components/headers/swikly-account-id'
+            swikly-account-trade-name:
+              $ref: '#/components/headers/swikly-account-trade-name'
+            swikly-account-currency:
+              $ref: '#/components/headers/swikly-account-currency'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reclaims:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Reclaim'
+
+  /accounts/{accountId}/reclaims/{reclaimId}:
+    get:
+      summary: Retrieve a reclaim
+      tags:
+        - _advanced reclaims
+      operationId: getReclaim
+      parameters:
+        - in: path
+          name: accountId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+        - in: path
+          name: reclaimId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+        - in: query
+          name: with
+          description: load additional relationships, comma separated values
+          required: false
+          style: simple
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [ files ]
+      responses:
+        '200':
+          description: A reclaim
+          headers:
+            swikly-account-id:
+              $ref: '#/components/headers/swikly-account-id'
+            swikly-account-trade-name:
+              $ref: '#/components/headers/swikly-account-trade-name'
+            swikly-account-currency:
+              $ref: '#/components/headers/swikly-account-currency'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reclaim:
+                    $ref: '#/components/schemas/Reclaim'
+    delete:
+      summary: Delete a scheduled reclaim
+      tags:
+        - _advanced reclaims
+      operationId: deleteReclaim
+      parameters:
+        - in: path
+          name: accountId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+        - in: path
+          name: reclaimId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+      responses:
+        '204':
+          description: Reclaim deleted successfully
+          headers:
+            swikly-account-id:
+              $ref: '#/components/headers/swikly-account-id'
+        '400':
+          description: Reclaim is not in a scheduled status.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Only scheduled reclaims can be deleted."
+                  error_code:
+                    type: string
+                    example: "ERR_DELETION_OF_NON_SCHEDULED_RECLAIM"
+
+  /accounts/{accountId}/deposits/{depositId}/reclaims:
+    post:
+      summary: Create a reclaim from a deposit
+      tags:
+        - _advanced reclaims
+      parameters:
+        - in: path
+          name: accountId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+        - in: path
+          name: depositId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - amount
+                - reason
+              properties:
+                amount:
+                  $ref: '#/components/schemas/Amount'
+                reason:
+                  type: string
+                  examples:
+                    - Reclaim reason
+                scheduledAt:
+                  allOf:
+                    - $ref: '#/components/schemas/Date'
+                    - description: The date when the reclaim's collection plan will be initiated. If provided, the reclaim is created with SCHEDULED status and the collection process will automatically begin on this date. If omitted, the reclaim is created with PENDING status and requires manual initiation. The date must be later than today and sooner than `maximumReclaimCreationDate`.
+
+      responses:
+        '200':
+          description: The created reclaim
+          headers:
+            swikly-account-id:
+              $ref: '#/components/headers/swikly-account-id'
+            swikly-account-trade-name:
+              $ref: '#/components/headers/swikly-account-trade-name'
+            swikly-account-currency:
+              $ref: '#/components/headers/swikly-account-currency'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reclaim:
+                    $ref: '#/components/schemas/Reclaim'
+
+  /accounts/{accountId}/no-shows/{noShowId}/reclaims:
+    post:
+      summary: Create a reclaim from a no-show
+      tags:
+        - _advanced reclaims
+      parameters:
+        - in: path
+          name: accountId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+        - in: path
+          name: noShowId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - amount
+                - reason
+              properties:
+                amount:
+                  $ref: '#/components/schemas/Amount'
+                reason:
+                  type: string
+                  examples:
+                    - Reclaim reason
+                scheduledAt:
+                  allOf:
+                    - $ref: '#/components/schemas/Date'
+                    - description: The date when the reclaim's collection plan will be initiated. If provided, the reclaim is created with SCHEDULED status and the collection process will automatically begin on this date. If omitted, the reclaim is created with PENDING status and requires manual initiation. The date must be later than today and sooner than `maximumReclaimCreationDate`.
+
+      responses:
+        '200':
+          description: The created reclaim
+          headers:
+            swikly-account-id:
+              $ref: '#/components/headers/swikly-account-id'
+            swikly-account-trade-name:
+              $ref: '#/components/headers/swikly-account-trade-name'
+            swikly-account-currency:
+              $ref: '#/components/headers/swikly-account-currency'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reclaim:
+                    $ref: '#/components/schemas/Reclaim'
+          links:
+            GetReclaimById:
+              operationId: getReclaim
+              parameters:
+                reclaimId: $response.body#/reclaim/id
+
+  /accounts/{accountId}/files:
+    post:
+      summary: Create a temporary file that can be later used in a reclaim creation.
+      tags:
+        - requests
+        - reclaims
+      parameters:
+        - in: path
+          name: accountId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: The created file
+          headers:
+            swikly-account-id:
+              $ref: '#/components/headers/swikly-account-id'
+            swikly-account-trade-name:
+              $ref: '#/components/headers/swikly-account-trade-name'
+            swikly-account-currency:
+              $ref: '#/components/headers/swikly-account-currency'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  file:
+                    properties:
+                      id:
+                        $ref: '#/components/schemas/Id'
+                      url:
+                        type: string
+                        format: uri
+
+  /accounts/{accountId}/reclaims/{reclaimId}/files:
+    post:
+      summary: Upload & attach a file to an existing reclaim
+      tags:
+        - _advanced reclaims
+      parameters:
+        - in: path
+          name: accountId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+        - in: path
+          name: reclaimId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: The created file
+          headers:
+            swikly-account-id:
+              $ref: '#/components/headers/swikly-account-id'
+            swikly-account-trade-name:
+              $ref: '#/components/headers/swikly-account-trade-name'
+            swikly-account-currency:
+              $ref: '#/components/headers/swikly-account-currency'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  file:
+                    $ref: '#/components/schemas/File'
+
+  /accounts/{accountId}/reclaims/{reclaimId}/files/{fileId}:
+    delete:
+      summary: Remove a file from a reclaim
+      tags:
+        - _advanced reclaims
+      parameters:
+        - in: path
+          name: accountId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+        - in: path
+          name: reclaimId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+        - in: path
+          name: fileId
+          schema:
+            $ref: '#/components/schemas/Id'
+          required: true
+      responses:
+        '204':
+          description: The resource was deleted successfully.
+          headers:
+            swikly-account-id:
+              $ref: '#/components/headers/swikly-account-id'
+            swikly-account-trade-name:
+              $ref: '#/components/headers/swikly-account-trade-name'
+            swikly-account-currency:
+              $ref: '#/components/headers/swikly-account-currency'
+
+  /shortener/short-links:
+    post:
+      summary: Create a short-link
+      description: Allows generating a short link for any URL related to Swikly.
+        You can pass your `link` value as a Query Param (`?link=xxx`), or in the request JSON body.
+      tags:
+        - _advanced short-links
+      parameters:
+        - in: query
+          name: link
+          schema:
+            type: string
+            format: uri
+            description: Any url on the swikly domain
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                link:
+                  type: string
+                  format: uri
+      responses:
+        '200':
+          description: The created short link
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  shortLink:
+                    $ref: '#/components/schemas/ShortLink'
+
+components:
+  parameters:
+    page:
+      in: query
+      name: page
+      required: false
+      schema:
+        $ref: '#/components/schemas/ResultsPage'
+    perPage:
+      in: query
+      name: per_page
+      description: The number of entities per page
+      required: false
+      schema:
+        $ref: '#/components/schemas/ResultsPerPage'
+
+  schemas:
+    Id:
+      type: string
+      format: uuid
+      examples: [ E67F8379-EACF-4CB8-B6FD-1D0046DE3E1F ]
+    Amount:
+      type: integer
+      minimum: 1
+      description: Amount in cents
+      examples: [ 2500 ]
+
+    Currency:
+      type: string
+      description: ISO 4217 Currency code
+      examples: [ EUR ]
+
+    Date:
+      type: string
+      format: date
+      examples: [ "2023-06-19" ]
+
+    DateOrNull:
+      type: [ 'string', 'null' ]
+      format: date
+      examples: [ "2023-06-19" ]
+
+    DateTime:
+      type: string
+      format: date-time
+      description: ISO 8601 formatted date
+      examples: [ "2023-06-19T13:10:09.433000Z" ]
+
+    DateTimeOrNull:
+      type: [ 'string', 'null' ]
+      format: date-time
+      description: ISO 8601 formatted date
+      examples: [ "2023-06-19T13:10:09.433000Z" ]
+
+    User:
+      type: object
+      required:
+        - id
+        - firstName
+        - lastName
+        - email
+        - createdAt
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          format: email
+        createdAt:
+          $ref: '#/components/schemas/DateTime'
+      examples:
+        - id: "F705FE79-E397-4623-A874-905F908ABC76"
+          firstName: "Yorgos"
+          lastName: "Kubrick"
+          email: "yorgos.kubrick@foobar.edu"
+          createdAt: "2022-08-26T12:58:23.835+00:00"
+
+    Account:
+      type: object
+      required:
+        - id
+        - commercialName
+        - currency
+        - createdAt
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        legacyId:
+          type: [ 'string', 'null' ]
+          format: uuid
+          description: The V1 legacy Id. If not null, the account is a V1 account that have been migrated to V2.
+          readonly: true
+          default: null
+        commercialName:
+          type: string
+          description: The displayed name of the account.
+        managerId:
+          type: [ 'string', 'null' ]
+          format: uuid
+          description: If not null, the account is managed by another account.
+          readonly: true
+          default: null
+        reference:
+          type: [ 'string', 'null' ]
+          description: Any custom reference for the account.
+        currency:
+          allOf:
+            - $ref: '#/components/schemas/Currency'
+            - description: The currency of the account
+              readonly: true
+        createdAt:
+          $ref: '#/components/schemas/DateTime'
+        secret:
+          type: string
+          description: The secret string used to sign Permalinks and Callbacks. The authenticated user must have the permission to see it.
+          readonly: true
+      examples:
+        - id: "439b21c5-1ca6-4363-a459-cbf8be860152"
+          legacyId: null
+          commercialName: "My account"
+          managerId: "391c84f6-ca6e-4d43-ab61-3243773cd573"
+          reference: null
+          currency: "EUR"
+          createdAt: "2022-08-26T12:58:23.835+00:00"
+          secret: "lksdfhlfdhgjfdklg"
+
+    Request:
+      type: object
+      required:
+        - id
+        - accountId
+        - link
+        - description
+        - createdAt
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        accountId:
+          $ref: '#/components/schemas/Id'
+        legacyId:
+          type: [ 'string', 'null' ]
+          format: uuid
+          description: The V1 legacy Id. If not null, the request has been created on the "old" Swikly platform and there are **readonly through this API**. All `summaries` will be empty as well.
+          readonly: true
+          default: null
+        customId:
+          type: [ 'string', 'null' ]
+          description: The custom id associated with the request it that will be displayed in the dashboard
+          examples: [ "customid12345" ]
+        customIdMustBeUnique:
+          type: boolean
+          description: When set to true, ensures the customId is unique across all requests. If false or omitted, duplicated customIds are allowed. As soon as a customId is registered as unique, no request can be registered with this same customId, even if this parameter is not provided or set to false.
+          examples: [ true ]
+        skipToPaymentPageIfPossible:
+          type: boolean
+          description: When set to true and if all required end user's personal information are set, the end user will be displayed the Bank Card form directly when accessing the checkout. Required fields are `firstName`, `lastName`, `email`, `phoneNumber`. For some accounts, `birthDate` and `address` are required as well.
+          examples: [ false ]
+        lastName:
+          type: [ 'string', 'null' ]
+          description: Last name of the end-user
+          examples: [ John ]
+        firstName:
+          type: [ 'string', 'null' ]
+          description: First name of the end-user
+          examples: [ Doe ]
+        email:
+          type: [ 'string', 'null' ]
+          format: email
+          description: Email of the end-user
+          examples: [ john@doe.com ]
+        phoneNumber:
+          type: [ 'string', 'null' ]
+          description: Phone number of the end-user, must contain the country code (ie:+33...)
+          examples: [ "+3312344567" ]
+        description:
+          type: string
+          description: Description of the request displayed to the end-user explain the reason of it
+          examples: [ Summer rental security deposit ]
+        freeText:
+          type: [ 'string', 'null' ]
+          description: Free text returned in the request, never displayed anywhere, for technical purpose
+          examples:
+            - any text
+        releasable:
+          type: boolean
+          description: Indicate if it is possible to release all the linked operations.
+            A deposit can be release if it has been secured and has not expired yet.
+            A no-show can be release if it has been secured and has not expired yet.
+            A payment cannot be released.
+          readOnly: true
+        cancelable:
+          type: boolean
+          description: Indicate if it is possible to cancel all the linked operations.
+            A deposit can be canceled if it has not been secured.
+            A no-show can be canceled if it has not been secured.
+            A payment can be canceled if it has not been paid.
+          readOnly: true
+        deposit:
+          oneOf:
+            - $ref: '#/components/schemas/Deposit'
+            - type: 'null'
+        noShow:
+          oneOf:
+            - $ref: '#/components/schemas/NoShow'
+            - type: 'null'
+        payment:
+          oneOf:
+            - $ref: '#/components/schemas/Payment'
+            - type: 'null'
+        endUser:
+          oneOf:
+            - allOf:
+              - $ref: '#/components/schemas/Person'
+              - description: The data the end user entered during the checkout
+            - type: object
+              properties:
+                address:
+                  $ref: '#/components/schemas/BaseAddress'
+              description: The address that may be entered during the request creation, as long as the end user has not completed the checkout.
+            - type: 'null'
+        link:
+          type: 'string'
+          format: uri
+          description: The checkout url
+          examples: [ https://v2.swik.link/xHbUtRi ]
+          readOnly: true
+        redirectUrl:
+          $ref: '#/components/schemas/RedirectUrl'
+        returnUrl:
+          $ref: '#/components/schemas/ReturnUrl'
+        createdAt:
+          allOf:
+            - $ref: '#/components/schemas/DateTime'
+            - description: Request creation Date.
+            - readOnly: true
+
+    Deposit:
+      type: object
+      required:
+        - id
+        - requestId
+        - amount
+        - amountToBeSecured
+        - securedAmount
+        - status
+        - startDate
+        - endDate
+        - expirationDate
+        - acceptedAt
+        - releasedAt
+        - canceledAt
+        - createdAt
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        requestId:
+          $ref: '#/components/schemas/Id'
+        request:
+          oneOf:
+            - $ref: '#/components/schemas/Request'
+            - type: 'null'
+        amount:
+          allOf:
+            - $ref: '#/components/schemas/Amount'
+            - description: Amount in cents of the security deposit.
+        amountToBeSecured:
+          allOf:
+            - $ref: '#/components/schemas/Amount'
+            - description: Amount in cents of the security deposit not secured yet. Equals the amount of the security deposit when not secured yet. Equals 0 when secured.
+            - readOnly: true
+        securedAmount:
+          allOf:
+            - $ref: '#/components/schemas/Amount'
+            - description: Amount in cents of the security deposit that has been secured. Equals 0 when security deposit is not secured yet. Equal amount when secured.
+            - readOnly: true
+        status:
+          type: string
+          enum:
+            - Pending
+            - Temporary
+            - Canceled
+            - Initialized
+            - Accepted
+            - Failed
+            - Released
+            - Expired
+            - ExpiredWithoutAcceptance
+          description: Status of the security deposit.
+        startDate:
+          allOf:
+            - $ref: '#/components/schemas/Date'
+            - description: Start date of the deposit
+        endDate:
+          allOf:
+            - $ref: '#/components/schemas/Date'
+            - description: End date of the deposit, the deposit will expire if it is not secured within 24 hours after this date.
+        expirationDate:
+          allOf:
+            - $ref: '#/components/schemas/Date'
+            - description: Date of expiration of the security deposit, an expired no-show cannot be reclaimed
+            - readOnly: true
+        reclaimSummary:
+          allOf:
+            - $ref: '#/components/schemas/ReclaimSummary'
+            - readOnly: true
+              description: A summary of all reclaim actions. Will be empty if legacyId is not null.
+        refundSummary:
+          allOf:
+            - $ref: '#/components/schemas/RefundSummary'
+            - readOnly: true
+              description: A summary of all refunds actions. Will be empty if legacyId is not null.
+        acceptedAt:
+          allOf:
+            - $ref: '#/components/schemas/DateTimeOrNull'
+            - description: Date at which the end-user has secured the security deposit.
+            - readOnly: true
+        releasedAt:
+          allOf:
+            - $ref: '#/components/schemas/DateTimeOrNull'
+            - description: Date at which the security deposit has been released.
+            - readOnly: true
+        canceledAt:
+          allOf:
+            - $ref: '#/components/schemas/DateTimeOrNull'
+            - description: Date at which the security deposit has been canceled.
+            - readOnly: true
+        createdAt:
+          allOf:
+            - $ref: '#/components/schemas/DateTime'
+            - description: Date at which the security deposit has been created.
+            - readOnly: true
+      examples:
+        - id: "A833478F-08B4-475A-8C5D-964DE474CA85"
+          requestId: "CF85309F-2557-4140-817D-E429B3F8E5D6"
+          amount: 50000
+          status: "Accepted"
+          startDate: "2024-11-04"
+          endDate: "2024-11-10"
+          expirationDate: "2024-12-10"
+          reclaimSummary:
+            reclaimableAmount: 15000
+            scheduledRequestedAmount: 0
+            maximumReclaimCreationDate: "2024-11-04"
+            pendingRequestedAmount: 25000
+            pendingReclaimedAmount: 20000
+            reclaimedAmount: 10000
+            estimatedFinishDate: "2024-11-28"
+            cancelableAmount: 25000
+            irrecoverableAmount: 0
+            schedulableReclaimAmount: 15000
+            irrecoverabilityCertificates: [ ]
+          refundSummary:
+            refundableAmount: 10000
+            pendingRefundAmount: 0
+            refundedAMount: 0
+          acceptedAt: "2024-10-30"
+          releasedAt: null
+          canceledAt: null
+          createdAt: "2024-01-10T10:02:30.271+00:00"
+
+    NoShow:
+      type: object
+      required:
+        - id
+        - requestId
+        - reservationDate
+        - amount
+        - amountToBeSecured
+        - securedAmount
+        - status
+        - startDate
+        - endDate
+        - expirationDate
+        - acceptedAt
+        - releasedAt
+        - canceledAt
+        - createdAt
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        requestId:
+          $ref: '#/components/schemas/Id'
+        request:
+          oneOf:
+            - $ref: '#/components/schemas/Request'
+            - type: 'null'
+        amount:
+          allOf:
+            - $ref: '#/components/schemas/Amount'
+            - description: Amount in cents of the no-show.
+        amountToBeSecured:
+          allOf:
+            - $ref: '#/components/schemas/Amount'
+            - description: Amount of the no-show not secured yet. Equals the amount of the no-show when not secured yet. Equals 0 when secured.
+            - readOnly: true
+        securedAmount:
+          allOf:
+            - $ref: '#/components/schemas/Amount'
+            - description: Amount of the no-show that has been secured. Equals 0 when no-show is not secured yet. Equal amount when secured.
+            - readOnly: true
+        status:
+          type: string
+          readOnly: true
+          enum:
+            - Pending
+            - Temporary
+            - Canceled
+            - Initialized
+            - Accepted
+            - Failed
+            - Released
+            - Expired
+            - ExpiredWithoutAcceptance
+        reservationDate:
+          allOf:
+            - $ref: '#/components/schemas/Date'
+            - description: Date of the reservation for which the no-show needs to be secured, the no-show will expire if it is not secured within 24 hours after this date.
+        expirationDate:
+          allOf:
+            - $ref: '#/components/schemas/Date'
+            - description: Date of expiration of the no-show, an expired no-show cannot be reclaimed
+            - readOnly: true
+        reclaimSummary:
+          allOf:
+            - $ref: '#/components/schemas/ReclaimSummary'
+            - readOnly: true
+        refundSummary:
+          allOf:
+            - $ref: '#/components/schemas/RefundSummary'
+            - readOnly: true
+        acceptedAt:
+          allOf:
+            - $ref: '#/components/schemas/DateTimeOrNull'
+            - description: Date at which the end-user has secured the no-show.
+            - readOnly: true
+        releasedAt:
+          allOf:
+            - $ref: '#/components/schemas/DateTimeOrNull'
+            - description: Date at which the no-show has been released.
+            - readOnly: true
+        expiredAt:
+          allOf:
+            - $ref: '#/components/schemas/DateTimeOrNull'
+            - description: Date at which the no-show has been expired.
+            - readOnly: true
+        canceledAt:
+          allOf:
+            - $ref: '#/components/schemas/DateTimeOrNull'
+            - description: Date at which the no-show has been canceled.
+            - readOnly: true
+        createdAt:
+          allOf:
+            - $ref: '#/components/schemas/DateTimeOrNull'
+            - description: Date at which the no-show has been created.
+      examples:
+        - id: "3786515B-A7A1-419D-B102-6205EAFD643F"
+          requestId: "CF85309F-2557-4140-817D-E429B3F8E5D6"
+          amount: 10000
+          status: "Pending"
+          reservationDate: "2024-08-12"
+          expirationDate: null
+          reclaimSummary:
+            reclaimableAmount: 15000
+            scheduledRequestedAmount: 0
+            maximumReclaimCreationDate: "2024-11-04"
+            pendingRequestedAmount: 25000
+            pendingReclaimedAmount: 20000
+            reclaimedAmount: 10000
+            estimatedFinishDate: "2024-11-28"
+            cancelableAmount: 25000
+            irrecoverableAmount: 0
+            schedulableReclaimAmount: 15000
+            irrecoverabilityCertificates: [ ]
+          refundSummary:
+            refundableAmount: 10000
+            pendingRefundAmount: 0
+            refundedAMount: 0
+          acceptedAt: null
+          expiredAt: null
+          releasedAt: null
+          canceledAt: null
+          createdAt: "2024-01-10T12:48:35.202+00:00"
+    Payment:
+      type: object
+      required:
+        - id
+        - requestId
+        - amount
+        - amountToBePaid
+        - amountPaid
+        - status
+        - dueDate
+        - succeededAt
+        - canceledAt
+        - createdAt
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        requestId:
+          $ref: '#/components/schemas/Id'
+        request:
+          oneOf:
+            - $ref: '#/components/schemas/Request'
+            - type: 'null'
+        amount:
+          allOf:
+            - $ref: '#/components/schemas/Amount'
+            - description: Amount of the payment in cents
+        amountToBePaid:
+          allOf:
+            - $ref: '#/components/schemas/Amount'
+            - description: Amount to be paid by the end user in cents
+            - readOnly: true
+        amountPaid:
+          allOf:
+            - $ref: '#/components/schemas/Amount'
+            - description: Amount paid by the end user in cents
+            - readOnly: true
+        status:
+          type: string
+          readOnly: true
+          enum:
+            - Pending
+            - Temporary
+            - Canceled
+            - Initialized
+            - Succeeded
+            - Failed
+            - ExpiredWithoutAcceptance
+        dueDate:
+          allOf:
+            - $ref: '#/components/schemas/DateOrNull'
+            - description: Maximum date for the payment to be paid by the end-user, the payment will expire if it is not secured within 24 hours after this date
+        refundSummary:
+          allOf:
+            - $ref: '#/components/schemas/RefundSummary'
+            - readOnly: true
+        succeededAt:
+          allOf:
+            - $ref: '#/components/schemas/DateTimeOrNull'
+            - description: Date at which the paiement has been paid.
+            - readOnly: true
+        canceledAt:
+          allOf:
+            - $ref: '#/components/schemas/DateTimeOrNull'
+            - description: Date at which the payment has been canceled.
+            - readOnly: true
+        createdAt:
+          allOf:
+            - $ref: '#/components/schemas/DateTime'
+            - description: Date at which the payment has been created.
+            - readOnly: true
+      examples:
+        - id: "14A19C95-183D-4267-ABA3-B9254EE03A5A"
+          requestId: "CF85309F-2557-4140-817D-E429B3F8E5D6"
+          amount: 30000
+          amountToBePaid: 30000
+          amountPaid: 30000
+          status: "Pending"
+          dueDate: "2024-01-10"
+          refundSummary:
+            refundableAmount: 0
+            pendingRefundAmount: 0
+            refundedAMount: 0
+          succeededAt: null
+          canceledAt: null
+          createdAt: "2024-01-10T12:52:42.827+00:00"
+
+    Refund:
+      type: object
+      required:
+        - id
+        - refundableType
+        - refundableId
+        - amount
+        - status
+        - createdAt
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        refundableType:
+          type: string
+          enum: [ Payment, Reclaim ]
+        refundableId:
+          $ref: '#/components/schemas/Id'
+        amount:
+          $ref: '#/components/schemas/Amount'
+        status:
+          type: string
+          readOnly: true
+          enum: [ Initialized, Pending, Succeeded, Failed ]
+        finishedAt:
+          $ref: '#/components/schemas/DateTimeOrNull'
+        createdAt:
+          $ref: '#/components/schemas/DateTime'
+      examples:
+        - id: "14A19C95-183D-4267-ABA3-B9254EE03A5A"
+          refundableType: "Payment"
+          refundableId: "CF85309F-2557-4140-817D-E429B3F8E5D6"
+          amount: 24000
+          status: "Pending"
+          finishedAt: null
+          createdAt: "2024-01-10T12:52:42.827+00:00"
+
+    RefundSummary:
+      type: object
+      required:
+        - refundableAmount
+        - pendingRefundAmount
+        - refundedAmount
+      properties:
+        refundableAmount:
+          allOf:
+            - $ref: '#/components/schemas/Amount'
+            - readOnly: true
+            - description: The amount in cents that can be refunded for this operation. This is the sum of refundable amounts from finished and planned reclaims for the operation.
+        pendingRefundAmount:
+          allOf:
+            - $ref: '#/components/schemas/Amount'
+            - readOnly: true
+            - description: The amount currently being refunded in cents for this operation.
+        refundedAmount:
+          allOf:
+            - $ref: '#/components/schemas/Amount'
+            - readOnly: true
+            - description: The amount in cents already refund for this operation.
+
+    File:
+      type: object
+      required:
+        - id
+        - name
+        - url
+        - createdAt
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        name:
+          type: string
+        url:
+          type: string
+          format: uri
+          description: the file url which is valid for 24 hours
+        createdAt:
+          $ref: '#/components/schemas/DateTime'
+      examples:
+        - id: "BBC980EC-D789-439B-80F4-EF4CCCE6FD1B"
+          name: "repair_invoice.pdf"
+          url: "https://api.v2.swikly.com/files/BBC980EC-D789-439B-80F4-EF4CCCE6FD1B"
+          createdAt: "2024-01-10T13:15:09.140+00:00"
+
+    BaseReclaim:
+      type: object
+      required:
+        - id
+        - amount
+        - cashedInAmount
+        - reason
+        - filesValidated
+        - guaranteedAmount
+        - createdAt
+        - finishedAt
+        - scheduledAt
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        reclaimableType:
+          type: string
+          enum:
+            - Deposit
+            - NoShow
+        reclaimableId:
+          $ref: '#/components/schemas/Id'
+        amount:
+          $ref: '#/components/schemas/Amount'
+        cashedInAmount:
+          $ref: '#/components/schemas/Amount'
+        reason:
+          type: string
+          examples:
+            - Broken chair
+        files:
+          type: array
+          items:
+            $ref: '#/components/schemas/File'
+        filesValidated:
+          type: boolean
+        guaranteedAmount:
+          readOnly: true
+          oneOf:
+            - $ref: '#/components/schemas/Amount'
+            - type: 'null'
+          description: "Amount in cents if guaranteed, else null"
+        createdAt:
+          $ref: '#/components/schemas/DateTime'
+        finishedAt:
+          $ref: '#/components/schemas/DateTimeOrNull'
+        scheduledAt:
+          $ref: '#/components/schemas/DateOrNull'
+
+    InitializedReclaim:
+      allOf:
+        - $ref: '#/components/schemas/BaseReclaim'
+        - type: object
+          required:
+            - status
+            - finishedAt
+          properties:
+            status:
+              type: string
+              enum:
+                - Initialized
+            finishedAt:
+              $ref: '#/components/schemas/DateTimeOrNull'
+    FinishedReclaim:
+      allOf:
+        - $ref: '#/components/schemas/BaseReclaim'
+        - type: object
+          required:
+            - status
+            - finishedAt
+          properties:
+            status:
+              type: string
+              enum:
+                - Finished
+            finishedAt:
+              $ref: '#/components/schemas/DateTime'
+    ScheduledReclaim:
+      allOf:
+        - $ref: '#/components/schemas/BaseReclaim'
+        - type: object
+          required:
+            - status
+            - scheduledAt
+          properties:
+            status:
+              type: string
+              enum:
+                - Scheduled
+            scheduledAt:
+              $ref: '#/components/schemas/Date'
+
+    Reclaim:
+      oneOf:
+        - $ref: '#/components/schemas/InitializedReclaim'
+        - $ref: '#/components/schemas/FinishedReclaim'
+        - $ref: '#/components/schemas/ScheduledReclaim'
+
+    ReclaimSummary:
+      type: object
+      required:
+        - reclaimableAmount
+        - scheduledRequestedAmount
+        - maximumReclaimCreationDate
+        - pendingRequestedAmount
+        - pendingReclaimedAmount
+        - reclaimedAmount
+        - estimatedFinishDate
+        - cancelableAmount
+        - schedulableReclaimAmount
+      properties:
+        reclaimableAmount:
+          allOf:
+            - $ref: '#/components/schemas/Amount'
+            - readOnly: true
+            - description: |
+                The remaining amount in cents that can still be reclaimed for this
+                operation. It is computed from the secured amount, subtracting:
+                - the total of requested amounts for pending reclaims,
+                - the total of requested amounts for pending debt-collection flows,
+                - the total of requested amounts for scheduled reclaims,
+                - the total amount already reclaimed from finished reclaims,
+                - the total amount recovered through successful debt-collection
+                flows. The value is never negative.
+        scheduledRequestedAmount:
+          allOf:
+            - $ref: '#/components/schemas/Amount'
+            - readOnly: true
+            - description: The total amount of scheduled reclaims in cents for this operation.
+        maximumReclaimCreationDate:
+          allOf:
+            - $ref: '#/components/schemas/Date'
+            - readOnly: true
+            - description: The maximum date to create a reclaim for this operation. You won't be able to create reclaim after this date.
+        pendingRequestedAmount:
+          allOf:
+            - $ref: '#/components/schemas/Amount'
+            - readOnly: true
+            - description: The total amount of security deposits requested for reclaim, currently in progress for this operation, in cents. This represents the sum of the amounts you have requested to reclaim, which are still being processed
+        pendingReclaimedAmount:
+          allOf:
+            - $ref: '#/components/schemas/Amount'
+            - readOnly: true
+            - description: The total amount of ongoing reclaims for which funds have already been recovered for this operation, in cents. This represents the funds Swikly has already reclaimed but which are not yet fully completed.
+        reclaimedAmount:
+          allOf:
+            - $ref: '#/components/schemas/Amount'
+            - readOnly: true
+            - description: The total amount reclaimed from completed reclaims for this operation, in cents.
+        estimatedFinishDate:
+          allOf:
+            - $ref: '#/components/schemas/DateOrNull'
+            - readOnly: true
+            - description: The estimated finish date of reclaims for this operation.
+        cancelableAmount:
+          allOf:
+            - $ref: '#/components/schemas/Amount'
+            - readOnly: true
+            - description: |
+                Cancelable reclaim amount in cents for this operation.
+                This is the remaining part of requested amounts (pending reclaims and debt collections), minus what has already been recovered, plus amounts from scheduled reclaims.
+        irrecoverableAmount:
+          allOf:
+            - $ref: '#/components/schemas/Amount'
+            - readOnly: true
+            - description: Unreclaimable amounts from completed reclaims in cents for this operation. This property will only be present if the API User has the Read Recovery permission
+        schedulableReclaimAmount:
+          allOf:
+            - $ref: '#/components/schemas/Amount'
+            - readOnly: true
+            - description: |
+                The remaining amount in cents that can still be scheduled for reclaim.
+                For non-secured operations, this is the operation amount minus the total of scheduled reclaims.
+                For secured operations that are still active, this equals `reclaimableAmount`.
+                For operations in an inactive status (canceled, expired, expired-without-acceptance or released), this amount is always 0.
+        irrecoverabilityCertificates:
+          type: array
+          items:
+            $ref: '#/components/schemas/File'
+          readOnly: true
+          description: List of download links for Certificates of Irrecoverability. This property will only be present if the API User has the Read Recovery permission
+
+    BaseAddress:
+      type: object
+      required:
+        - country
+      properties:
+        country:
+          type: string
+          description: "[ISO](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2) country code"
+        region:
+          type: [ 'string', 'null' ]
+        postalCode:
+          type: string
+        city:
+          type: string
+        street:
+          type: string
+      examples:
+        - country: "FR"
+          region: null
+          postalCode: "69002"
+          city: "Lyon"
+          street: "12 rue des Oliviers"
+
+    Address:
+      allOf:
+        - $ref: '#/components/schemas/BaseAddress'
+        - required:
+            - postalCode
+            - city
+            - street
+
+    Person:
+      type: object
+      required:
+        - id
+        - firstName
+        - lastName
+        - address
+        - email
+        - birthDate
+        - createdAt
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        firstName:
+          type: string
+        lastName:
+          type: string
+        address:
+          $ref: '#/components/schemas/Address'
+        email:
+          type: string
+          format: email
+        birthDate:
+          $ref: '#/components/schemas/DateOrNull'
+        phone:
+          type: [ 'string', 'null' ]
+        createdAt:
+          $ref: '#/components/schemas/DateTime'
+      examples:
+        - id: "D4FF24A9-FD74-4914-8B86-408C1D380272"
+          firstName: "Jamie"
+          lastName: "Lebowski"
+          email: "jamie.lebowski@gmail.com"
+          address:
+            country: "FR"
+            region: null
+            postalCode: "69002"
+            city: "Lyon"
+            street: "12 rue des Oliviers"
+          birthDate: "1995-05-26"
+          phone: "+33695825425"
+          createdAt: "2024-01-08T13:26:09.140+00:00"
+
+    ShortLink:
+      type: object
+      required:
+        - id
+        - link
+        - shortLink
+        - createdAt
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        link:
+          type: string
+          format: uri
+          description: Any url on the swikly domain
+        shortLink:
+          type: string
+          format: uri
+          description: The shortened url
+          examples:
+            - https://v2.swik.link/xHbUtRi
+            - https://v2.sandbox.swik.link/p7exwtvR
+        createdAt:
+          $ref: '#/components/schemas/DateTime'
+
+    CallbackControlKey:
+      type: string
+      description: See https://github.com/swikly/swikly-link/wiki/6.-Callback-URL-and-Redirect-URL-parameters
+      examples: [ "f2d81a260dea8a100dd517984e53c56a7523d96942a834b9cdc249bd4e8c7aa9" ]
+
+    RequestSecuredCallback:
+      type: [ 'string', 'null' ]
+      format: uri
+      description: "Once the request is secured, a JSON HTTP POST request will be sent to this URL with the request object in the body (see 'callbacks' part)."
+      examples: [ https://myserver.com/send/callback/here ]
+
+    ReclaimFinishedCallback:
+      type: [ 'string', 'null' ]
+      format: uri
+      description: "Once a reclaim is finished, a JSON HTTP POST request will be sent to this URL with the request object in the body (see 'callbacks' part)."
+      examples: [ https://myserver.com/send/callback/here ]
+
+    RefundFinishedCallback:
+      type: [ 'string', 'null' ]
+      format: uri
+      description: "Once a refund is finished, a JSON HTTP POST request will be sent to this URL with the request object in the body (see 'callbacks' part)."
+      examples: [ https://myserver.com/send/callback/here ]
+
+    RedirectUrl:
+      type: [ 'string', 'null' ]
+      format: uri
+      description: Url the end-user is redirected to once the request is secured
+      examples: [ https://myserver.com/redirect/here ]
+
+    ReturnUrl:
+      type: [ 'string', 'null' ]
+      format: uri
+      description: When returnUrl is set, instead of automatically redirecting the user when the request is secured, we display a button at the end of the checkout. The end-user is redirected once he clicked on the button
+      examples: [ https://myserver.com/redirect/here/with-button ]
+
+    ResultsPage:
+      description: The page of results
+      type: integer
+      minimum: 1
+      default: 1
+      examples:
+        - 1
+
+    ResultsPerPage:
+      description: The number of results per page
+      type: integer
+      minimum: 1
+      maximum: 100
+      default: 15
+      examples:
+        - 10
+
+    ResultsMeta:
+      description: Pagination metadata
+      type: object
+      required:
+        - currentPage
+        - lastPage
+        - perPage
+        - path
+        - total
+      properties:
+        currentPage:
+          type: integer
+        lastPage:
+          type: integer
+        perPage:
+          type: integer
+        path:
+          type: string
+        total:
+          type: integer
+
+  headers:
+    swikly-account-id:
+      description: The Id of the targeted account
+      schema:
+        $ref: '#/components/schemas/Id'
+    swikly-account-trade-name:
+      description: The trade name of the targeted account
+      schema:
+        type: string
+    swikly-account-currency:
+      description: The currency of the targeted account
+      schema:
+        $ref: '#/components/schemas/Currency'
+
+    callbacks-parameters:
+      Swikly-Account-Id:
+        in: header
+        name: Swikly-Account-Id
+        schema:
+          $ref: '#/components/schemas/Id'
+        description: The ID of the concerned account
+      Swikly-Account-Trade-Name:
+        in: header
+        name: Swikly-Trade-Name
+        schema:
+          type: string
+        description: The name of the concerned account in ASCII format
+      Swikly-Account-Currency:
+        in: header
+        name: Swikly-Currency
+        schema:
+          $ref: '#/components/schemas/Currency'
+        description: The currency of the concerned account
+      Swikly-Signature:
+        in: header
+        name: Swikly-Signature
+        schema:
+          type: string
+          pattern: '^t=\d{10,},sha256=[0-9a-fA-F]{64}'
+        examples: [ 't=1739352941,sha256=7244dc6a957d9583516a170ff07242499e58e74da34afd732a60f900e8e162e1' ]
+        description: The SHA256 HMAC signature of the request. See [Callbacks & webhooks > Webhook Signatures](#overview--callbacks--webhooks)
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: |
+        Your `API token` (see [documentation](#overview--authentication--api-key))
+
+        Instruction for manual calls:
+
+security:
+  - BearerAuth: [ ]
+
+tags:
+  - name: users
+    description: |
+      User related informations
+
+  - name: accounts
+    description: |
+      Accounts and sub accounts are the main entities in Swikly. They are used to manage your business. A user can have access to many accounts.
+
+  - name: requests
+    description: |
+      Requests are the entities that hold operations such as deposits, no-shows and payments
+      They can be created directly from the app, via a permalink, or via this API
+
+  - name: deposits
+    description: |
+      Deposits are operations used to request security deposits
+
+  - name: no-shows
+    description: |
+      NoShows are operations used to secure a reservation, a training course or an event
+
+  - name: payments
+    description: |
+      Payments are operations used to request a payment
+
+  - name: reclaims
+    description: |
+      A reclaim is used to collect funds secured by a deposit or a no-show. This typically occurs if damage is discovered and covered by a security deposit, or if someone fails to appear for an appointment for which a no-show deposit was collected.
+
+      A reclaim request will initiate the mitigation process between the business requesting to cash-in the deposit or down payment, Swikly and the end-user.
+
+      A swik can be reclaimed once the initial transaction has been accepted by the end-user, as long as the amount reclaimed is not higher than the amount of the swik and if the swik has not yet expired.
+
+      **Reclaims are not available for payments.**
+
+      To complete your reclaim request, [you must provide the following supporting documents](#post-/accounts/-accountId-/reclaims/-reclaimId-/files) immediately after creating your swik reclaim.
+
+  - name: refunds
+    description: |
+      A refund is used to partially or fully return funds previously collected, either because too much was collected via a reclaim or to reimburse a payment.
+      The refunded amount is transferred back to the original payment method used by the end user.
+
+  - name: short-links
+    description: |
+      Short links can be used to shorten any swikly link

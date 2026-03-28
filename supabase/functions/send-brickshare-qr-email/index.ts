@@ -31,6 +31,14 @@ interface EmailRequest {
   type: 'delivery' | 'return';
 }
 
+// Helper function to generate a unique reception QR code (different from user QR)
+async function generateReceptionQRCode(shipmentId: string): Promise<string> {
+  // Format: BS-REC-<timestamp>-<random>
+  const timestamp = Date.now().toString(36).toUpperCase().slice(-6);
+  const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+  return `BS-REC-${timestamp}-${random}`;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -246,8 +254,10 @@ serve(async (req) => {
     const pudoPhone = pudo?.contact_phone || '';
 
     let qrCode: string;
+    let receptionQRCode: string = '';
     let subject: string;
     let htmlContent: string;
+    let labelHTML: string = '';
 
     if (type === 'delivery') {
       qrCode = shipment.delivery_qr_code;
@@ -262,12 +272,104 @@ serve(async (req) => {
           }
         );
       }
+
+      // Generate a DIFFERENT QR code for PUDO reception (warehouse use)
+      receptionQRCode = await generateReceptionQRCode(shipment_id);
       
       subject = `Tu código QR para recoger: ${productName}`;
       
-      // Generate QR code image
+      // Generate QR code image for USER (delivery QR)
       const qrImageDataURL = await generateQRCodeDataURL(qrCode);
+
+      // Generate QR code image for PUDO RECEPTION (different QR for warehouse staff)
+      const receptionQRImageDataURL = await generateQRCodeDataURL(receptionQRCode);
       
+      // Generate PUDO reception label HTML (10cm x 5cm, 300dpi = 1181px x 591px)
+      // This label is for warehouse staff to scan during package reception
+      labelHTML = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Etiqueta PUDO - Recepción</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { font-family: 'Arial', sans-serif; }
+            .label-container {
+              width: 10cm;
+              height: 5cm;
+              display: flex;
+              flex-direction: column;
+              justify-content: space-between;
+              padding: 0.3cm;
+              border: 1px solid #000;
+              background: white;
+              position: relative;
+              page-break-after: always;
+            }
+            .qr-section {
+              display: flex;
+              justify-content: center;
+              align-items: center;
+            }
+            .qr-code {
+              width: 3cm;
+              height: 3cm;
+              background: white;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+            }
+            .qr-code img {
+              width: 100%;
+              height: 100%;
+              object-fit: contain;
+            }
+            .info-section {
+              display: flex;
+              flex-direction: column;
+              justify-content: flex-end;
+              font-size: 8pt;
+              line-height: 1.2;
+              text-align: left;
+            }
+            .user-name {
+              font-weight: bold;
+              font-size: 9pt;
+              margin-bottom: 0.1cm;
+            }
+            .pudo-name {
+              font-weight: bold;
+              font-size: 8pt;
+              margin-bottom: 0.05cm;
+            }
+            .pudo-address {
+              font-size: 7pt;
+              color: #333;
+            }
+            @media print {
+              body { margin: 0; padding: 0; }
+              .label-container { border: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="label-container">
+            <div class="qr-section">
+              <div class="qr-code">
+                ${receptionQRImageDataURL ? `<img src="${receptionQRImageDataURL}" alt="Reception QR" />` : '<p>QR</p>'}
+              </div>
+            </div>
+            <div class="info-section">
+              <div class="user-name">Entrega: ${userName}</div>
+              <div class="pudo-name">${pudoName}</div>
+              <div class="pudo-address">${pudoAddress}${pudoPostalCode || pudoCity ? ' - ' : ''}${pudoPostalCode} ${pudoCity}</div>
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+
       htmlContent = `
         <!DOCTYPE html>
         <html>
@@ -461,7 +563,9 @@ serve(async (req) => {
         success: true, 
         message: 'QR code email sent successfully',
         email_id: emailResult.id,
-        qr_code: qrCode
+        qr_code: qrCode,
+        reception_qr_code: receptionQRCode,
+        label_html: labelHTML
       }),
       { 
         status: 200, 

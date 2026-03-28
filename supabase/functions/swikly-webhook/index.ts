@@ -95,51 +95,65 @@ serve(async (req) => {
     });
   }
 
-  // ── Find the assignment by wish_id ────────────────────────────────────────
-  const { data: assignment, error: findErr } = await supabase
-    .from("assignments")
-    .select(
-      `id, user_id, swikly_status, swikly_deposit_amount,
-       sets (name, lego_ref),
-       users (full_name, email)`
-    )
+  // ── Find the shipment by swikly_wish_id ───────────────────────────────────
+  const { data: shipment, error: findErr } = await supabase
+    .from("shipments")
+    .select("id, user_id, set_ref, swikly_status, swikly_deposit_amount")
     .eq("swikly_wish_id", wishId)
     .single();
 
-  if (findErr || !assignment) {
-    console.error("Assignment not found for wish_id:", wishId);
-    return new Response("Assignment not found", { status: 404 });
+  if (findErr || !shipment) {
+    console.error("Shipment not found for swikly_wish_id:", wishId, findErr?.message);
+    return new Response("Shipment not found", { status: 404 });
   }
 
-  // ── Update swikly_status in DB ────────────────────────────────────────────
-  await supabase
-    .from("assignments")
+  // ── Update swikly_status in shipments ─────────────────────────────────────
+  const { error: updErr } = await supabase
+    .from("shipments")
     .update({ swikly_status: newStatus })
-    .eq("id", assignment.id);
+    .eq("id", shipment.id);
+
+  if (updErr) {
+    console.error(`Failed to update shipment ${shipment.id}:`, updErr.message);
+    return new Response("DB update failed", { status: 500 });
+  }
 
   console.log(
-    `Assignment ${assignment.id} swikly_status updated: ${assignment.swikly_status} → ${newStatus}`
+    `Shipment ${shipment.id} swikly_status updated: ${shipment.swikly_status} → ${newStatus}`
   );
 
-  // ── Resolve user email ────────────────────────────────────────────────────
-  let userEmail: string = (assignment.users as any)?.email ?? "";
+  // ── Resolve user email and name ───────────────────────────────────────────
+  const { data: userProfile } = await supabase
+    .from("users")
+    .select("full_name, email")
+    .eq("id", shipment.user_id)
+    .maybeSingle();
+
+  let userEmail: string = userProfile?.email ?? "";
   if (!userEmail) {
-    const { data: authUser } = await supabase.auth.admin.getUserById(
-      assignment.user_id
-    );
+    const { data: authUser } = await supabase.auth.admin.getUserById(shipment.user_id);
     userEmail = authUser?.user?.email ?? "";
   }
 
-  const userName: string = (assignment.users as any)?.full_name ?? "Cliente";
-  const set = assignment.sets as any;
-  const depositEur = ((assignment.swikly_deposit_amount ?? 0) / 100).toFixed(2);
+  const userName: string = userProfile?.full_name ?? "Cliente";
+
+  // ── Get set info for email context ────────────────────────────────────────
+  const { data: setData } = await supabase
+    .from("sets")
+    .select("set_name, set_ref")
+    .eq("set_ref", shipment.set_ref)
+    .maybeSingle();
+
+  const setName = setData?.set_name ?? shipment.set_ref ?? "";
+  const setRef = setData?.set_ref ?? shipment.set_ref ?? "";
+  const depositEur = ((shipment.swikly_deposit_amount ?? 0) / 100).toFixed(2);
 
   // ── Send email based on new status ───────────────────────────────────────
   if (newStatus === "accepted" && userEmail) {
     await sendEmail("swikly_deposit_confirmed", userEmail, {
       name: userName,
-      set_name: set?.name ?? "",
-      set_ref: set?.lego_ref ?? "",
+      set_name: setName,
+      set_ref: setRef,
       deposit_amount: depositEur,
     });
   }
@@ -147,7 +161,8 @@ serve(async (req) => {
   if (newStatus === "released" && userEmail) {
     await sendEmail("swikly_deposit_released", userEmail, {
       name: userName,
-      set_name: set?.name ?? "",
+      set_name: setName,
+      set_ref: setRef,
       deposit_amount: depositEur,
     });
   }
@@ -155,7 +170,8 @@ serve(async (req) => {
   if (newStatus === "captured" && userEmail) {
     await sendEmail("swikly_deposit_captured", userEmail, {
       name: userName,
-      set_name: set?.name ?? "",
+      set_name: setName,
+      set_ref: setRef,
       deposit_amount: depositEur,
     });
   }

@@ -36,3 +36,15 @@ verify_jwt = false
 
 [functions.send-brickshare-qr-email]
 verify_jwt = false
+
+[functions.create-swikly-wish-shipment]
+verify_jwt = true
+
+[functions.swikly-webhook]
+verify_jwt = false
+
+[functions.swikly-manage-wish]
+verify_jwt = true
+
+[functions.process-assignment-payment]
+verify_jwt = true

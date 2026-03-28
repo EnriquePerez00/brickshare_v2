@@ -54,3 +54,4 @@ supabase/dump_reset.sql
 !docs/DATABASE_SCHEMA.md
 !docs/schema_dump.sql
 supabase/.env
+supabase/functions/.env

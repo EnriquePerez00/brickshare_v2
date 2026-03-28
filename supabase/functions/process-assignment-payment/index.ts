@@ -201,7 +201,7 @@ serve(async (req) => {
 
         // 5. Create PaymentIntent for Transport Fee (Correos only) - Immediate charge
         let transportPaymentIntent;
-        const shippingCost = parseInt(Deno.env.get("COSTE_ENVIO_DEVOLUCION") ?? "10");
+        const shippingCost = parseInt(Deno.env.get("COSTE_ENVIO_DEVOLUCION") ?? "8");
 
         try {
             transportPaymentIntent = await stripe.paymentIntents.create({
