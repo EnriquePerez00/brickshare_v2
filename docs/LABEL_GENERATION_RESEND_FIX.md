@@ -58,22 +58,22 @@ SUPABASE_URL=http://127.0.0.1:54331
 SUPABASE_SERVICE_ROLE_KEY=<your_service_role_key>
 
 # Resend (Email Service) ✅ ACTUALIZADO
-RESEND_API_KEY=re_SHuDbPYg_9xmaZExxHeH6uvdL8Nk1HjQn
+RESEND_API_KEY=<your_resend_api_key>
 
 # Stripe
 STRIPE_SECRET_KEY=<your_stripe_secret_key>
 STRIPE_WEBHOOK_SECRET=<your_webhook_secret>
 
 # Correos API
-CORREOS_CLIENT_ID=8f21043b027346faa6eb9582f2312fdd
-CORREOS_CLIENT_SECRET=9d973F90ab294211B8B14723A6aC6128
+CORREOS_CLIENT_ID=<your_correos_client_id>
+CORREOS_CLIENT_SECRET=<your_correos_client_secret>
 
 # Brickset API
-BRICKSET_API_KEY=3-Vz2Y-d9eO-WJojN
+BRICKSET_API_KEY=<your_brickset_api_key>
 
 # Swikly (Garantías)
-SWIKLY_API_KEY=placeholder_swikly_key
-SWIKLY_WEBHOOK_SECRET=placeholder_swikly_webhook_secret
+SWIKLY_API_KEY=<your_swikly_api_key>
+SWIKLY_WEBHOOK_SECRET=<your_swikly_webhook_secret>
 
 # App URL
 APP_URL=http://localhost:5173
