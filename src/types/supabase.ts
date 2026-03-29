@@ -267,6 +267,47 @@ export type Database = {
           },
         ]
       }
+      reception_missing_pieces: {
+        Row: {
+          created_at: string
+          id: string
+          piece_ref: string
+          quantity: number
+          set_id: string
+          status: string
+          time: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          piece_ref: string
+          quantity: number
+          set_id: string
+          status?: string
+          time?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          piece_ref?: string
+          quantity?: number
+          set_id?: string
+          status?: string
+          time?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reception_missing_pieces_set_id_fkey"
+            columns: ["set_id"]
+            isOneToOne: false
+            referencedRelation: "sets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reception_operations: {
         Row: {
           created_at: string
@@ -320,6 +361,50 @@ export type Database = {
             foreignKeyName: "operaciones_recepcion_set_id_fkey"
             columns: ["set_id"]
             isOneToOne: false
+            referencedRelation: "sets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reception_set_weight: {
+        Row: {
+          created_at: string | null
+          expected_weight_kg: number | null
+          id: string
+          notes: string | null
+          recorded_by: string
+          set_id: string
+          set_ref: string
+          weight_kg: number
+          weight_variance_percentage: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          expected_weight_kg?: number | null
+          id?: string
+          notes?: string | null
+          recorded_by: string
+          set_id: string
+          set_ref: string
+          weight_kg: number
+          weight_variance_percentage?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          expected_weight_kg?: number | null
+          id?: string
+          notes?: string | null
+          recorded_by?: string
+          set_id?: string
+          set_ref?: string
+          weight_kg?: number
+          weight_variance_percentage?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reception_set_weight_set_id_fkey"
+            columns: ["set_id"]
+            isOneToOne: true
             referencedRelation: "sets"
             referencedColumns: ["id"]
           },
@@ -637,12 +722,9 @@ export type Database = {
       shipments: {
         Row: {
           actual_delivery_date: string | null
-          additional_notes: string | null
           assigned_date: string | null
-          brickshare_metadata: Json | null
           brickshare_package_id: string | null
           brickshare_pudo_id: string | null
-          carrier: string | null
           correos_shipment_id: string | null
           created_at: string
           delivery_qr_code: string | null
@@ -650,15 +732,11 @@ export type Database = {
           delivery_validated_at: string | null
           handling_processed: boolean | null
           id: string
-          label_url: string | null
-          pickup_id: string | null
-          pickup_provider: string | null
           pickup_provider_address: string | null
           pickup_type: string | null
           pudo_type: string | null
           return_qr_code: string | null
           return_qr_expires_at: string | null
-          return_request_date: string | null
           return_validated_at: string | null
           set_id: string | null
           set_ref: string | null
@@ -681,12 +759,9 @@ export type Database = {
         }
         Insert: {
           actual_delivery_date?: string | null
-          additional_notes?: string | null
           assigned_date?: string | null
-          brickshare_metadata?: Json | null
           brickshare_package_id?: string | null
           brickshare_pudo_id?: string | null
-          carrier?: string | null
           correos_shipment_id?: string | null
           created_at?: string
           delivery_qr_code?: string | null
@@ -694,15 +769,11 @@ export type Database = {
           delivery_validated_at?: string | null
           handling_processed?: boolean | null
           id?: string
-          label_url?: string | null
-          pickup_id?: string | null
-          pickup_provider?: string | null
           pickup_provider_address?: string | null
           pickup_type?: string | null
           pudo_type?: string | null
           return_qr_code?: string | null
           return_qr_expires_at?: string | null
-          return_request_date?: string | null
           return_validated_at?: string | null
           set_id?: string | null
           set_ref?: string | null
@@ -725,12 +796,9 @@ export type Database = {
         }
         Update: {
           actual_delivery_date?: string | null
-          additional_notes?: string | null
           assigned_date?: string | null
-          brickshare_metadata?: Json | null
           brickshare_package_id?: string | null
           brickshare_pudo_id?: string | null
-          carrier?: string | null
           correos_shipment_id?: string | null
           created_at?: string
           delivery_qr_code?: string | null
@@ -738,15 +806,11 @@ export type Database = {
           delivery_validated_at?: string | null
           handling_processed?: boolean | null
           id?: string
-          label_url?: string | null
-          pickup_id?: string | null
-          pickup_provider?: string | null
           pickup_provider_address?: string | null
           pickup_type?: string | null
           pudo_type?: string | null
           return_qr_code?: string | null
           return_qr_expires_at?: string | null
-          return_request_date?: string | null
           return_validated_at?: string | null
           set_id?: string | null
           set_ref?: string | null
@@ -1209,6 +1273,10 @@ export type Database = {
       }
     }
     Functions: {
+      add_missing_pieces_batch: {
+        Args: { p_pieces: Json; p_set_id: string }
+        Returns: Json
+      }
       confirm_assign_sets_to_users: {
         Args: { p_user_ids: string[] }
         Returns: {
@@ -1287,6 +1355,14 @@ export type Database = {
         Args: { p_amount?: number; p_user_id: string }
         Returns: undefined
       }
+      mark_pieces_as_ordered: {
+        Args: { p_piece_refs: string[] }
+        Returns: Json
+      }
+      mark_repairs_complete: {
+        Args: { p_notes?: string; p_set_id: string }
+        Returns: Json
+      }
       preview_assign_sets_to_users: {
         Args: never
         Returns: {
@@ -1304,6 +1380,16 @@ export type Database = {
       process_referral_credit: {
         Args: { p_referee_user_id: string }
         Returns: undefined
+      }
+      process_set_return_with_weight: {
+        Args: {
+          p_set_id: string
+          p_shipment_id: string
+          p_user_id: string
+          p_weight_measured: number
+          p_weight_tolerance?: number
+        }
+        Returns: Json
       }
       update_set_status_from_return: {
         Args: { p_envio_id?: string; p_new_status: string; p_set_id: string }

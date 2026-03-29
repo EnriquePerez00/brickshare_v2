@@ -2,7 +2,7 @@
 
 ## 🎯 Propósito
 
-El script `safe-db-reset.sh` proporciona una forma segura de resetear la base de datos local de Supabase creando automáticamente un backup antes de cada reset.
+El script `safe-db-reset.sh` ofrece una forma conveniente de resetear la base de datos local de Supabase con backup automático. Es una alternativa opcional a `supabase db reset` que añade protección de datos.
 
 ## 📋 Características
 
@@ -107,14 +107,17 @@ supabase/
 5. **Puerto correcto**: Usa el puerto 5433 (puerto local de Supabase)
 6. **Historial local**: Los backups solo existen localmente, no en remoto
 
-## 🆚 vs `supabase db reset` normal
+## 🆚 Comparación: `supabase db reset` vs `safe-db-reset.sh`
+
+Ambas opciones son válidas. Elige según tu necesidad:
 
 | Aspecto | `supabase db reset` | `safe-db-reset.sh` |
 |---------|-------------------|-------------------|
+| Velocidad | ⚡ Más rápido | ⚡⚡ Un poco más lento (hace backup) |
 | Backup automático | ❌ No | ✅ Sí |
 | Historial | ❌ No | ✅ Sí (con timestamp) |
-| Restauración fácil | ❌ Manual | ✅ Comando incluido |
-| Seguridad | ⚠️ Pérdida de datos | ✅ Backup antes de reset |
+| Restauración | Manual si necesita | ✅ Comando incluido |
+| Casos de uso | Reset rápido durante desarrollo | Development general (recomendado) |
 
 ## 🔧 Troubleshooting
 

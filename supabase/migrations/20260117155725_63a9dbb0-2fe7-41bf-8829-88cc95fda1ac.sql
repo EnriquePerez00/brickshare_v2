@@ -1,4 +1,4 @@
-scti-- Create app_role enum for user roles
+-- Create app_role enum for user roles
 CREATE TYPE public.app_role AS ENUM ('admin', 'user');
 
 -- Create products table

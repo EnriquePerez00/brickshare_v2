@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📧 Email de Entrega - User3 Laura López - Brickshare</title>
+  <style>
+    /* Reset y base */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; 
+      background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
+      padding: 20px;
+      line-height: 1.6;
+      color: #333;
+    }
+    
+    .container { max-width: 900px; margin: 0 auto; }
+    
+    /* Encabezado con info del email */
+    .email-header {
+      background: white;
+      border-radius: 8px 8px 0 0;
+      padding: 20px;
+      border: 1px solid #ddd;
+      border-bottom: none;
+      font-size: 13px;
+    }
+    
+    .email-header-row {
+      display: flex;
+      margin: 6px 0;
+      padding: 2px 0;
+    }
+    
+    .email-header-label {
+      font-weight: 600;
+      color: #555;
+      width: 80px;
+      text-align: right;
+      padding-right: 12px;
+      flex-shrink: 0;
+    }
+    
+    .email-header-value {
+      color: #222;
+      flex-grow: 1;
+    }
+    
+    .email-header-subject {
+      font-size: 15px;
+      font-weight: bold;
+      color: #111;
+      margin-top: 8px;
+    }
+    
+    /* Contenedor del email */
+    .email-wrapper {
+      background: white;
+      border: 1px solid #ddd;
+      border-top: none;
+      border-radius: 0 0 8px 8px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      margin-bottom: 30px;
+    }
+    
+    .email-content {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+    }
+    
+    /* Header del email */
+    .email-hero {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 40px 30px;
+      text-align: center;
+    }
+    
+    .email-hero h1 {
+      font-size: 28px;
+      margin: 0;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    
+    /* Body del email */
+    .email-body {
+      background: #f9f9f9;
+      padding: 40px 30px;
+    }
+    
+    .email-body p {
+      margin: 15px 0;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+    
+    .email-body strong {
+      color: #222;
+      font-weight: 600;
+    }
+    
+    /* Caja QR */
+    .qr-box {
+      background: white;
+      padding: 35px;
+      text-align: center;
+      margin: 25px 0;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+      border: 1px solid #f0f0f0;
+    }
+    
+    .qr-box h2 {
+      font-size: 16px;
+      color: #333;
+      margin: 0 0 20px 0;
+      font-weight: 600;
+    }
+    
+    .qr-code-image {
+      max-width: 280px;
+      height: auto;
+      margin: 0 auto 20px;
+      display: block;
+      border-radius: 8px;
+      border: 2px solid #667eea;
+      padding: 8px;
+      background: white;
+    }
+    
+    .qr-code-text {
+      font-size: 22px;
+      font-weight: bold;
+      color: #667eea;
+      letter-spacing: 3px;
+      font-family: 'Courier New', monospace;
+      margin: 15px 0;
+      padding: 12px;
+      background: #f0f4ff;
+      border-radius: 8px;
+    }
+    
+    .qr-code-instructions {
+      margin-top: 12px;
+      color: #666;
+      font-size: 13px;
+    }
+    
+    /* Caja de información PUDO */
+    .info-box {
+      background: white;
+      padding: 25px;
+      margin: 25px 0;
+      border-left: 5px solid #667eea;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    
+    .info-box h3 {
+      margin: 0 0 15px 0;
+      font-size: 16px;
+      color: #222;
+      font-weight: 600;
+    }
+    
+    .info-box p {
+      margin: 8px 0;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    
+    .pudo-name {
+      font-weight: 700;
+      color: #333;
+      font-size: 15px;
+    }
+    
+    .pudo-address {
+      color: #555;
+      font-size: 14px;
+    }
+    
+    .pudo-phone {
+      color: #667eea;
+      font-weight: 600;
+      margin-top: 8px;
+    }
+    
+    /* Instrucciones */
+    .instructions {
+      margin: 25px 0;
+    }
+    
+    .instructions h3 {
+      font-size: 16px;
+      color: #222;
+      margin-bottom: 15px;
+      font-weight: 600;
+    }
+    
+    .instructions ol {
+      padding-left: 25px;
+      margin: 0;
+    }
+    
+    .instructions li {
+      margin: 10px 0;
+      color: #555;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    
+    /* Footer del email */
+    .email-footer {
+      background: #f5f5f5;
+      padding: 25px 30px;
+      text-align: center;
+      border-top: 1px solid #e5e5e5;
+      font-size: 13px;
+      color: #777;
+    }
+    
+    .email-footer p {
+      margin: 6px 0;
+    }
+    
+    /* Sección de técnicos */
+    .tech-section {
+      background: white;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 25px;
+      margin-top: 30px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    
+    .tech-section h2 {
+      font-size: 16px;
+      color: #333;
+      margin: 0 0 20px 0;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #667eea;
+      font-weight: 600;
+    }
+    
+    .tech-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    
+    .tech-table tr {
+      border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .tech-table tr:last-child {
+      border-bottom: none;
+    }
+    
+    .tech-table td {
+      padding: 10px 12px;
+      vertical-align: middle;
+    }
+    
+    .tech-table td:first-child {
+      font-weight: 600;
+      color: #555;
+      width: 200px;
+      background: #f9f9f9;
+    }
+    
+    .tech-table td:last-child {
+      color: #333;
+      font-family: 'Courier New', monospace;
+      word-break: break-all;
+    }
+    
+    .status-badge {
+      display: inline-block;
+      background: #fbbf24;
+      color: #92400e;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-weight: bold;
+      font-size: 12px;
+    }
+    
+    /* Sección de etiqueta PUDO */
+    .label-section {
+      background: white;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 25px;
+      margin-top: 30px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    
+    .label-section h2 {
+      font-size: 16px;
+      color: #333;
+      margin: 0 0 20px 0;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #667eea;
+      font-weight: 600;
+    }
+    
+    .label-container {
+      display: flex;
+      justify-content: center;
+      margin: 20px 0;
+    }
+    
+    .label-preview {
+      width: 280px;
+      height: 140px;
+      border: 2px solid #333;
+      border-radius: 4px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      background: white;
+      font-family: Arial, sans-serif;
+      font-size: 11px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    
+    .label-qr {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-grow: 1;
+    }
+    
+    .label-qr img {
+      width: 80px;
+      height: 80px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    
+    .label-info {
+      border-top: 1px solid #333;
+      padding-top: 4px;
+      font-size: 9px;
+      line-height: 1.2;
+    }
+    
+    .label-user-name {
+      font-weight: bold;
+      font-size: 10px;
+      margin-bottom: 2px;
+    }
+    
+    .label-pudo-name {
+      font-weight: bold;
+      font-size: 9px;
+    }
+    
+    .label-pudo-address {
+      font-size: 8px;
+      color: #555;
+    }
+    
+    .note-box {
+      background: #f0f7ff;
+      border-left: 4px solid #0084ff;
+      padding: 12px 15px;
+      margin-top: 15px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #0066cc;
+    }
+    
+    /* Responsive */
+    @media (max-width: 600px) {
+      .email-header { padding: 15px; }
+      .email-body { padding: 20px 15px; }
+      .qr-box { padding: 20px; }
+      .info-box { padding: 15px; }
+      .email-hero h1 { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    
+    <!-- ENCABEZADO DEL EMAIL -->
+    <div class="email-header">
+      <div class="email-header-row">
+        <div class="email-header-label">De:</div>
+        <div class="email-header-value">Brickshare &lt;onboarding@resend.dev&gt;</div>
+      </div>
+      <div class="email-header-row">
+        <div class="email-header-label">Para:</div>
+        <div class="email-header-value">enriqueperezbcn1973+test3@gmail.com</div>
+      </div>
+      <div class="email-header-row">
+        <div class="email-header-label">CC/BCC:</div>
+        <div class="email-header-value">—</div>
+      </div>
+      <div class="email-header-row email-header-subject">
+        Asunto: Tu código QR para recoger: City In-Flight 2006 (2928)
+      </div>
+    </div>
+    
+    <!-- CONTENIDO DEL EMAIL -->
+    <div class="email-wrapper">
+      <div class="email-content">
+        
+        <!-- HERO SECTION -->
+        <div class="email-hero">
+          <h1>¡Tu pedido está listo para recoger! 🎉</h1>
+        </div>
+        
+        <!-- BODY SECTION -->
+        <div class="email-body">
+          
+          <p>Hola <strong>Laura López Fernández</strong>,</p>
+          
+          <p>Tu set <strong>City In-Flight 2006</strong> está listo para ser recogido en nuestro punto Brickshare.</p>
+          
+          <!-- QR BOX -->
+          <div class="qr-box">
+            <h2>Tu Código QR para Recoger: City In-Flight 2006 (2928)</h2>
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=BS-DEL-54A82B94-2F1" alt="QR Code para Entrega" class="qr-code-image">
+            <div class="qr-code-text">BS-DEL-54A82B94-2F1</div>
+            <div class="qr-code-instructions">Presenta este código en el punto de recogida</div>
+          </div>
+          
+          <!-- INFO BOX - PUDO -->
+          <div class="info-box">
+            <h3>📍 Punto de Recogida</h3>
+            <p class="pudo-name">Brickshare Barcelona Eixample</p>
+            <p class="pudo-address">Passeig de Gràcia 100</p>
+            <p class="pudo-address">08008 Barcelona, España</p>
+            <p class="pudo-phone">📞 Teléfono disponible en punto</p>
+          </div>
+          
+          <!-- INSTRUCCIONES -->
+          <div class="instructions">
+            <h3>¿Cómo funciona?</h3>
+            <ol>
+              <li>Dirígete al punto Brickshare en el horario de apertura</li>
+              <li>Muestra tu código QR al personal</li>
+              <li>Ellos escanearán el código para validar la entrega</li>
+              <li>¡Recoge tu set y disfruta! 🧱</li>
+            </ol>
+          </div>
+          
+          <p>Si tienes alguna pregunta, no dudes en contactarnos.</p>
+          
+          <p>¡Que disfrutes construyendo!</p>
+          <p><strong>El equipo de Brickshare</strong></p>
+          
+        </div>
+        
+        <!-- FOOTER -->
+        <div class="email-footer">
+          <p>© 2026 Brickshare. Todos los derechos reservados.</p>
+          <p>Este es un correo automático, por favor no respondas a este mensaje.</p>
+        </div>
+        
+      </div>
+    </div>
+    
+    <!-- SECCIÓN TÉCNICA -->
+    <div class="tech-section">
+      <h2>📋 Datos Técnicos del Envío</h2>
+      <table class="tech-table">
+        <tr>
+          <td>Shipment ID</td>
+          <td>54a82b94-2f1a-4771-a8bf-7ef3e06e5d98</td>
+        </tr>
+        <tr>
+          <td>Estado del Envío</td>
+          <td><span class="status-badge">in_transit_pudo</span></td>
+        </tr>
+        <tr>
+          <td>Usuario</td>
+          <td>Laura López Fernández (user3)</td>
+        </tr>
+        <tr>
+          <td>Email</td>
+          <td>enriqueperezbcn1973+test3@gmail.com</td>
+        </tr>
+        <tr>
+          <td>Set LEGO</td>
+          <td>City In-Flight 2006 (Set Ref: 2928) - City Theme</td>
+        </tr>
+        <tr>
+          <td>Piezas</td>
+          <td>141 piezas | Minifiguras: 2</td>
+        </tr>
+        <tr>
+          <td>QR de Entrega</td>
+          <td><strong>BS-DEL-54A82B94-2F1</strong></td>
+        </tr>
+        <tr>
+          <td>QR de Devolución</td>
+          <td>BS-RET-54A82B94-2F1</td>
+        </tr>
+        <tr>
+          <td>Tipo PUDO</td>
+          <td>Brickshare (Propio)</td>
+        </tr>
+        <tr>
+          <td>ID PUDO</td>
+          <td>BS-PUDO-002</td>
+        </tr>
+        <tr>
+          <td>Ubicación PUDO</td>
+          <td>Brickshare Barcelona Eixample - Passeig de Gràcia 100, 08008 Barcelona</td>
+        </tr>
+        <tr>
+          <td>Suscripción</td>
+          <td>brick_pro (3 sets simultáneos)</td>
+        </tr>
+        <tr>
+          <td>Función Edge</td>
+          <td>send-brickshare-qr-email (Deno Runtime)</td>
+        </tr>
+        <tr>
+          <td>Proveedor Email</td>
+          <td>Resend (resend.com)</td>
+        </tr>
+        <tr>
+          <td>Timestamp Creación</td>
+          <td>2026-03-29 20:22:44 UTC+2</td>
+        </tr>
+      </table>
+    </div>
+    
+    <!-- SECCIÓN ETIQUETA PUDO -->
+    <div class="label-section">
+      <h2>🏷️ Etiqueta PUDO para Almacén (10cm x 5cm @ 300dpi)</h2>
+      <p style="font-size: 13px; color: #666; margin-bottom: 20px;">Esta etiqueta se imprime y se coloca en el paquete para que el personal del PUDO la escanee durante la recepción. Contiene un QR <strong>diferente</strong> al del usuario (para control interno del almacén).</p>
+      
+      <div class="label-container">
+        <div class="label-preview">
+          <div class="label-qr">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=BS-REC-54A82B94-REC" alt="Reception QR">
+          </div>
+          <div class="label-info">
+            <div class="label-user-name">Entrega: Laura López</div>
+            <div class="label-pudo-name">Brickshare Barcelona</div>
+            <div class="label-pudo-address">Passeig de Gràcia 100</div>
+            <div class="label-pudo-address">08008 Barcelona</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="note-box">
+        <strong>ℹ️ Nota Importante:</strong> El QR de recepción (BS-REC-54A82B94-REC) es diferente al QR del usuario (BS-DEL-54A82B94-2F1). El personal del PUDO escanea el código de recepción para validar que la entrega se realizó correctamente.
+      </div>
+    </div>
+    
+  </div>
+</body>
+</html>

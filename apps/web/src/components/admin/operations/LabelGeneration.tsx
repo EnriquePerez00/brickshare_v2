@@ -45,8 +45,40 @@ interface PendingShipment {
 // Creates a Swikly wish (deposit guarantee) for the shipment.
 // Amount equals sets.set_pvp_release for the shipped set.
 // Must succeed before the process can continue.
+//
+// ⚠️ DEVELOPMENT MODE: Swikly is bypassed in development environments.
+// Set VITE_SKIP_SWIKLY_IN_DEV=true in .env.local to use mock responses.
 const createSwiklyDeposit = async (shipmentId: string): Promise<{ wish_id: string; wish_url: string; deposit_amount: number }> => {
+    const skipSwiklyInDev = import.meta.env.VITE_SKIP_SWIKLY_IN_DEV === 'true';
+    
     try {
+        // ── Development bypass: Use mock Swikly deposit ──────────────────────
+        if (skipSwiklyInDev) {
+            console.log(`⏭️  [DEV] Skipping Swikly for shipment ${shipmentId} (VITE_SKIP_SWIKLY_IN_DEV=true)`);
+            
+            const mockWishId = `MOCK-${shipmentId.substring(0, 8).toUpperCase()}`;
+            const mockDepositAmount = 5000; // €50.00
+            
+            // Update shipment with mock Swikly data
+            await supabase
+                .from('shipments')
+                .update({
+                    swikly_wish_id: mockWishId,
+                    swikly_wish_url: 'https://mock-swikly.local',
+                    swikly_status: 'wish_created',
+                    swikly_deposit_amount: mockDepositAmount,
+                })
+                .eq('id', shipmentId);
+            
+            console.log(`✅ [DEV] Mock Swikly wish created: ${mockWishId} — €${(mockDepositAmount / 100).toFixed(2)}`);
+            
+            return {
+                wish_id: mockWishId,
+                wish_url: 'https://mock-swikly.local',
+                deposit_amount: mockDepositAmount,
+            };
+        }
+
         const { data, error } = await supabase.functions.invoke(
             'create-swikly-wish-shipment',
             { body: { shipment_id: shipmentId } }

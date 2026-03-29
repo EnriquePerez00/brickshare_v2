@@ -2,7 +2,7 @@
 
 Aplicación web completa de alquiler/préstamo de sets LEGO para familias, construida con **Vite + React + TypeScript** en el frontend y **Supabase** (PostgreSQL local) en el backend.
 
-> ⚠️ **IMPORTANTE**: Este proyecto usa **Supabase LOCAL únicamente** (Docker). NO existe conexión a Supabase Cloud.
+> ℹ️ **NOTA**: Este proyecto usa **Supabase LOCAL** (Docker) para desarrollo. Todo el stack corre localmente en tu máquina.
 
 ---
 
@@ -276,6 +276,10 @@ psql postgresql://postgres:postgres@127.0.0.1:54322/postgres
 
 # Obtener status BD
 supabase status
+
+# Reset de base de datos (elige una opción)
+./scripts/safe-db-reset.sh    # Con backup automático (recomendado)
+supabase db reset             # Reset directo sin backup
 
 # Exportar esquema
 supabase db dump --schema public -f docs/schema_dump.sql
