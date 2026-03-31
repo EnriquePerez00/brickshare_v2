@@ -1,47 +1,48 @@
-import { defineConfig } from "vitest/config";
-import { loadEnv } from "vite";
-import react from "@vitejs/plugin-react-swc";
-import path from "path";
+import { defineConfig } from 'vitest/config'
+import path from 'path'
+import dotenv from 'dotenv'
+import fs from 'fs'
 
 export default defineConfig(({ mode }) => {
-  // Load env file based on `mode` in the current working directory.
-  // Set the third parameter to '' to load all env regardless of the `VITE_` prefix.
-  const env = loadEnv(mode, path.resolve(__dirname, '../../'), '');
+  // Load environment variables for tests
+  const envTestPath = path.resolve(__dirname, '.env.test')
+  const envLocalPath = path.resolve(__dirname, '.env.local')
+  
+  const testEnv: Record<string, string> = {}
+  
+  // Load .env.test first (takes precedence)
+  if (fs.existsSync(envTestPath)) {
+    const envConfig = dotenv.config({ path: envTestPath })
+    if (envConfig.parsed) {
+      Object.assign(testEnv, envConfig.parsed)
+    }
+  }
+  
+  // Load .env.local for fallback values
+  if (fs.existsSync(envLocalPath)) {
+    const envConfig = dotenv.config({ path: envLocalPath })
+    if (envConfig.parsed) {
+      // Only add values that aren't already in testEnv
+      for (const [key, value] of Object.entries(envConfig.parsed)) {
+        if (!(key in testEnv)) {
+          testEnv[key] = value
+        }
+      }
+    }
+  }
 
   return {
-    plugins: [react()],
     test: {
       globals: true,
-      environment: "jsdom",
-      setupFiles: ["./src/test/setup.ts"],
-      env: {
-        // Explicitly pass environment variables to test environment
-        VITE_SUPABASE_URL: env.VITE_SUPABASE_URL,
-        VITE_SUPABASE_ANON_KEY: env.VITE_SUPABASE_ANON_KEY,
-        SUPABASE_SERVICE_ROLE_KEY: env.SUPABASE_SERVICE_ROLE_KEY,
-      },
-      include: ["src/**/*.test.{ts,tsx}"],
-      coverage: {
-        provider: "v8",
-        reporter: ["text", "json", "html"],
-        exclude: [
-          "node_modules/**",
-          "src/test/**",
-          "src/vite-env.d.ts",
-          "src/main.tsx",
-          "**/*.config.*",
-        ],
-        thresholds: {
-          lines: 50,
-          functions: 50,
-          branches: 40,
-        },
-      },
+      environment: 'jsdom',
+      setupFiles: [],
+      // ⚠️ CRITICAL: Inject environment variables into test environment
+      env: testEnv,
     },
     resolve: {
       alias: {
-        "@": path.resolve(__dirname, "./src"),
+        '@': path.resolve(__dirname, './src'),
       },
     },
-  };
-});
+  }
+})

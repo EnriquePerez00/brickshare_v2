@@ -168,6 +168,7 @@ const LabelGeneration = () => {
     const [generatingAll, setGeneratingAll] = useState(false);
 
     // Fetch assigned shipments (ready for label generation)
+    // IMPORTANT: Only show shipments with Swikly deposit accepted
     const { data: pendingShipments, isLoading } = useQuery({
         queryKey: ["pending-shipments"],
         queryFn: async () => {
@@ -191,6 +192,7 @@ const LabelGeneration = () => {
                     )
                 `)
                 .eq("shipment_status", "assigned")
+                .eq("swikly_status", "accepted")
                 .order("created_at", { ascending: true });
 
             if (error) throw error;

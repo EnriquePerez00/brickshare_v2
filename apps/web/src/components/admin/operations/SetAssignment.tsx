@@ -119,13 +119,21 @@ const SetAssignment = () => {
             return data as ConfirmedShipment[];
         },
         onSuccess: (data: ConfirmedShipment[]) => {
+            console.log(`[Assignment] Confirmed ${data.length} shipments, creating Swikly deposits...`);
             setConfirmedShipments(data);
             setViewMode("confirmed");
             setPreviewAssignments([]);
-            toast.success(`¡Éxito! Se crearon ${data.length} asignaciones. Los pagos se procesarán al imprimir etiquetas.`);
+            toast.success(`¡Éxito! Se crearon ${data.length} asignaciones. Procesando fianzas en Swikly...`);
 
             queryClient.invalidateQueries({ queryKey: ["admin-set-assignment-inventory"] });
             queryClient.invalidateQueries({ queryKey: ["admin-shipments"] });
+            
+            // Create Swikly deposits for all confirmed shipments
+            console.log(`[Assignment] Invoking Swikly deposit creation for ${data.length} shipments`);
+            data.forEach((shipment, index) => {
+                console.log(`[Assignment] Creating Swikly deposit (${index + 1}/${data.length}) for shipment ${shipment.shipment_id}`);
+                createSwiklyDepositMutation.mutate(shipment.shipment_id);
+            });
         },
         onError: (error: any) => {
             toast.error("Error al confirmar asignaciones: " + (error.message || error));
@@ -133,6 +141,41 @@ const SetAssignment = () => {
     });
 
     // Delete mutation - removes confirmed assignment with rollback
+    // Create Swikly deposit mutation
+    const createSwiklyDepositMutation = useMutation({
+        mutationFn: async (shipmentId: string) => {
+            console.log(`[Swikly] Creating deposit for shipment: ${shipmentId}`);
+            const { data, error } = await supabase.functions.invoke(
+                'create-swikly-wish-shipment',
+                { body: { shipment_id: shipmentId } }
+            );
+
+            if (error) {
+                console.error(`[Swikly] Error creating deposit for ${shipmentId}:`, error);
+                throw error;
+            }
+            
+            console.log(`[Swikly] Deposit created successfully for shipment ${shipmentId}:`, data);
+            return data;
+        },
+        onSuccess: (data, shipmentId) => {
+            console.log(`[Swikly] onSuccess - Invalidating queries for shipment ${shipmentId}`);
+            // Check if using bypass mode (mock deposit)
+            const isMockDeposit = data?.wish_id?.startsWith?.('mock-');
+            if (isMockDeposit) {
+                toast.info(`🔧 Fianza MOCK creada en modo desarrollo (${data.wish_id})`);
+            } else {
+                toast.success(`Fianza creada en Swikly para el envío`);
+            }
+            queryClient.invalidateQueries({ queryKey: ["pending-deposits"] });
+            queryClient.invalidateQueries({ queryKey: ["admin-shipments"] });
+        },
+        onError: (error: Error, shipmentId: string) => {
+            console.error(`[Swikly] onError - Failed to create deposit for ${shipmentId}:`, error.message);
+            toast.error(`Error al crear fianza en Swikly: ${error.message}`);
+        },
+    });
+
     // Confirm single user mutation
     const confirmSingleMutation = useMutation({
         mutationFn: async (assignment: PreviewAssignment) => {
@@ -147,16 +190,21 @@ const SetAssignment = () => {
             return { shipment: data[0] as ConfirmedShipment, pudoType: assignment.pudo_type };
         },
         onSuccess: ({ shipment, pudoType }) => {
+            console.log(`[Assignment] Single assignment confirmed for ${shipment.user_name}, creating Swikly deposit...`);
             // Add to confirmed shipments
             setConfirmedShipments(prev => [...prev, shipment]);
             
             // Remove from preview assignments
             setPreviewAssignments(prev => prev.filter(a => a.user_id !== shipment.user_id));
             
-            toast.success(`¡Asignación confirmada para ${shipment.user_name}! El pago se procesará al imprimir la etiqueta.`);
+            toast.success(`¡Asignación confirmada para ${shipment.user_name}! Procesando fianza en Swikly...`);
 
             queryClient.invalidateQueries({ queryKey: ["admin-set-assignment-inventory"] });
             queryClient.invalidateQueries({ queryKey: ["admin-shipments"] });
+            
+            // Create Swikly deposit after successful assignment
+            console.log(`[Assignment] Invoking Swikly deposit creation for shipment ${shipment.shipment_id}`);
+            createSwiklyDepositMutation.mutate(shipment.shipment_id);
             
             setConfirmingUserId(null);
         },

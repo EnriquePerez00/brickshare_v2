@@ -29,15 +29,19 @@ supabase status
 
 Esto iniciará:
 - PostgreSQL en `postgresql://postgres:postgres@127.0.0.1:54322/postgres`
-- API REST en `http://127.0.0.1:54321`
+- API REST en `http://127.0.0.1:54331` ⚠️ **NOTA**: Este proyecto usa el puerto **54331** (no el estándar 54321)
 - Supabase Studio en `http://127.0.0.1:54323`
 
 ### 4. Configurar Variables de Entorno
-Copiar `.env.example` a `.env.local` y actualizar las credenciales obtenidas de `supabase status`:
+Copiar `.env.example` a `apps/web/.env.local` y actualizar las credenciales obtenidas de `supabase status`:
 
 ```bash
-cp .env.example .env.local
+cp .env.example apps/web/.env.local
 ```
+
+⚠️ **Importante**: El archivo `apps/web/.env.local` ya está configurado para usar el puerto **54331**.
+
+Si necesitas configurar Swikly (depósitos de garantía), consulta [SWIKLY_DEV_CONFIGURATION.md](./SWIKLY_DEV_CONFIGURATION.md).
 
 ### 5. Iniciar la Aplicación
 ```bash
@@ -79,7 +83,7 @@ supabase functions serve --debug
 ### Base de Datos
 
 ```bash
-# Conectar a PostgreSQL con psql
+# Conectar a PostgreSQL con psql (Puerto 54322 para DB, 54331 para API)
 psql postgresql://postgres:postgres@127.0.0.1:54322/postgres
 
 # Exportar esquema
@@ -229,11 +233,31 @@ psql postgresql://postgres:postgres@127.0.0.1:54322/postgres
 
 # Con un cliente visual, usar:
 # Host: 127.0.0.1
-# Port: 54322
+# Port: 54322 (Base de Datos) | 54331 (API REST)
 # Database: postgres
 # Username: postgres
 # Password: postgres
 ```
+
+### Exponer Entorno Local (Webhooks)
+
+Para recibir webhooks de servicios externos (Stripe, Swikly, etc.) necesitas exponer tu entorno local usando un túnel:
+
+```bash
+# Instalar ngrok (si no lo tienes)
+brew install ngrok
+
+# Exponer el puerto de Supabase (54331)
+ngrok http 54331
+```
+
+La URL generada (ej: `https://abc123.ngrok.io`) puede usarse para:
+- Webhooks de Stripe: `https://abc123.ngrok.io/functions/v1/stripe-webhook`
+- Webhooks de Swikly: `https://abc123.ngrok.io/functions/v1/swikly-webhook`
+
+⚠️ **Seguridad**: Solo mantén el túnel activo durante desarrollo. Ciérralo cuando no lo uses.
+
+Para más detalles sobre configuración de Swikly, consulta [SWIKLY_DEV_CONFIGURATION.md](./SWIKLY_DEV_CONFIGURATION.md).
 
 ### Supabase Studio
 
@@ -288,10 +312,17 @@ supabase gen types typescript --local > src/types/supabase.ts
 
 ## 📚 Recursos
 
+### Documentación Externa
 - [Supabase Local Development](https://supabase.com/docs/guides/cli/local-development)
 - [Supabase Migrations](https://supabase.com/docs/guides/cli/local-development#database-migrations)
 - [Edge Functions](https://supabase.com/docs/guides/functions)
 - [Row Level Security](https://supabase.com/docs/guides/auth/row-level-security)
+
+### Documentación del Proyecto
+- [Configuración de Swikly](./SWIKLY_DEV_CONFIGURATION.md) - Setup de depósitos de garantía
+- [Arquitectura](./ARCHITECTURE.md) - Diseño técnico del sistema
+- [Esquema de Base de Datos](./DATABASE_SCHEMA.md) - Referencia completa de tablas
+- [Roadmap de Desarrollo](./DEVELOPMENT_ROADMAP.md) - Próximas funcionalidades
 
 ## 🎯 Próximos Pasos
 
@@ -302,5 +333,19 @@ supabase gen types typescript --local > src/types/supabase.ts
 
 ---
 
-**Última actualización**: 21/03/2026  
-**Modo de desarrollo**: 100% Local con Docker
+## 🔧 Configuración de Puertos
+
+| Servicio | Puerto | URL |
+|---|---|---|
+| **PostgreSQL** | 54322 | `postgresql://postgres:postgres@127.0.0.1:54322/postgres` |
+| **API REST** | 54331 | `http://127.0.0.1:54331` |
+| **Supabase Studio** | 54323 | `http://127.0.0.1:54323` |
+| **Frontend** | 8080 | `http://localhost:8080` |
+
+⚠️ **Nota**: Este proyecto usa el puerto **54331** para la API REST en lugar del puerto estándar 54321 de Supabase.
+
+---
+
+**Última actualización**: 31/03/2026  
+**Modo de desarrollo**: 100% Local con Docker  
+**Puerto API personalizado**: 54331

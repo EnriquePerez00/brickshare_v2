@@ -521,21 +521,6 @@ COMMENT ON FUNCTION "public"."generate_return_qr"("p_shipment_id" "uuid") IS 'Ge
 
 
 
-CREATE OR REPLACE FUNCTION "public"."get_set_by_ref"("p_set_ref" "text") RETURNS TABLE("set_name" "text", "set_ref" "text", "theme" "text")
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-BEGIN
-  RETURN QUERY
-  SELECT s.set_name, s.set_ref, s.theme
-  FROM sets s
-  WHERE s.set_ref = p_set_ref;
-END;
-$$;
-
-
-ALTER FUNCTION "public"."get_set_by_ref"("p_set_ref" "text") OWNER TO "postgres";
-
-
 CREATE OR REPLACE FUNCTION "public"."get_user_active_pudo"("p_user_id" "uuid") RETURNS TABLE("pudo_type" "text", "pudo_id" "text", "pudo_name" "text", "pudo_address" "text", "pudo_city" "text", "pudo_postal_code" "text")
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
@@ -1393,18 +1378,12 @@ CREATE TABLE IF NOT EXISTS "public"."shipments" (
     "shipping_provider" "text",
     "pickup_provider_address" "text",
     "tracking_number" "text",
-    "carrier" "text",
-    "additional_notes" "text",
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "return_request_date" timestamp with time zone,
-    "pickup_provider" "text",
     "set_ref" "text",
     "set_id" "uuid",
     "handling_processed" boolean DEFAULT false,
     "correos_shipment_id" "text",
-    "label_url" "text",
-    "pickup_id" "text",
     "swikly_wish_id" "text",
     "swikly_wish_url" "text",
     "swikly_status" "text" DEFAULT 'pending'::"text",
@@ -1417,7 +1396,6 @@ CREATE TABLE IF NOT EXISTS "public"."shipments" (
     "return_qr_code" "text",
     "return_qr_expires_at" timestamp with time zone,
     "return_validated_at" timestamp with time zone,
-    "brickshare_metadata" "jsonb" DEFAULT '{}'::"jsonb",
     "brickshare_package_id" "text",
     "pudo_type" "text",
     "shipping_province" "text",
@@ -1431,15 +1409,11 @@ CREATE TABLE IF NOT EXISTS "public"."shipments" (
 ALTER TABLE "public"."shipments" OWNER TO "postgres";
 
 
+COMMENT ON TABLE "public"."shipments" IS 'Stores shipment records with tracking, delivery status, and PUDO location information';
+
+
+
 COMMENT ON COLUMN "public"."shipments"."shipment_status" IS 'Allowed values: preparacion, ruta_envio, entregado, devuelto, ruta_devolucion, cancelado';
-
-
-
-COMMENT ON COLUMN "public"."shipments"."return_request_date" IS 'Date when the user requested a return';
-
-
-
-COMMENT ON COLUMN "public"."shipments"."pickup_provider" IS 'Carrier or entity in charge of the return pickup';
 
 
 
@@ -1452,14 +1426,6 @@ COMMENT ON COLUMN "public"."shipments"."set_id" IS 'Direct reference to the set 
 
 
 COMMENT ON COLUMN "public"."shipments"."correos_shipment_id" IS 'External shipment identifier returned by Correos Preregister API';
-
-
-
-COMMENT ON COLUMN "public"."shipments"."label_url" IS 'Path to the generated shipping label in storage';
-
-
-
-COMMENT ON COLUMN "public"."shipments"."pickup_id" IS 'External identifier for the scheduled pickup';
 
 
 
@@ -3052,12 +3018,6 @@ GRANT ALL ON FUNCTION "public"."generate_referral_code_users"() TO "service_role
 GRANT ALL ON FUNCTION "public"."generate_return_qr"("p_shipment_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."generate_return_qr"("p_shipment_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."generate_return_qr"("p_shipment_id" "uuid") TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "public"."get_set_by_ref"("p_set_ref" "text") TO "anon";
-GRANT ALL ON FUNCTION "public"."get_set_by_ref"("p_set_ref" "text") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."get_set_by_ref"("p_set_ref" "text") TO "service_role";
 
 
 
