@@ -2,14 +2,13 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Truck, ClipboardList, Boxes, Settings, UserPlus, Tag, ShoppingCart, ShieldAlert } from "lucide-react";
+import { Truck, ClipboardList, Boxes, Settings, UserPlus, Tag, ShoppingCart } from "lucide-react";
 import SetAssignment from "@/components/admin/operations/SetAssignment";
 import LabelGeneration from "@/components/admin/operations/LabelGeneration";
 import ShipmentsList from "@/components/admin/operations/ShipmentsList";
 import ReturnsList from "@/components/admin/operations/ReturnsList";
 import RepairsList from "@/components/admin/operations/RepairsList";
 import PurchasePiecesList from "@/components/admin/operations/PurchasePiecesList";
-import PendingDeposits from "@/components/admin/operations/PendingDeposits";
 import MaintenanceList from "@/components/admin/inventory/MaintenanceList";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -48,7 +47,7 @@ const Operations = () => {
                 </div>
 
                 <Tabs defaultValue="assignment" className="space-y-6">
-                    <TabsList className="grid w-full grid-cols-8 lg:w-auto">
+                    <TabsList className="grid w-full grid-cols-7 lg:w-auto">
                         <TabsTrigger value="assignment" className="flex items-center gap-2">
                             <UserPlus className="h-4 w-4" />
                             <span className="hidden sm:inline">Asignación</span>
@@ -83,11 +82,6 @@ const Operations = () => {
                             <Boxes className="h-4 w-4" />
                             <span className="hidden sm:inline">Mantenimiento</span>
                             <span className="sm:hidden">🧹</span>
-                        </TabsTrigger>
-                        <TabsTrigger value="deposits" className="flex items-center gap-2">
-                            <ShieldAlert className="h-4 w-4" />
-                            <span className="hidden sm:inline">Garantías</span>
-                            <span className="sm:hidden">💳</span>
                         </TabsTrigger>
                     </TabsList>
 
@@ -133,10 +127,6 @@ const Operations = () => {
                             <p className="text-muted-foreground mb-6">Administra sets en limpieza e higienización. Marca como completado para devolverlos al inventario central.</p>
                             <MaintenanceList />
                         </div>
-                    </TabsContent>
-
-                    <TabsContent value="deposits">
-                        <PendingDeposits />
                     </TabsContent>
                 </Tabs>
             </div>
