@@ -19,13 +19,9 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -48,12 +44,14 @@ interface ReturnItem {
     } | null;
 }
 
+const WEIGHT_TOLERANCE = 0.05; // 5%
+
 const ReturnsList = () => {
     const [returns, setReturns] = useState<ReturnItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [selectedItem, setSelectedItem] = useState<ReturnItem | null>(null);
-    const [newStatus, setNewStatus] = useState<string>("");
+    const [measuredWeight, setMeasuredWeight] = useState<string>("");
     const [isUpdating, setIsUpdating] = useState(false);
     const { toast } = useToast();
     const { user } = useAuth();
@@ -105,36 +103,74 @@ const ReturnsList = () => {
 
     const handleEditClick = (item: ReturnItem) => {
         setSelectedItem(item);
-        setNewStatus(item.sets?.set_status || "inactive");
+        setMeasuredWeight("");
         setIsDialogOpen(true);
     };
 
+    const calculateWeightValidation = (measured: number, expected: number | null) => {
+        if (!expected || measured <= 0) return null;
+        
+        const minWeight = expected * (1 - WEIGHT_TOLERANCE);
+        const maxWeight = expected * (1 + WEIGHT_TOLERANCE);
+        const isOk = measured >= minWeight && measured <= maxWeight;
+        const difference = measured - expected;
+
+        return {
+            isOk,
+            minWeight: Math.round(minWeight * 100) / 100,
+            maxWeight: Math.round(maxWeight * 100) / 100,
+            difference: Math.round(difference * 100) / 100,
+            status: isOk ? "active" : "in_repair",
+        };
+    };
+
     const handleConfirmUpdate = async () => {
-        if (!selectedItem || !selectedItem.sets) return;
+        if (!selectedItem || !selectedItem.sets || !measuredWeight) return;
+
+        const weight = parseFloat(measuredWeight);
+        if (isNaN(weight) || weight <= 0) {
+            toast({
+                title: "Invalid weight",
+                description: "Please enter a valid weight greater than 0.",
+                variant: "destructive",
+            });
+            return;
+        }
 
         setIsUpdating(true);
         try {
-            const { error } = await supabase.rpc("update_set_status_from_return", {
-                p_set_id: selectedItem.sets.id,
-                p_new_status: newStatus,
-                p_envio_id: selectedItem.id
-            });
+            // Call RPC function to process return with weight
+            const { data, error } = await supabase.rpc(
+                "process_set_return_with_weight",
+                {
+                    p_shipment_id: selectedItem.id,
+                    p_set_id: selectedItem.set_id,
+                    p_user_id: selectedItem.user_id,
+                    p_weight_measured: weight,
+                    p_weight_tolerance: WEIGHT_TOLERANCE,
+                }
+            );
 
             if (error) throw error;
 
+            const result = data as any;
+            if (!result.success) {
+                throw new Error(result.error || "Unknown error");
+            }
+
             toast({
-                title: "Status updated",
-                description: `The set status has been changed to "${newStatus}".`,
+                title: "Return processed successfully",
+                description: `Set marked as ${result.new_status}. Weight: ${weight}g`,
                 className: "bg-green-100 border-green-200 dark:bg-green-900/30 dark:border-green-800",
             });
 
             await fetchReturns();
             setIsDialogOpen(false);
         } catch (error: any) {
-            console.error("Error updating status:", error);
+            console.error("Error processing return:", error);
             toast({
                 title: "Error",
-                description: error.message || "Could not update status.",
+                description: error.message || "Could not process return.",
                 variant: "destructive",
             });
         } finally {
@@ -142,14 +178,11 @@ const ReturnsList = () => {
         }
     };
 
-    const getStatusBadgeVariant = (status: string) => {
-        switch (status) {
-            case "active": return "default";
-            case "inactive": return "secondary";
-            case "in_repair": return "destructive";
-            default: return "outline";
-        }
-    };
+    const validation = selectedItem?.sets?.set_weight && measuredWeight
+        ? calculateWeightValidation(parseFloat(measuredWeight), selectedItem.sets.set_weight)
+        : null;
+
+    const isConfirmDisabled = !measuredWeight || isUpdating || !validation;
 
     if (isLoading) {
         return (
@@ -217,7 +250,7 @@ const ReturnsList = () => {
                                         variant="ghost"
                                         size="icon"
                                         onClick={() => handleEditClick(item)}
-                                        title="Edit set status"
+                                        title="Weigh and process return"
                                     >
                                         <Edit2 className="h-4 w-4" />
                                     </Button>
@@ -231,51 +264,91 @@ const ReturnsList = () => {
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Update Set Status</DialogTitle>
+                        <DialogTitle>Process Set Return</DialogTitle>
                         <DialogDescription>
-                            Change the status of set <strong>{selectedItem?.sets?.set_ref}</strong>.
-                            This action will automatically update the inventory.
+                            Weigh the set <strong>{selectedItem?.sets?.set_ref}</strong> and verify its condition.
+                            Status will be automatically determined based on weight tolerance (±5%).
                         </DialogDescription>
                     </DialogHeader>
 
                     <div className="grid gap-4 py-4">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                Test Result
+                        {/* Expected Weight Display */}
+                        <div className="space-y-2 p-3 bg-muted rounded-lg">
+                            <label className="text-sm font-medium text-muted-foreground">
+                                Expected Weight
                             </label>
-                            <Select value={newStatus} onValueChange={setNewStatus}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select test result" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="active">Weight OK (Move to Stock)</SelectItem>
-                                    <SelectItem value="in_repair">Missing Pieces (Move to Repair)</SelectItem>
-                                </SelectContent>
-                            </Select>
+                            <div className="text-2xl font-bold">
+                                {selectedItem?.sets?.set_weight ? `${selectedItem.sets.set_weight}g` : "N/A"}
+                            </div>
+                            {validation && (
+                                <div className="text-xs text-muted-foreground">
+                                    Acceptable range: {validation.minWeight}g - {validation.maxWeight}g
+                                </div>
+                            )}
                         </div>
 
-                        {newStatus === "in_repair" && (
-                            <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg p-3 flex gap-3 text-amber-800 dark:text-amber-200 text-sm">
-                                <AlertCircle className="h-5 w-5 flex-shrink-0" />
-                                <p>Will be marked as "In Repair" (+1 unit).</p>
-                            </div>
+                        {/* Measured Weight Input */}
+                        <div className="space-y-2">
+                            <Label htmlFor="weight">Measured Weight (gr)</Label>
+                            <Input
+                                id="weight"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder="000.00"
+                                value={measuredWeight}
+                                onChange={(e) => setMeasuredWeight(e.target.value)}
+                                disabled={isUpdating}
+                                className="font-mono text-lg"
+                            />
+                        </div>
+
+                        {/* Validation Feedback */}
+                        {validation && (
+                            <>
+                                {validation.isOk ? (
+                                    <Alert className="bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-900">
+                                        <AlertCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                                        <AlertDescription className="text-green-800 dark:text-green-200">
+                                            ✓ Weight OK ({measuredWeight}g). Set will be marked as <strong>ACTIVE</strong> and returned to stock.
+                                        </AlertDescription>
+                                    </Alert>
+                                ) : (
+                                    <Alert className="bg-orange-50 border-orange-200 dark:bg-orange-950/30 dark:border-orange-900">
+                                        <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                                        <AlertDescription className="text-orange-800 dark:text-orange-200">
+                                            ⚠ Weight out of range ({measuredWeight}g, difference: {validation.difference > 0 ? '+' : ''}{validation.difference}g).
+                                            Set will be marked as <strong>IN REPAIR</strong> for missing pieces inspection.
+                                        </AlertDescription>
+                                    </Alert>
+                                )}
+                            </>
                         )}
 
-                        {newStatus === "active" && (
-                            <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-lg p-3 flex gap-3 text-blue-800 dark:text-blue-200 text-sm">
-                                <AlertCircle className="h-5 w-5 flex-shrink-0" />
-                                <p>Will be marked as "Active/Stock".</p>
-                            </div>
+                        {!validation && measuredWeight && (
+                            <Alert className="bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-900">
+                                <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                                <AlertDescription className="text-red-800 dark:text-red-200">
+                                    Please enter a valid weight.
+                                </AlertDescription>
+                            </Alert>
                         )}
                     </div>
 
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isUpdating}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setIsDialogOpen(false)}
+                            disabled={isUpdating}
+                        >
                             Cancel
                         </Button>
-                        <Button onClick={handleConfirmUpdate} disabled={isUpdating}>
+                        <Button
+                            onClick={handleConfirmUpdate}
+                            disabled={isConfirmDisabled}
+                        >
                             {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Confirm Change
+                            Confirm & Process
                         </Button>
                     </DialogFooter>
                 </DialogContent>

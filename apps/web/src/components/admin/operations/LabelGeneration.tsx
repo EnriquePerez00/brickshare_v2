@@ -12,8 +12,13 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Printer, Tag, RefreshCw, Package } from "lucide-react";
+import { Printer, Tag, RefreshCw, Package, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
+
+// ── Cost configuration ─────────────────────────────────────────────────────────
+// Shipping cost for Correos PUDO (in EUR). Must match the value used in
+// process-assignment-payment Edge Function.
+const COSTE_ENVIO_DEVOLUCION = 8;
 
 interface PendingShipment {
     id: string;
@@ -22,6 +27,9 @@ interface PendingShipment {
     pudo_type: string;
     delivery_qr_code: string;
     correos_shipment_id: string | null;
+    swikly_wish_id: string | null;
+    swikly_status: string | null;
+    swikly_deposit_amount: number | null;
     users: {
         full_name: string | null;
         email: string | null;
@@ -29,8 +37,78 @@ interface PendingShipment {
     sets: {
         set_name: string;
         set_ref: string;
+        set_pvp_release: number | null;
     } | null;
 }
+
+// ── Swikly deposit helper ──────────────────────────────────────────────────────
+// Creates a Swikly wish (deposit guarantee) for the shipment.
+// Amount equals sets.set_pvp_release for the shipped set.
+// Must succeed before the process can continue.
+//
+// ⚠️ DEVELOPMENT MODE: Swikly is bypassed in development environments.
+// Set VITE_SKIP_SWIKLY_IN_DEV=true in .env.local to use mock responses.
+const createSwiklyDeposit = async (shipmentId: string): Promise<{ wish_id: string; wish_url: string; deposit_amount: number }> => {
+    const skipSwiklyInDev = import.meta.env.VITE_SKIP_SWIKLY_IN_DEV === 'true';
+    
+    try {
+        // ── Development bypass: Use mock Swikly deposit ──────────────────────
+        if (skipSwiklyInDev) {
+            console.log(`⏭️  [DEV] Skipping Swikly for shipment ${shipmentId} (VITE_SKIP_SWIKLY_IN_DEV=true)`);
+            
+            const mockWishId = `MOCK-${shipmentId.substring(0, 8).toUpperCase()}`;
+            const mockDepositAmount = 5000; // €50.00
+            
+            // Update shipment with mock Swikly data
+            await supabase
+                .from('shipments')
+                .update({
+                    swikly_wish_id: mockWishId,
+                    swikly_wish_url: 'https://mock-swikly.local',
+                    swikly_status: 'wish_created',
+                    swikly_deposit_amount: mockDepositAmount,
+                })
+                .eq('id', shipmentId);
+            
+            console.log(`✅ [DEV] Mock Swikly wish created: ${mockWishId} — €${(mockDepositAmount / 100).toFixed(2)}`);
+            
+            return {
+                wish_id: mockWishId,
+                wish_url: 'https://mock-swikly.local',
+                deposit_amount: mockDepositAmount,
+            };
+        }
+
+        const { data, error } = await supabase.functions.invoke(
+            'create-swikly-wish-shipment',
+            { body: { shipment_id: shipmentId } }
+        );
+
+        if (error) {
+            throw new Error(error.message || 'Error al crear la fianza Swikly');
+        }
+
+        if (!data?.success) {
+            throw new Error(data?.error || 'Swikly no devolvió una respuesta válida');
+        }
+
+        // If skipped (already existed), that's OK
+        if (data.skipped) {
+            console.log(`ℹ️ Swikly wish already existed for shipment ${shipmentId}`);
+        } else {
+            console.log(`✅ Swikly wish created: ${data.wish_id} — €${(data.deposit_amount / 100).toFixed(2)}`);
+        }
+
+        return {
+            wish_id: data.wish_id,
+            wish_url: data.wish_url ?? '',
+            deposit_amount: data.deposit_amount,
+        };
+    } catch (error: any) {
+        console.error('❌ Error creando fianza Swikly:', error);
+        throw new Error(`Error fianza Swikly: ${error.message}`);
+    }
+};
 
 // Helper function to process payment for Correos PUDO users
 const processCorreosPayment = async (userId: string, setRef: string): Promise<boolean> => {
@@ -90,6 +168,7 @@ const LabelGeneration = () => {
     const [generatingAll, setGeneratingAll] = useState(false);
 
     // Fetch assigned shipments (ready for label generation)
+    // IMPORTANT: Only show shipments with Swikly deposit accepted
     const { data: pendingShipments, isLoading } = useQuery({
         queryKey: ["pending-shipments"],
         queryFn: async () => {
@@ -102,6 +181,9 @@ const LabelGeneration = () => {
                     pudo_type,
                     delivery_qr_code,
                     correos_shipment_id,
+                    swikly_wish_id,
+                    swikly_status,
+                    swikly_deposit_amount,
                     users:user_id (
                         full_name,
                         email,
@@ -110,6 +192,7 @@ const LabelGeneration = () => {
                     )
                 `)
                 .eq("shipment_status", "assigned")
+                .eq("swikly_status", "accepted")
                 .order("created_at", { ascending: true });
 
             if (error) throw error;
@@ -119,7 +202,7 @@ const LabelGeneration = () => {
                 const setRefs = [...new Set(data.map(s => s.set_ref))];
                 const { data: setsData } = await supabase
                     .from("sets")
-                    .select("set_name, set_ref")
+                    .select("set_name, set_ref, set_pvp_release")
                     .in("set_ref", setRefs);
 
                 // Map sets data to shipments
@@ -138,10 +221,10 @@ const LabelGeneration = () => {
         const shipment = pendingShipments?.find(s => s.id === shipmentId);
         if (!shipment) throw new Error('Shipment not found');
 
-        // Step 1: Process payment first (required for Correos PUDO)
-        console.log('📤 Processing payment for Correos shipment:', shipmentId);
+        // Step 1: Process shipping payment (required for Correos PUDO)
+        console.log(`📤 Processing Correos shipping payment (€${COSTE_ENVIO_DEVOLUCION}) for shipment:`, shipmentId);
         await processCorreosPayment(shipment.user_id, shipment.set_ref);
-        toast.info('Pago procesado correctamente');
+        toast.info(`Pago de envío (€${COSTE_ENVIO_DEVOLUCION}) procesado correctamente`);
 
         // Step 2: Preregister if not already done
         if (!shipment?.correos_shipment_id) {
@@ -186,23 +269,45 @@ const LabelGeneration = () => {
         const shipment = pendingShipments?.find(s => s.id === shipmentId);
         
         // Check if QR code exists, generate if missing
-        if (!shipment?.delivery_qr_code) {
+        let qrCode = shipment?.delivery_qr_code;
+        if (!qrCode) {
             console.log('Delivery QR code missing, generating...');
-            const qrCode = `BS-DEL-${shipmentId.substring(0, 12).toUpperCase()}`;
+            qrCode = `BS-DEL-${shipmentId.substring(0, 12).toUpperCase()}`;
+            
+            // Also generate pickup QR code with BS-PCK- prefix
+            const pickupQR = `BS-PCK-${shipmentId.substring(0, 12).toUpperCase()}`;
             
             const { error: updateError } = await supabase
                 .from('shipments')
-                .update({ delivery_qr_code: qrCode })
+                .update({ 
+                    delivery_qr_code: qrCode,
+                    pickup_qr_code: pickupQR
+                })
                 .eq('id', shipmentId);
             
             if (updateError) {
-                throw new Error(`Error generando código QR: ${updateError.message}`);
+                throw new Error(`Error generando códigos QR: ${updateError.message}`);
             }
             
-            console.log('QR code generated:', qrCode);
+            console.log('Delivery QR code generated:', qrCode);
+            console.log('Pickup QR code generated:', pickupQR);
+        } else if (!shipment?.pickup_qr_code) {
+            // If delivery code exists but pickup code is missing, generate pickup code
+            const pickupQR = `BS-PCK-${shipmentId.substring(0, 12).toUpperCase()}`;
+            
+            const { error: pickupError } = await supabase
+                .from('shipments')
+                .update({ pickup_qr_code: pickupQR })
+                .eq('id', shipmentId);
+
+            if (pickupError) {
+                throw new Error(`Error generando código QR de recogida: ${pickupError.message}`);
+            }
+
+            console.log('Pickup QR code created:', pickupQR);
         }
 
-        // Send QR email to user
+        // Send QR email to user and generate PUDO reception label
         const { data, error } = await supabase.functions.invoke(
             'send-brickshare-qr-email',
             {
@@ -219,7 +324,33 @@ const LabelGeneration = () => {
         }
 
         toast.success('Email con QR enviado al usuario');
+        
+        // Store the label HTML for printing
+        if (data?.label_html) {
+            // Store in session storage for printing in new window
+            sessionStorage.setItem(`label-${shipmentId}`, data.label_html);
+            
+            // Trigger print window after a short delay
+            setTimeout(() => {
+                openLabelPrintWindow(shipmentId, data.label_html);
+            }, 500);
+        }
+        
         return data;
+    };
+
+    // Open label in print-friendly window
+    const openLabelPrintWindow = (shipmentId: string, labelHTML: string) => {
+        const printWindow = window.open('', `print-label-${shipmentId}`, 'width=400,height=300');
+        if (printWindow) {
+            printWindow.document.write(labelHTML);
+            printWindow.document.close();
+            
+            // Trigger print dialog after content loads
+            setTimeout(() => {
+                printWindow.print();
+            }, 250);
+        }
     };
 
     // Update shipment status
@@ -241,7 +372,15 @@ const LabelGeneration = () => {
             setGeneratingIds(prev => new Set(prev).add(shipment.id));
 
             try {
-                // Generate label based on PUDO type
+                // ── STEP 0: Create Swikly deposit (MANDATORY for ALL pudo types) ──
+                console.log('🔒 Creating Swikly deposit for shipment:', shipment.id);
+                const depositInfo = await createSwiklyDeposit(shipment.id);
+                toast.info(
+                    `Fianza Swikly creada (€${(depositInfo.deposit_amount / 100).toFixed(2)})`,
+                    { description: `Wish ID: ${depositInfo.wish_id}` }
+                );
+
+                // ── STEP 1: Generate label based on PUDO type ─────────────────────
                 if (shipment.pudo_type === 'correos') {
                     await generateCorreosLabel(shipment.id);
                 } else if (shipment.pudo_type === 'brickshare') {
@@ -274,7 +413,11 @@ const LabelGeneration = () => {
             let errorMessage = error.message;
             
             // Provide more specific error messages
-            if (errorMessage.includes('PUDO')) {
+            if (errorMessage.includes('Swikly') || errorMessage.includes('fianza')) {
+                errorMessage = `Error de fianza para ${shipment.users?.full_name}: ${error.message}`;
+            } else if (errorMessage.includes('set_pvp_release')) {
+                errorMessage = `El set ${shipment.set_ref} no tiene precio PVP configurado. Actualiza el set antes de generar la etiqueta.`;
+            } else if (errorMessage.includes('PUDO')) {
                 errorMessage = `${shipment.users?.full_name} no tiene punto PUDO configurado`;
             } else if (errorMessage.includes('QR')) {
                 errorMessage = `Error generando código QR para ${shipment.users?.full_name}`;
@@ -309,8 +452,12 @@ const LabelGeneration = () => {
             for (const shipment of pendingShipments) {
                 try {
                     console.log(`Processing shipment ${shipment.id} for ${shipment.users?.full_name}`);
+
+                    // STEP 0: Create Swikly deposit (MANDATORY for ALL pudo types)
+                    console.log('🔒 Creating Swikly deposit for shipment:', shipment.id);
+                    await createSwiklyDeposit(shipment.id);
                     
-                    // Generate label based on PUDO type
+                    // STEP 1: Generate label based on PUDO type
                     if (shipment.pudo_type === 'correos') {
                         await generateCorreosLabel(shipment.id);
                     } else if (shipment.pudo_type === 'brickshare') {
@@ -423,6 +570,7 @@ const LabelGeneration = () => {
                                             <TableHead>Usuario</TableHead>
                                             <TableHead>Set (Ref)</TableHead>
                                             <TableHead className="text-center">Tipo PUDO</TableHead>
+                                            <TableHead className="text-center">Fianza</TableHead>
                                             <TableHead className="text-center">QR/Código</TableHead>
                                             <TableHead className="text-right">Acción</TableHead>
                                         </TableRow>
@@ -451,6 +599,18 @@ const LabelGeneration = () => {
                                                     </TableCell>
                                                     <TableCell className="text-center">
                                                         {getPudoBadge(shipment.pudo_type)}
+                                                    </TableCell>
+                                                    <TableCell className="text-center">
+                                                        {shipment.swikly_wish_id ? (
+                                                            <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300 gap-1">
+                                                                <ShieldCheck className="h-3 w-3" />
+                                                                €{shipment.swikly_deposit_amount ? (shipment.swikly_deposit_amount / 100).toFixed(0) : '?'}
+                                                            </Badge>
+                                                        ) : (
+                                                            <span className="text-xs text-muted-foreground">
+                                                                Pendiente
+                                                            </span>
+                                                        )}
                                                     </TableCell>
                                                     <TableCell className="text-center">
                                                         {shipment.pudo_type === 'brickshare' && shipment.delivery_qr_code ? (

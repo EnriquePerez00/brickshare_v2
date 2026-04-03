@@ -45,6 +45,62 @@ CREATE TYPE "public"."operation_type" AS ENUM (
 ALTER TYPE "public"."operation_type" OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."add_missing_pieces_batch"("p_set_id" "uuid", "p_pieces" json) RETURNS json
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+DECLARE
+    v_piece RECORD;
+    v_inserted_count INTEGER := 0;
+    v_error_count INTEGER := 0;
+BEGIN
+    -- Validar que el set existe
+    IF NOT EXISTS (SELECT 1 FROM public.sets WHERE id = p_set_id) THEN
+        RAISE EXCEPTION 'Set not found: %', p_set_id;
+    END IF;
+
+    -- Insertar cada pieza del JSON array
+    FOR v_piece IN 
+        SELECT 
+            (elem::jsonb->>'piece_ref') AS piece_ref,
+            (elem::jsonb->>'quantity')::INTEGER AS quantity
+        FROM json_array_elements(p_pieces) AS elem
+    LOOP
+        BEGIN
+            INSERT INTO public.reception_missing_pieces (
+                set_id,
+                piece_ref,
+                quantity,
+                status
+            ) VALUES (
+                p_set_id,
+                v_piece.piece_ref,
+                v_piece.quantity,
+                'pending'
+            );
+            v_inserted_count := v_inserted_count + 1;
+        EXCEPTION WHEN OTHERS THEN
+            v_error_count := v_error_count + 1;
+        END;
+    END LOOP;
+
+    RETURN json_build_object(
+        'success', v_error_count = 0,
+        'inserted_count', v_inserted_count,
+        'error_count', v_error_count
+    );
+EXCEPTION WHEN OTHERS THEN
+    RETURN json_build_object(
+        'success', false,
+        'error', SQLERRM,
+        'inserted_count', v_inserted_count
+    );
+END;
+$$;
+
+
+ALTER FUNCTION "public"."add_missing_pieces_batch"("p_set_id" "uuid", "p_pieces" json) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."confirm_assign_sets_to_users"("p_user_ids" "uuid"[]) RETURNS TABLE("shipment_id" "uuid", "user_id" "uuid", "set_id" "uuid", "user_name" "text", "user_email" "text", "user_phone" "text", "set_name" "text", "set_ref" "text", "set_weight" numeric, "pudo_id" "text", "pudo_name" "text", "pudo_address" "text", "pudo_cp" "text", "pudo_city" "text", "pudo_province" "text", "created_at" timestamp with time zone)
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -465,21 +521,6 @@ COMMENT ON FUNCTION "public"."generate_return_qr"("p_shipment_id" "uuid") IS 'Ge
 
 
 
-CREATE OR REPLACE FUNCTION "public"."get_set_by_ref"("p_set_ref" "text") RETURNS TABLE("set_name" "text", "set_ref" "text", "theme" "text")
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-BEGIN
-  RETURN QUERY
-  SELECT s.set_name, s.set_ref, s.theme
-  FROM sets s
-  WHERE s.set_ref = p_set_ref;
-END;
-$$;
-
-
-ALTER FUNCTION "public"."get_set_by_ref"("p_set_ref" "text") OWNER TO "postgres";
-
-
 CREATE OR REPLACE FUNCTION "public"."get_user_active_pudo"("p_user_id" "uuid") RETURNS TABLE("pudo_type" "text", "pudo_id" "text", "pudo_name" "text", "pudo_address" "text", "pudo_city" "text", "pudo_postal_code" "text")
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
@@ -733,6 +774,107 @@ $$;
 ALTER FUNCTION "public"."increment_referral_credits"("p_user_id" "uuid", "p_amount" integer) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."mark_pieces_as_ordered"("p_piece_refs" "text"[]) RETURNS json
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+DECLARE
+    v_updated_count INTEGER := 0;
+BEGIN
+    -- Validar que hay piece_refs
+    IF array_length(p_piece_refs, 1) IS NULL OR array_length(p_piece_refs, 1) = 0 THEN
+        RETURN json_build_object(
+            'success', false,
+            'error', 'No piece references provided',
+            'updated_count', 0
+        );
+    END IF;
+
+    -- Actualizar todas las piezas pending que coincidan con los piece_refs
+    UPDATE public.reception_missing_pieces
+    SET status = 'ordered',
+        updated_at = NOW()
+    WHERE piece_ref = ANY(p_piece_refs)
+    AND status = 'pending';
+
+    GET DIAGNOSTICS v_updated_count = ROW_COUNT;
+
+    RETURN json_build_object(
+        'success', true,
+        'updated_count', v_updated_count,
+        'piece_refs_processed', array_length(p_piece_refs, 1)
+    );
+EXCEPTION WHEN OTHERS THEN
+    RETURN json_build_object(
+        'success', false,
+        'error', SQLERRM,
+        'updated_count', 0
+    );
+END;
+$$;
+
+
+ALTER FUNCTION "public"."mark_pieces_as_ordered"("p_piece_refs" "text"[]) OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."mark_pieces_as_ordered"("p_piece_refs" "text"[]) IS 'Marca piezas faltantes con status pending como ordered. Usado desde la sección Comprar Piezas del panel admin.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."mark_repairs_complete"("p_set_id" "uuid", "p_notes" "text" DEFAULT NULL::"text") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+DECLARE
+    v_set_ref TEXT;
+    v_missing_pieces_count INTEGER;
+BEGIN
+    -- Obtener información del set
+    SELECT set_ref INTO v_set_ref
+    FROM public.sets
+    WHERE id = p_set_id;
+
+    IF v_set_ref IS NULL THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'message', 'Set not found'
+        );
+    END IF;
+
+    -- Contar piezas faltantes aún registradas
+    SELECT COUNT(*) INTO v_missing_pieces_count
+    FROM public.reception_missing_pieces
+    WHERE set_id = p_set_id;
+
+    -- Cambiar estado a disponible
+    UPDATE public.sets
+    SET set_status = 'active',
+        updated_at = NOW()
+    WHERE id = p_set_id;
+
+    -- Actualizar inventario si existe
+    UPDATE public.inventory_sets
+    SET en_stock = en_stock + 1,
+        en_reparacion = CASE WHEN en_reparacion > 0 THEN en_reparacion - 1 ELSE 0 END,
+        updated_at = NOW()
+    WHERE set_id = p_set_id;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'message', 'Repairs marked as complete',
+        'set_ref', v_set_ref,
+        'missing_pieces_recorded', v_missing_pieces_count,
+        'status', 'active'
+    );
+END;
+$$;
+
+
+ALTER FUNCTION "public"."mark_repairs_complete"("p_set_id" "uuid", "p_notes" "text") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."mark_repairs_complete"("p_set_id" "uuid", "p_notes" "text") IS 'Marca un set como reparado y lo devuelve al inventario disponible.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."preview_assign_sets_to_users"() RETURNS TABLE("user_id" "uuid", "user_name" "text", "set_id" "uuid", "set_name" "text", "set_ref" "text", "set_price" numeric, "current_stock" integer, "matches_wishlist" boolean, "pudo_type" "text")
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -871,6 +1013,103 @@ $$;
 
 
 ALTER FUNCTION "public"."process_referral_credit"("p_referee_user_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."process_set_return_with_weight"("p_shipment_id" "uuid", "p_set_id" "uuid", "p_user_id" "uuid", "p_weight_measured" numeric, "p_weight_tolerance" numeric DEFAULT 0.05) RETURNS json
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+DECLARE
+    v_expected_weight NUMERIC;
+    v_min_weight NUMERIC;
+    v_max_weight NUMERIC;
+    v_new_status TEXT;
+    v_weight_ok BOOLEAN;
+    v_result JSON;
+BEGIN
+    -- Validar parámetros
+    IF p_weight_measured <= 0 THEN
+        RAISE EXCEPTION 'Weight measured must be greater than 0';
+    END IF;
+
+    -- Obtener peso esperado del set
+    SELECT set_weight INTO v_expected_weight
+    FROM public.sets
+    WHERE id = p_set_id;
+
+    IF v_expected_weight IS NULL THEN
+        RAISE EXCEPTION 'Set weight not found for set_id: %', p_set_id;
+    END IF;
+
+    -- Calcular rango de tolerancia
+    v_min_weight := v_expected_weight * (1 - p_weight_tolerance);
+    v_max_weight := v_expected_weight * (1 + p_weight_tolerance);
+    v_weight_ok := p_weight_measured BETWEEN v_min_weight AND v_max_weight;
+    v_new_status := CASE WHEN v_weight_ok THEN 'active' ELSE 'in_repair' END;
+
+    -- Insertar registro en reception_operations
+    INSERT INTO public.reception_operations (
+        event_id,
+        user_id,
+        set_id,
+        weight_measured,
+        reception_completed,
+        missing_parts
+    ) VALUES (
+        p_shipment_id,
+        p_user_id,
+        p_set_id,
+        p_weight_measured,
+        true,
+        CASE 
+            WHEN NOT v_weight_ok THEN 
+                format('Peso fuera de tolerancia: %s g (esperado: %s g, rango: %s-%s g)', 
+                    p_weight_measured, v_expected_weight, v_min_weight, v_max_weight)
+            ELSE NULL
+        END
+    );
+
+    -- Actualizar estado del set
+    UPDATE public.sets
+    SET set_status = v_new_status
+    WHERE id = p_set_id;
+
+    -- Actualizar inventario
+    IF v_new_status = 'active' THEN
+        UPDATE public.inventory_sets
+        SET inventory_set_total_qty = COALESCE(inventory_set_total_qty, 0) + 1
+        WHERE set_id = p_set_id;
+    ELSE
+        -- Si entra en reparación, no modificar el inventario aquí
+        -- Se gestionará mediante la tabla reception_operations
+        NULL;
+    END IF;
+
+    -- Marcar shipment como procesado
+    UPDATE public.shipments
+    SET handling_processed = true
+    WHERE id = p_shipment_id;
+
+    -- Retornar resultado
+    v_result := json_build_object(
+        'success', true,
+        'new_status', v_new_status,
+        'weight_ok', v_weight_ok,
+        'measured_weight', p_weight_measured,
+        'expected_weight', v_expected_weight,
+        'tolerance_range', json_build_object('min', v_min_weight, 'max', v_max_weight)
+    );
+
+    RETURN v_result;
+EXCEPTION WHEN OTHERS THEN
+    RETURN json_build_object(
+        'success', false,
+        'error', SQLERRM
+    );
+END;
+$$;
+
+
+ALTER FUNCTION "public"."process_set_return_with_weight"("p_shipment_id" "uuid", "p_set_id" "uuid", "p_user_id" "uuid", "p_weight_measured" numeric, "p_weight_tolerance" numeric) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."set_updated_at"() RETURNS "trigger"
@@ -1139,18 +1378,12 @@ CREATE TABLE IF NOT EXISTS "public"."shipments" (
     "shipping_provider" "text",
     "pickup_provider_address" "text",
     "tracking_number" "text",
-    "carrier" "text",
-    "additional_notes" "text",
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "return_request_date" timestamp with time zone,
-    "pickup_provider" "text",
     "set_ref" "text",
     "set_id" "uuid",
     "handling_processed" boolean DEFAULT false,
     "correos_shipment_id" "text",
-    "label_url" "text",
-    "pickup_id" "text",
     "swikly_wish_id" "text",
     "swikly_wish_url" "text",
     "swikly_status" "text" DEFAULT 'pending'::"text",
@@ -1163,7 +1396,6 @@ CREATE TABLE IF NOT EXISTS "public"."shipments" (
     "return_qr_code" "text",
     "return_qr_expires_at" timestamp with time zone,
     "return_validated_at" timestamp with time zone,
-    "brickshare_metadata" "jsonb" DEFAULT '{}'::"jsonb",
     "brickshare_package_id" "text",
     "pudo_type" "text",
     "shipping_province" "text",
@@ -1177,15 +1409,11 @@ CREATE TABLE IF NOT EXISTS "public"."shipments" (
 ALTER TABLE "public"."shipments" OWNER TO "postgres";
 
 
+COMMENT ON TABLE "public"."shipments" IS 'Stores shipment records with tracking, delivery status, and PUDO location information';
+
+
+
 COMMENT ON COLUMN "public"."shipments"."shipment_status" IS 'Allowed values: preparacion, ruta_envio, entregado, devuelto, ruta_devolucion, cancelado';
-
-
-
-COMMENT ON COLUMN "public"."shipments"."return_request_date" IS 'Date when the user requested a return';
-
-
-
-COMMENT ON COLUMN "public"."shipments"."pickup_provider" IS 'Carrier or entity in charge of the return pickup';
 
 
 
@@ -1201,11 +1429,19 @@ COMMENT ON COLUMN "public"."shipments"."correos_shipment_id" IS 'External shipme
 
 
 
-COMMENT ON COLUMN "public"."shipments"."label_url" IS 'Path to the generated shipping label in storage';
+COMMENT ON COLUMN "public"."shipments"."swikly_wish_id" IS 'Swikly wish ID for the deposit guarantee';
 
 
 
-COMMENT ON COLUMN "public"."shipments"."pickup_id" IS 'External identifier for the scheduled pickup';
+COMMENT ON COLUMN "public"."shipments"."swikly_wish_url" IS 'URL for the user to complete the deposit guarantee';
+
+
+
+COMMENT ON COLUMN "public"."shipments"."swikly_status" IS 'Deposit status: pending, wish_created, accepted, declined, cancelled, expired, released, captured';
+
+
+
+COMMENT ON COLUMN "public"."shipments"."swikly_deposit_amount" IS 'Deposit amount in cents, based on sets.set_pvp_release';
 
 
 
@@ -1319,6 +1555,43 @@ COMMENT ON TABLE "public"."qr_validation_logs" IS 'Logs of QR code validations f
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."reception_missing_pieces" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "set_id" "uuid" NOT NULL,
+    "time" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "piece_ref" "text" NOT NULL,
+    "quantity" integer NOT NULL,
+    "status" "text" DEFAULT 'pending'::"text" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "reception_missing_pieces_quantity_check" CHECK (("quantity" > 0)),
+    CONSTRAINT "reception_missing_pieces_status_check" CHECK (("status" = ANY (ARRAY['pending'::"text", 'ordered'::"text", 'received'::"text"])))
+);
+
+
+ALTER TABLE "public"."reception_missing_pieces" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."reception_missing_pieces" IS 'Registro de piezas faltantes detectadas en sets en reparación durante el proceso de devolución y recepción.';
+
+
+
+COMMENT ON COLUMN "public"."reception_missing_pieces"."set_id" IS 'Referencia al set LEGO que le faltan piezas.';
+
+
+
+COMMENT ON COLUMN "public"."reception_missing_pieces"."piece_ref" IS 'Referencia LEGO de la pieza faltante (ej: "3001").';
+
+
+
+COMMENT ON COLUMN "public"."reception_missing_pieces"."quantity" IS 'Cantidad de piezas faltantes de este tipo.';
+
+
+
+COMMENT ON COLUMN "public"."reception_missing_pieces"."status" IS 'Estado del pedido de reemplazo: pending (registrada), ordered (pedida), received (recibida).';
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."reception_operations" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "event_id" "uuid",
@@ -1348,6 +1621,26 @@ COMMENT ON COLUMN "public"."reception_operations"."reception_completed" IS 'True
 
 
 COMMENT ON COLUMN "public"."reception_operations"."missing_parts" IS 'Details or notes about missing pieces found during reception.';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."reception_set_weight" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "set_id" "uuid" NOT NULL,
+    "set_ref" "text" NOT NULL,
+    "weight_kg" numeric(10,3) NOT NULL,
+    "expected_weight_kg" numeric(10,3),
+    "weight_variance_percentage" numeric(10,2),
+    "recorded_by" "uuid" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    "notes" "text"
+);
+
+
+ALTER TABLE "public"."reception_set_weight" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."reception_set_weight" IS 'Registro del peso de sets devueltos. Usado para detectar automáticamente piezas faltantes mediante varianza de peso.';
 
 
 
@@ -1803,6 +2096,21 @@ ALTER TABLE ONLY "public"."qr_validation_logs"
 
 
 
+ALTER TABLE ONLY "public"."reception_missing_pieces"
+    ADD CONSTRAINT "reception_missing_pieces_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."reception_set_weight"
+    ADD CONSTRAINT "reception_set_weight_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."reception_set_weight"
+    ADD CONSTRAINT "reception_set_weight_set_id_key" UNIQUE ("set_id");
+
+
+
 ALTER TABLE ONLY "public"."referrals"
     ADD CONSTRAINT "referrals_pkey" PRIMARY KEY ("id");
 
@@ -1974,6 +2282,26 @@ CREATE INDEX "idx_qr_validation_shipment" ON "public"."qr_validation_logs" USING
 
 
 
+CREATE INDEX "idx_reception_missing_pieces_set_id" ON "public"."reception_missing_pieces" USING "btree" ("set_id");
+
+
+
+CREATE INDEX "idx_reception_missing_pieces_status" ON "public"."reception_missing_pieces" USING "btree" ("status");
+
+
+
+CREATE INDEX "idx_reception_missing_pieces_time" ON "public"."reception_missing_pieces" USING "btree" ("time" DESC);
+
+
+
+CREATE INDEX "idx_reception_set_weight_created_at" ON "public"."reception_set_weight" USING "btree" ("created_at" DESC);
+
+
+
+CREATE INDEX "idx_reception_set_weight_set_id" ON "public"."reception_set_weight" USING "btree" ("set_id");
+
+
+
 CREATE INDEX "idx_set_piece_list_lego_ref" ON "public"."set_piece_list" USING "btree" ("set_ref");
 
 
@@ -1991,6 +2319,10 @@ CREATE INDEX "idx_shipment_update_logs_shipment_id" ON "public"."shipment_update
 
 
 CREATE INDEX "idx_shipment_update_logs_updated_by" ON "public"."shipment_update_logs" USING "btree" ("updated_by", "created_at" DESC);
+
+
+
+CREATE INDEX "idx_shipments_swikly_wish_id" ON "public"."shipments" USING "btree" ("swikly_wish_id") WHERE ("swikly_wish_id" IS NOT NULL);
 
 
 
@@ -2114,6 +2446,10 @@ CREATE OR REPLACE TRIGGER "update_inventario_sets_updated_at" BEFORE UPDATE ON "
 
 
 
+CREATE OR REPLACE TRIGGER "update_reception_missing_pieces_updated_at" BEFORE UPDATE ON "public"."reception_missing_pieces" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
+
+
+
 CREATE OR REPLACE TRIGGER "update_reception_operations_updated_at" BEFORE UPDATE ON "public"."reception_operations" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
 
 
@@ -2185,6 +2521,21 @@ ALTER TABLE ONLY "public"."reception_operations"
 
 ALTER TABLE ONLY "public"."qr_validation_logs"
     ADD CONSTRAINT "qr_validation_logs_shipment_id_fkey" FOREIGN KEY ("shipment_id") REFERENCES "public"."shipments"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."reception_missing_pieces"
+    ADD CONSTRAINT "reception_missing_pieces_set_id_fkey" FOREIGN KEY ("set_id") REFERENCES "public"."sets"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."reception_set_weight"
+    ADD CONSTRAINT "reception_set_weight_recorded_by_fkey" FOREIGN KEY ("recorded_by") REFERENCES "auth"."users"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."reception_set_weight"
+    ADD CONSTRAINT "reception_set_weight_set_id_fkey" FOREIGN KEY ("set_id") REFERENCES "public"."sets"("id") ON DELETE CASCADE;
 
 
 
@@ -2279,11 +2630,23 @@ CREATE POLICY "Admins and Operators can view operations" ON "public"."backoffice
 
 
 
+CREATE POLICY "Admins and operators can delete missing pieces" ON "public"."reception_missing_pieces" FOR DELETE TO "authenticated" USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") OR "public"."has_role"("auth"."uid"(), 'operador'::"public"."app_role")));
+
+
+
 CREATE POLICY "Admins and operators can insert" ON "public"."reception_operations" FOR INSERT TO "authenticated" WITH CHECK (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") OR "public"."has_role"("auth"."uid"(), 'operador'::"public"."app_role")));
 
 
 
+CREATE POLICY "Admins and operators can insert missing pieces" ON "public"."reception_missing_pieces" FOR INSERT TO "authenticated" WITH CHECK (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") OR "public"."has_role"("auth"."uid"(), 'operador'::"public"."app_role")));
+
+
+
 CREATE POLICY "Admins and operators can update" ON "public"."reception_operations" FOR UPDATE TO "authenticated" USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") OR "public"."has_role"("auth"."uid"(), 'operador'::"public"."app_role"))) WITH CHECK (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") OR "public"."has_role"("auth"."uid"(), 'operador'::"public"."app_role")));
+
+
+
+CREATE POLICY "Admins and operators can update missing pieces" ON "public"."reception_missing_pieces" FOR UPDATE TO "authenticated" USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") OR "public"."has_role"("auth"."uid"(), 'operador'::"public"."app_role"))) WITH CHECK (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") OR "public"."has_role"("auth"."uid"(), 'operador'::"public"."app_role")));
 
 
 
@@ -2345,7 +2708,19 @@ CREATE POLICY "Authenticated users can read" ON "public"."reception_operations" 
 
 
 
+CREATE POLICY "Authenticated users can read missing pieces" ON "public"."reception_missing_pieces" FOR SELECT TO "authenticated" USING (true);
+
+
+
 CREATE POLICY "Inventario is viewable by everyone" ON "public"."inventory_sets" FOR SELECT USING (true);
+
+
+
+CREATE POLICY "Operadores can view and manage set weights" ON "public"."reception_set_weight" USING (((EXISTS ( SELECT 1
+   FROM "public"."user_roles"
+  WHERE (("user_roles"."user_id" = "auth"."uid"()) AND ("user_roles"."role" = 'operador'::"public"."app_role")))) OR (EXISTS ( SELECT 1
+   FROM "public"."user_roles"
+  WHERE (("user_roles"."user_id" = "auth"."uid"()) AND ("user_roles"."role" = 'admin'::"public"."app_role"))))));
 
 
 
@@ -2490,7 +2865,13 @@ ALTER TABLE "public"."inventory_sets" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."qr_validation_logs" ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE "public"."reception_missing_pieces" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."reception_operations" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."reception_set_weight" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."referrals" ENABLE ROW LEVEL SECURITY;
@@ -2592,6 +2973,12 @@ GRANT USAGE ON SCHEMA "public" TO "service_role";
 
 
 
+GRANT ALL ON FUNCTION "public"."add_missing_pieces_batch"("p_set_id" "uuid", "p_pieces" json) TO "anon";
+GRANT ALL ON FUNCTION "public"."add_missing_pieces_batch"("p_set_id" "uuid", "p_pieces" json) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."add_missing_pieces_batch"("p_set_id" "uuid", "p_pieces" json) TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."confirm_assign_sets_to_users"("p_user_ids" "uuid"[]) TO "anon";
 GRANT ALL ON FUNCTION "public"."confirm_assign_sets_to_users"("p_user_ids" "uuid"[]) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."confirm_assign_sets_to_users"("p_user_ids" "uuid"[]) TO "service_role";
@@ -2631,12 +3018,6 @@ GRANT ALL ON FUNCTION "public"."generate_referral_code_users"() TO "service_role
 GRANT ALL ON FUNCTION "public"."generate_return_qr"("p_shipment_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."generate_return_qr"("p_shipment_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."generate_return_qr"("p_shipment_id" "uuid") TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "public"."get_set_by_ref"("p_set_ref" "text") TO "anon";
-GRANT ALL ON FUNCTION "public"."get_set_by_ref"("p_set_ref" "text") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."get_set_by_ref"("p_set_ref" "text") TO "service_role";
 
 
 
@@ -2712,6 +3093,18 @@ GRANT ALL ON FUNCTION "public"."increment_referral_credits"("p_user_id" "uuid", 
 
 
 
+GRANT ALL ON FUNCTION "public"."mark_pieces_as_ordered"("p_piece_refs" "text"[]) TO "anon";
+GRANT ALL ON FUNCTION "public"."mark_pieces_as_ordered"("p_piece_refs" "text"[]) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."mark_pieces_as_ordered"("p_piece_refs" "text"[]) TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."mark_repairs_complete"("p_set_id" "uuid", "p_notes" "text") TO "anon";
+GRANT ALL ON FUNCTION "public"."mark_repairs_complete"("p_set_id" "uuid", "p_notes" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."mark_repairs_complete"("p_set_id" "uuid", "p_notes" "text") TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."preview_assign_sets_to_users"() TO "anon";
 GRANT ALL ON FUNCTION "public"."preview_assign_sets_to_users"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."preview_assign_sets_to_users"() TO "service_role";
@@ -2721,6 +3114,12 @@ GRANT ALL ON FUNCTION "public"."preview_assign_sets_to_users"() TO "service_role
 GRANT ALL ON FUNCTION "public"."process_referral_credit"("p_referee_user_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."process_referral_credit"("p_referee_user_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."process_referral_credit"("p_referee_user_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."process_set_return_with_weight"("p_shipment_id" "uuid", "p_set_id" "uuid", "p_user_id" "uuid", "p_weight_measured" numeric, "p_weight_tolerance" numeric) TO "anon";
+GRANT ALL ON FUNCTION "public"."process_set_return_with_weight"("p_shipment_id" "uuid", "p_set_id" "uuid", "p_user_id" "uuid", "p_weight_measured" numeric, "p_weight_tolerance" numeric) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."process_set_return_with_weight"("p_shipment_id" "uuid", "p_set_id" "uuid", "p_user_id" "uuid", "p_weight_measured" numeric, "p_weight_tolerance" numeric) TO "service_role";
 
 
 
@@ -2808,9 +3207,21 @@ GRANT ALL ON TABLE "public"."qr_validation_logs" TO "service_role";
 
 
 
+GRANT ALL ON TABLE "public"."reception_missing_pieces" TO "anon";
+GRANT ALL ON TABLE "public"."reception_missing_pieces" TO "authenticated";
+GRANT ALL ON TABLE "public"."reception_missing_pieces" TO "service_role";
+
+
+
 GRANT ALL ON TABLE "public"."reception_operations" TO "anon";
 GRANT ALL ON TABLE "public"."reception_operations" TO "authenticated";
 GRANT ALL ON TABLE "public"."reception_operations" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."reception_set_weight" TO "anon";
+GRANT ALL ON TABLE "public"."reception_set_weight" TO "authenticated";
+GRANT ALL ON TABLE "public"."reception_set_weight" TO "service_role";
 
 
 

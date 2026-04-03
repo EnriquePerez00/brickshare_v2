@@ -2,7 +2,7 @@
 
 Aplicación web completa de alquiler/préstamo de sets LEGO para familias, construida con **Vite + React + TypeScript** en el frontend y **Supabase** (PostgreSQL local) en el backend.
 
-> ⚠️ **IMPORTANTE**: Este proyecto usa **Supabase LOCAL únicamente** (Docker). NO existe conexión a Supabase Cloud.
+> ℹ️ **NOTA**: Este proyecto usa **Supabase LOCAL** (Docker) para desarrollo. Todo el stack corre localmente en tu máquina.
 
 ---
 
@@ -277,6 +277,10 @@ psql postgresql://postgres:postgres@127.0.0.1:54322/postgres
 # Obtener status BD
 supabase status
 
+# Reset de base de datos (elige una opción)
+./scripts/safe-db-reset.sh    # Con backup automático (recomendado)
+supabase db reset             # Reset directo sin backup
+
 # Exportar esquema
 supabase db dump --schema public -f docs/schema_dump.sql
 
@@ -350,6 +354,51 @@ npm run test                # Incluye tests de integración
 ```
 - **15+ tests de integración** de flujos completos
 - Ubicación: `apps/web/src/__tests__/integration/`
+
+### Tests Swikly E2E (Sandbox + Validación Automática)
+
+Para desarrollo local, usamos Swikly Sandbox con validación automática mediante tarjeta VISA de prueba:
+
+```bash
+# 1. Asegurar que Supabase está corriendo
+supabase start
+
+# 2. Configurar credenciales Swikly en supabase/functions/.env
+SWIKLY_API_TOKEN_SANDBOX=api-xxxxxxxxxxxxx
+SWIKLY_ACCOUNT_ID=550e8400-e29b-41d4-a716-446655440000
+
+# 3. Ejecutar tests E2E de Swikly
+cd apps/web
+npm run test -- swikly-flow.test.ts
+```
+
+**Tarjeta VISA de Prueba (Sandbox):**
+- Número: `4970 1051 8181 8183`
+- Vencimiento: `12/27`
+- CVV: `123`
+- Email: `test-swikly@brickshare.local`
+- **Se aprueba automáticamente en Sandbox - sin confirmación manual**
+
+**Flujo E2E Testado:**
+1. ✅ Crear envío con set LEGO
+2. ✅ Llamar Edge Function (create-swikly-wish-shipment)
+3. ✅ Simular pago con VISA de prueba
+4. ✅ Procesar webhook de Swikly
+5. ✅ Verificar estado actualizado en BD (swikly_status='secured')
+
+**Ventajas para desarrollo:**
+- ✅ Sin pasos manuales en tests automatizados
+- ✅ Tests ejecutables en CI/CD sin interacción usuario
+- ✅ API Sandbox acepta tarjeta de prueba inmediatamente
+- ✅ Webhook procesado automáticamente
+- ✅ Ver documentación completa: [SWIKLY_E2E_TESTING_GUIDE.md](docs/SWIKLY_E2E_TESTING_GUIDE.md)
+
+**Resultado de tests:**
+```
+ ✓ src/tests/e2e/swikly-flow.test.ts (7 tests) 3ms
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+```
 
 ### Tests E2E (Playwright)
 ```bash

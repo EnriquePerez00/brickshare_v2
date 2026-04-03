@@ -287,6 +287,7 @@ BEGIN
 
   -- Update profile (trigger already created basic record)
   UPDATE public.users SET
+    email = 'enriqueperezbcn1973@gmail.com',
     full_name = 'Enrique Perez',
     phone = '+34600123456',
     address = 'Josep Tarradellas 97-101',

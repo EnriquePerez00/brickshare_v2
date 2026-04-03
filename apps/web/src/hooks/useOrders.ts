@@ -52,31 +52,32 @@ export const useReturnSet = () => {
 
     return useMutation({
         mutationFn: async (envioId: string) => {
-            const { error: dbError } = await supabase
-                .from("shipments" as any)
-                .update({ shipment_status: "in_return_pudo" } as any)
-                .eq("id", envioId);
-
-            if (dbError) throw dbError;
-
-            const { data, error: functionError } = await supabase.functions.invoke('correos-logistics', {
+            const { data, error: functionError } = await supabase.functions.invoke('request-return', {
                 body: {
-                    action: 'return_preregister',
-                    p_shipment_id: envioId
+                    shipmentId: envioId
                 }
             });
 
             if (functionError) {
                 console.error("Function Error:", functionError);
-                throw new Error("Error registering return with Correos: " + functionError.message);
+                throw new Error(functionError.message);
+            }
+
+            if (data?.error) {
+                throw new Error(data.error);
             }
 
             return data;
         },
-        onSuccess: () => {
+        onSuccess: (data) => {
+            const pudoType = data?.pudo_type || "unknown";
+            const returnCode = data?.return_code || "";
+            
             toast({
-                title: "Return initiated",
-                description: "The return has been registered. You will receive an email with the Correos code.",
+                title: "Devolución iniciada",
+                description: pudoType === "brickshare" 
+                    ? "Recibirás un email con el código QR para devolver tu set en tu punto Brickshare PUDO."
+                    : "Recibirás un email con el código de devolución de Correos.",
             });
             queryClient.invalidateQueries({ queryKey: ["orders"] });
         },

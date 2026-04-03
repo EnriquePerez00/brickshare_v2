@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Etiqueta PUDO - Recepción</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: 'Arial', sans-serif; 
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: #f0f0f0;
+      padding: 20px;
+    }
+    .label-container {
+      width: 10cm;
+      height: 5cm;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 0.3cm;
+      border: 2px solid #000;
+      background: white;
+      position: relative;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .qr-section {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .qr-code {
+      width: 3cm;
+      height: 3cm;
+      background: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border: 1px solid #ddd;
+      border-radius: 2px;
+    }
+    .qr-code img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      padding: 2px;
+    }
+    .info-section {
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      font-size: 8pt;
+      line-height: 1.2;
+      text-align: left;
+    }
+    .user-name {
+      font-weight: bold;
+      font-size: 9pt;
+      margin-bottom: 0.1cm;
+      color: #000;
+    }
+    .pudo-name {
+      font-weight: bold;
+      font-size: 8pt;
+      margin-bottom: 0.05cm;
+      color: #000;
+    }
+    .pudo-address {
+      font-size: 7pt;
+      color: #333;
+      line-height: 1.1;
+    }
+    
+    /* Estilos para el preview */
+    .preview-container {
+      margin-top: 40px;
+      text-align: center;
+      color: #666;
+      font-size: 12px;
+    }
+    
+    @media print {
+      body { 
+        margin: 0; 
+        padding: 0; 
+        background: white;
+        display: block;
+      }
+      .label-container { 
+        border: 1px solid #000;
+        box-shadow: none;
+        width: 10cm;
+        height: 5cm;
+      }
+      .preview-container {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div style="text-align: center;">
+    <div class="label-container">
+      <div class="qr-section">
+        <div class="qr-code">
+          <!-- QR generado con ejemplo: BS-REC-ABC123-XYZ789 -->
+          <svg width="283" height="283" viewBox="0 0 283 283" xmlns="http://www.w3.org/2000/svg">
+            <!-- QR Code simulado (patrón básico) -->
+            <rect width="283" height="283" fill="white"/>
+            
+            <!-- Esquinas de posicionamiento (finder patterns) -->
+            <!-- Esquina superior izquierda -->
+            <rect x="0" y="0" width="49" height="49" fill="black"/>
+            <rect x="7" y="7" width="35" height="35" fill="white"/>
+            <rect x="14" y="14" width="21" height="21" fill="black"/>
+            
+            <!-- Esquina superior derecha -->
+            <rect x="234" y="0" width="49" height="49" fill="black"/>
+            <rect x="241" y="7" width="35" height="35" fill="white"/>
+            <rect x="248" y="14" width="21" height="21" fill="black"/>
+            
+            <!-- Esquina inferior izquierda -->
+            <rect x="0" y="234" width="49" height="49" fill="black"/>
+            <rect x="7" y="241" width="35" height="35" fill="white"/>
+            <rect x="14" y="248" width="21" height="21" fill="black"/>
+            
+            <!-- Patrón de sincronización -->
+            <line x1="49" y1="6" x2="234" y2="6" stroke="black" stroke-width="1" stroke-dasharray="7,1"/>
+            <line x1="6" y1="49" x2="6" y2="234" stroke="black" stroke-width="1" stroke-dasharray="7,1"/>
+            
+            <!-- Datos (patrón aleatorio para simular QR real) -->
+            <rect x="70" y="70" width="143" height="143" fill="white"/>
+            <!-- Módulos de datos simulados -->
+            <circle cx="85" cy="85" r="2" fill="black"/>
+            <circle cx="100" cy="90" r="2" fill="black"/>
+            <circle cx="115" cy="100" r="2" fill="black"/>
+            <circle cx="130" cy="110" r="2" fill="black"/>
+            <circle cx="145" cy="120" r="2" fill="black"/>
+            <circle cx="160" cy="130" r="2" fill="black"/>
+            <circle cx="175" cy="140" r="2" fill="black"/>
+            <circle cx="190" cy="150" r="2" fill="black"/>
+            <circle cx="205" cy="160" r="2" fill="black"/>
+            
+            <!-- Más módulos aleatorios para aspecto realista -->
+            <rect x="80" y="85" width="3" height="3" fill="black"/>
+            <rect x="95" y="100" width="3" height="3" fill="black"/>
+            <rect x="110" y="115" width="3" height="3" fill="black"/>
+            <rect x="125" y="130" width="3" height="3" fill="black"/>
+            <rect x="140" y="145" width="3" height="3" fill="black"/>
+            <rect x="155" y="160" width="3" height="3" fill="black"/>
+            <rect x="170" y="175" width="3" height="3" fill="black"/>
+            <rect x="185" y="190" width="3" height="3" fill="black"/>
+            <rect x="200" y="205" width="3" height="3" fill="black"/>
+            <rect x="215" y="220" width="3" height="3" fill="black"/>
+          </svg>
+        </div>
+      </div>
+      <div class="info-section">
+        <div class="user-name">Entrega: Enrique Pérez García</div>
+        <div class="pudo-name">Brickshare Madrid Centro</div>
+        <div class="pudo-address">Calle Gran Vía 28<br/>28013 Madrid</div>
+      </div>
+    </div>
+    
+    <div class="preview-container">
+      <p><strong>Etiqueta PUDO Brickshare - Recepción en Almacén</strong></p>
+      <p>Dimensiones: 10cm × 5cm | Formato: Para impresora térmica</p>
+      <p style="margin-top: 20px; color: #999;">
+        ⌘P (Cmd+P) o Ctrl+P para imprimir<br/>
+        Selecciona: Papel personalizado 10cm × 5cm | Márgenes: Ninguno
+      </p>
+    </div>
+  </div>
+</body>
+</html>
