@@ -269,20 +269,42 @@ const LabelGeneration = () => {
         const shipment = pendingShipments?.find(s => s.id === shipmentId);
         
         // Check if QR code exists, generate if missing
-        if (!shipment?.delivery_qr_code) {
+        let qrCode = shipment?.delivery_qr_code;
+        if (!qrCode) {
             console.log('Delivery QR code missing, generating...');
-            const qrCode = `BS-DEL-${shipmentId.substring(0, 12).toUpperCase()}`;
+            qrCode = `BS-DEL-${shipmentId.substring(0, 12).toUpperCase()}`;
+            
+            // Also generate pickup QR code with BS-PCK- prefix
+            const pickupQR = `BS-PCK-${shipmentId.substring(0, 12).toUpperCase()}`;
             
             const { error: updateError } = await supabase
                 .from('shipments')
-                .update({ delivery_qr_code: qrCode })
+                .update({ 
+                    delivery_qr_code: qrCode,
+                    pickup_qr_code: pickupQR
+                })
                 .eq('id', shipmentId);
             
             if (updateError) {
-                throw new Error(`Error generando código QR: ${updateError.message}`);
+                throw new Error(`Error generando códigos QR: ${updateError.message}`);
             }
             
-            console.log('QR code generated:', qrCode);
+            console.log('Delivery QR code generated:', qrCode);
+            console.log('Pickup QR code generated:', pickupQR);
+        } else if (!shipment?.pickup_qr_code) {
+            // If delivery code exists but pickup code is missing, generate pickup code
+            const pickupQR = `BS-PCK-${shipmentId.substring(0, 12).toUpperCase()}`;
+            
+            const { error: pickupError } = await supabase
+                .from('shipments')
+                .update({ pickup_qr_code: pickupQR })
+                .eq('id', shipmentId);
+
+            if (pickupError) {
+                throw new Error(`Error generando código QR de recogida: ${pickupError.message}`);
+            }
+
+            console.log('Pickup QR code created:', pickupQR);
         }
 
         // Send QR email to user and generate PUDO reception label

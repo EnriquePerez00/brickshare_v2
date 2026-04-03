@@ -3,6 +3,10 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+const FROM_DOMAIN = Deno.env.get("RESEND_FROM_DOMAIN") || "brickclinic.eu";
+const FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "info@brickclinic.eu";
+const SANDBOX_RECIPIENT = Deno.env.get("RESEND_SANDBOX_RECIPIENT") || "enriqueperezbcn1973@gmail.com";
+const IS_DEVELOPMENT = !Deno.env.get("PROD");
 
 // Function to generate QR code as Data URL using QR Server API
 async function generateQRCodeDataURL(text: string): Promise<string> {
@@ -31,13 +35,12 @@ interface EmailRequest {
   type: 'delivery' | 'return';
 }
 
-// Helper function to generate a unique reception QR code (different from user QR)
-async function generateReceptionQRCode(shipmentId: string): Promise<string> {
-  // Format: BS-REC-<timestamp>-<random>
-  const timestamp = Date.now().toString(36).toUpperCase().slice(-6);
-  const random = Math.random().toString(36).substring(2, 8).toUpperCase();
-  return `BS-REC-${timestamp}-${random}`;
+// Helper function to generate QR codes with proper BS-XXX- prefix format (without timestamp)
+function generateQRCode(shipmentId: string, prefix: 'DEL' | 'PCK' | 'RET'): string {
+  const shipmentIdShort = shipmentId.substring(0, 12).toUpperCase();
+  return `BS-${prefix}-${shipmentIdShort}`;
 }
+
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -254,35 +257,48 @@ serve(async (req) => {
     const pudoPhone = pudo?.contact_phone || '';
 
     let qrCode: string;
-    let receptionQRCode: string = '';
     let subject: string;
     let htmlContent: string;
     let labelHTML: string = '';
 
     if (type === 'delivery') {
-      qrCode = shipment.delivery_qr_code;
+      // Generate QR codes if not exist
+      let deliveryQR = shipment.delivery_qr_code;
+      let pickupQR = shipment.pickup_qr_code;
       
-      // Validate QR code exists
-      if (!qrCode) {
-        return new Response(
-          JSON.stringify({ error: 'Delivery QR code not found for this shipment' }),
-          { 
-            status: 400, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        );
+      if (!deliveryQR || !pickupQR) {
+        deliveryQR = deliveryQR || generateQRCode(shipment_id, 'DEL');
+        pickupQR = pickupQR || generateQRCode(shipment_id, 'PCK');
+        
+        // Save to database
+        const { error: updateError } = await supabaseClient
+          .from('shipments')
+          .update({ 
+            delivery_qr_code: deliveryQR,
+            pickup_qr_code: pickupQR
+          })
+          .eq('id', shipment_id);
+          
+        if (updateError) {
+          console.error('Error saving QR codes:', updateError);
+          return new Response(
+            JSON.stringify({ error: 'Failed to save QR codes to database' }),
+            { 
+              status: 500, 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            }
+          );
+        }
       }
-
-      // Generate a DIFFERENT QR code for PUDO reception (warehouse use)
-      receptionQRCode = await generateReceptionQRCode(shipment_id);
       
       subject = `Tu código QR para recoger: ${productName}`;
       
-      // Generate QR code image for USER (delivery QR)
-      const qrImageDataURL = await generateQRCodeDataURL(qrCode);
+      // Generate QR code image for USER EMAIL (pickup QR - BS-PCK)
+      qrCode = pickupQR;
+      const qrImageDataURL = await generateQRCodeDataURL(pickupQR);
 
-      // Generate QR code image for PUDO RECEPTION (different QR for warehouse staff)
-      const receptionQRImageDataURL = await generateQRCodeDataURL(receptionQRCode);
+      // Generate QR code image for PUDO LABEL (delivery QR - BS-DEL)
+      const deliveryQRImageDataURL = await generateQRCodeDataURL(deliveryQR);
       
       // Generate PUDO reception label HTML (10cm x 5cm, 300dpi = 1181px x 591px)
       // This label is for warehouse staff to scan during package reception
@@ -357,7 +373,7 @@ serve(async (req) => {
           <div class="label-container">
             <div class="qr-section">
               <div class="qr-code">
-                ${receptionQRImageDataURL ? `<img src="${receptionQRImageDataURL}" alt="Reception QR" />` : '<p>QR</p>'}
+                ${deliveryQRImageDataURL ? `<img src="${deliveryQRImageDataURL}" alt="Delivery QR" />` : '<p>QR</p>'}
               </div>
             </div>
             <div class="info-section">
@@ -435,17 +451,28 @@ serve(async (req) => {
       `;
     } else {
       // Return email
-      qrCode = shipment.return_qr_code;
-      
-      // Validate QR code exists
-      if (!qrCode) {
-        return new Response(
-          JSON.stringify({ error: 'Return QR code not found for this shipment' }),
-          { 
-            status: 400, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        );
+      // Generate return QR code if not exists
+      if (!shipment.return_qr_code) {
+        qrCode = generateQRCode(shipment_id, 'RET');
+        
+        // Save to database
+        const { error: updateError } = await supabaseClient
+          .from('shipments')
+          .update({ return_qr_code: qrCode })
+          .eq('id', shipment_id);
+          
+        if (updateError) {
+          console.error('Error saving return QR code:', updateError);
+          return new Response(
+            JSON.stringify({ error: 'Failed to save return QR code to database' }),
+            { 
+              status: 500, 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            }
+          );
+        }
+      } else {
+        qrCode = shipment.return_qr_code;
       }
       
       subject = `Tu código QR para devolver: ${productName}`;
@@ -520,43 +547,48 @@ serve(async (req) => {
     }
 
     // Send email via Resend
-    if (!RESEND_API_KEY || RESEND_API_KEY.startsWith('re_test')) {
-      console.warn('⚠️ Resend API key not configured for production. Using test key.');
-      // In development/test, still return success but log a warning
-      console.log('📧 Email would be sent to:', userEmail);
-      console.log('📧 Subject:', subject);
+    if (!RESEND_API_KEY) {
+      console.error('❌ RESEND_API_KEY is not configured in environment');
+      throw new Error('Email service not configured: RESEND_API_KEY is missing');
     }
 
-    let emailResult = { id: `test-${Date.now()}` };
-    
-    if (RESEND_API_KEY && !RESEND_API_KEY.startsWith('re_test')) {
-      // Only attempt actual email send if we have a real API key
-      const emailResponse = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${RESEND_API_KEY}`,
-        },
-        body: JSON.stringify({
-          from: 'Brickshare <onboarding@resend.dev>',
-          to: [userEmail],
-          subject: subject,
-          html: htmlContent,
-        }),
+    // In development, override recipient to sandbox-only address
+    const finalRecipient = IS_DEVELOPMENT ? SANDBOX_RECIPIENT : userEmail;
+
+    console.log('📧 Sending email via Resend...');
+    console.log('   From Domain:', FROM_DOMAIN);
+    console.log('   From Email:', FROM_EMAIL);
+    console.log('   To:', finalRecipient);
+    console.log('   Environment:', IS_DEVELOPMENT ? 'DEVELOPMENT (sandbox)' : 'PRODUCTION');
+    console.log('   Subject:', subject);
+    console.log('   API Key (first 10 chars):', RESEND_API_KEY ? RESEND_API_KEY.substring(0, 10) + '...' : 'NOT SET');
+
+    const emailResponse = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: `Brickshare <${FROM_EMAIL}>`,
+        to: [finalRecipient],
+        subject: subject,
+        html: htmlContent,
+      }),
+    });
+
+    if (!emailResponse.ok) {
+      const errorData = await emailResponse.text();
+      console.error('❌ Error sending email via Resend:', {
+        status: emailResponse.status,
+        statusText: emailResponse.statusText,
+        error: errorData
       });
-
-      if (!emailResponse.ok) {
-        const errorData = await emailResponse.text();
-        console.error('Error sending email via Resend:', {
-          status: emailResponse.status,
-          statusText: emailResponse.statusText,
-          error: errorData
-        });
-        throw new Error(`Resend API error (${emailResponse.status}): Failed to send email`);
-      }
-
-      emailResult = await emailResponse.json();
+      throw new Error(`Resend API error (${emailResponse.status}): ${errorData}`);
     }
+
+    const emailResult = await emailResponse.json();
+    console.log('✅ Email sent successfully:', emailResult);
 
     return new Response(
       JSON.stringify({ 
@@ -564,7 +596,6 @@ serve(async (req) => {
         message: 'QR code email sent successfully',
         email_id: emailResult.id,
         qr_code: qrCode,
-        reception_qr_code: receptionQRCode,
         label_html: labelHTML
       }),
       { 

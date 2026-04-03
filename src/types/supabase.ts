@@ -1325,14 +1325,6 @@ export type Database = {
           qr_code: string
         }[]
       }
-      get_set_by_ref: {
-        Args: { p_set_ref: string }
-        Returns: {
-          set_name: string
-          set_ref: string
-          theme: string
-        }[]
-      }
       get_user_active_pudo: {
         Args: { p_user_id: string }
         Returns: {

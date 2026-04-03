@@ -162,7 +162,7 @@ supabase db reset              # NO usar directamente
 ### ✅ SIEMPRE usa:
 ./scripts/db-reset.sh          # Reset con backup automático y seeds
 supabase gen types typescript --local > src/types/supabase.ts  # Regenerar tipos
-psql postgresql://postgres:postgres@127.0.0.1:54322/postgres   # Conectar a BD
+psql postgresql://postgres:postgres@127.0.0.1:5433/postgres    # Conectar a BD (puerto 5433, NO 54322)
 
 # Testing
 npm run test                   # Vitest
@@ -171,6 +171,11 @@ npm run lint                   # ESLint
 # Documentación
 npm run dump-schema            # Actualizar docs/DATABASE_SCHEMA.md y schema_dump.sql
 ```
+
+### ⚠️ IMPORTANTE: Puerto de PostgreSQL
+- **Puerto correcto**: `5433` (expuesto al host desde Docker)
+- **Puerto incorrecto**: `54322` (puerto interno del contenedor, NO accesible desde terminal)
+- Ver `docs/DATABASE_PORT_CLARIFICATION.md` para más detalles
 
 ---
 
